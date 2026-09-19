@@ -1,4 +1,5 @@
-import { useRef, type FC } from 'react';
+const fs = require('fs');
+const content = `import { useRef, type FC } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
@@ -250,3 +251,6 @@ export const SceneRoot: FC = () => {
     </div>
   );
 };
+`;
+fs.writeFileSync('src/components/three/scene/SceneRoot.tsx', content.trim() + '\n', 'utf8');
+console.log('SceneRoot updated with interactive 3D objects and hover events.');

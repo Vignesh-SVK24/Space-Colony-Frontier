@@ -1,4 +1,5 @@
-import { useEffect, type FC } from 'react';
+const fs = require('fs');
+const content = `import { useEffect, type FC } from 'react';
 import { SceneRoot } from './components/three/scene/SceneRoot';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { useNexusGameStore } from './state/useNexusGameStore';
@@ -108,3 +109,6 @@ export const App: FC = () => {
 };
 
 export default App;
+`;
+fs.writeFileSync('src/App.tsx', content.trim() + '\n', 'utf8');
+console.log('App.tsx transformed into complete Nexus Interface.');
