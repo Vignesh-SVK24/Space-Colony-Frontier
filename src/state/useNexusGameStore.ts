@@ -50,6 +50,26 @@ export interface SelectedEntity {
   actions: { id: string; label: string; variant?: 'primary' | 'secondary' | 'danger' }[];
 }
 
+export type SpaceWeatherType = 'CALM' | 'SOLAR_STORM' | 'METEOR_SHOWER' | 'RADIATION_WAVE' | 'UNKNOWN_SIGNAL';
+export type MapScaleLevel = 'surface' | 'orbit' | 'system' | 'deep_space';
+
+export interface RadarContact {
+  id: string;
+  name: string;
+  type: 'ship' | 'station' | 'satellite' | 'asteroid' | 'ufo' | 'landmark';
+  faction: 'colony' | 'civilian' | 'mining' | 'alien' | 'neutral';
+  pos: [number, number, number];
+  distanceKm: number;
+  status: string;
+}
+
+export interface SatelliteNetworkVitals {
+  commsCoverage: number; // 0-100%
+  navAccuracy: number;   // 0-100%
+  activeSatellites: number;
+  totalSatellites: number;
+}
+
 export interface NexusAlertItem {
   id: string;
   type: 'info' | 'success' | 'warning' | 'critical' | 'discovery' | 'alien' | 'system';
@@ -95,6 +115,16 @@ interface NexusGameState {
   isBoosting: boolean;
   isBraking: boolean;
 
+  // Celestial & Large-Scale Space Telemetry
+  shipPosition: [number, number, number];
+  solarCycleAngle: number;
+  moonAngle: number;
+  weatherEvent: SpaceWeatherType;
+  satelliteNetwork: SatelliteNetworkVitals;
+  radarContacts: RadarContact[];
+  mapScale: MapScaleLevel;
+  discoveredLocations: string[];
+
   // Actions
   setTimeMultiplier: (multiplier: 0 | 1 | 2 | 5) => void;
   setCameraMode: (mode: number) => void;
@@ -102,6 +132,11 @@ interface NexusGameState {
   closeModal: () => void;
   toggleHud: () => void;
   setFlightTelemetry: (telemetry: { speed: number; isBoosting: boolean; isBraking: boolean }) => void;
+  setShipPosition: (pos: [number, number, number]) => void;
+  triggerWeatherEvent: (weather: SpaceWeatherType) => void;
+  setMapScale: (scale: MapScaleLevel) => void;
+  recordDiscovery: (id: string, name: string) => void;
+  updateRadarContacts: (contacts: RadarContact[]) => void;
   selectEntity: (entity: SelectedEntity) => void;
   clearSelection: () => void;
   setHoveredEntity: (entity: { name: string; type: string; distanceM: number; actionPrompt?: string } | null) => void;
@@ -215,6 +250,20 @@ export const useNexusGameStore = create<NexusGameState>((set, get) => ({
   isBoosting: false,
   isBraking: false,
 
+  shipPosition: [0, 8, 14],
+  solarCycleAngle: 0.85,
+  moonAngle: 0.35,
+  weatherEvent: 'CALM',
+  satelliteNetwork: {
+    commsCoverage: 98.4,
+    navAccuracy: 99.2,
+    activeSatellites: 6,
+    totalSatellites: 6
+  },
+  radarContacts: [],
+  mapScale: 'orbit',
+  discoveredLocations: ['colony-alpha', 'selene-prime', 'apex-station'],
+
   setTimeMultiplier: (multiplier) => {
     nexusAudio.playConfirm();
     set({ timeMultiplier: multiplier });
@@ -247,6 +296,38 @@ export const useNexusGameStore = create<NexusGameState>((set, get) => ({
       isBraking: telemetry.isBraking
     });
   },
+
+  setShipPosition: (pos) => set({ shipPosition: pos }),
+
+  triggerWeatherEvent: (weather) => {
+    nexusAudio.playWarning();
+    set({ weatherEvent: weather });
+    get().addAlert({
+      type: weather === 'CALM' ? 'info' : 'warning',
+      title: 'SPACE WEATHER ADVISORY',
+      message: `Atmospheric and celestial sensor network reports: ${weather.replace(/_/g, ' ')}.`
+    });
+  },
+
+  setMapScale: (scale) => {
+    nexusAudio.playClick(1000);
+    set({ mapScale: scale });
+  },
+
+  recordDiscovery: (id, name) => {
+    const { discoveredLocations, addAlert } = get();
+    if (!discoveredLocations.includes(id)) {
+      nexusAudio.playDiscovery();
+      set({ discoveredLocations: [...discoveredLocations, id] });
+      addAlert({
+        type: 'discovery',
+        title: 'NEW SECTOR DISCOVERY',
+        message: `Astronomical sensors registered uncharted target: ${name}. Synchronized to database.`
+      });
+    }
+  },
+
+  updateRadarContacts: (contacts) => set({ radarContacts: contacts }),
 
   selectEntity: (entity) => {
     nexusAudio.playConfirm();
@@ -349,6 +430,13 @@ export const useNexusGameStore = create<NexusGameState>((set, get) => ({
     updatedResources.energy.current = Math.min(updatedResources.energy.capacity, updatedResources.energy.current + 0.2);
     updatedResources.oxygen.current = Math.min(updatedResources.oxygen.capacity, updatedResources.oxygen.current + 0.1);
 
-    set({ resources: updatedResources });
+    const newSolarAngle = (state.solarCycleAngle + 0.0005 * state.timeMultiplier) % (Math.PI * 2);
+    const newMoonAngle = (state.moonAngle + 0.0002 * state.timeMultiplier) % (Math.PI * 2);
+
+    set({
+      resources: updatedResources,
+      solarCycleAngle: newSolarAngle,
+      moonAngle: newMoonAngle
+    });
   }
 }));

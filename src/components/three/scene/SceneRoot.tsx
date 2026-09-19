@@ -1,10 +1,19 @@
 import { type FC } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { Stars } from '@react-three/drei';
 import * as THREE from 'three';
 import { SpaceshipController } from '../spaceships/SpaceshipController';
 import { ProceduralPlanet } from '../planets/ProceduralPlanet';
-import { AsteroidField } from '../asteroids/AsteroidField';
+import { PlanetAtmosphere } from '../planets/PlanetAtmosphere';
+import { SunSystem } from '../celestial/SunSystem';
+import { DeepSpaceSkybox } from '../celestial/DeepSpaceSkybox';
+import { DistantPlanets } from '../celestial/DistantPlanets';
+import { MoonSystem } from '../celestial/MoonSystem';
+import { SatelliteConstellation } from '../orbit/SatelliteConstellation';
+import { OrbitalStations } from '../orbit/OrbitalStations';
+import { ExpandedAsteroidBelts } from '../asteroids/ExpandedAsteroidBelts';
+import { CivilianTrafficManager } from '../traffic/CivilianTrafficManager';
+import { AlienUFOActivity } from '../aliens/AlienUFOActivity';
+import { WorldSpaceLabels } from '../effects/WorldSpaceLabels';
 import { useNexusGameStore } from '../../../state/useNexusGameStore';
 
 function ColonyLandingPad() {
@@ -138,45 +147,54 @@ export const SceneRoot: FC = () => {
           scene.fog = new THREE.FogExp2('#02040a', 0.004);
         }}
       >
-        {/* Cinematic Directional Sunlight with Strong Contrast */}
-        <directionalLight
-          position={[40, 70, 50]}
-          intensity={2.2}
-          castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-          shadow-bias={-0.0001}
-        />
+        {/* Global Ambient & Deep Space Rim Fill */}
+        <ambientLight intensity={0.2} />
+        <hemisphereLight args={['#38bdf8', '#020617', 0.35]} />
 
-        {/* Ambient & Fill Light */}
-        <ambientLight intensity={0.25} />
-        <hemisphereLight args={['#38bdf8', '#0f172a', 0.35]} />
+        {/* Local Colony Beacon Point Light */}
+        <pointLight position={[0, 3, 0]} intensity={3.0} color="#38bdf8" distance={30} />
 
-        {/* Local Colony Point Light */}
-        <pointLight position={[0, 3, 0]} intensity={3.0} color="#38bdf8" distance={25} />
+        {/* TIER 8: Deep Space Sun / Primary Directional Star System */}
+        <SunSystem />
 
-        {/* Dense Twinkling Starfield */}
-        <Stars
-          radius={220}
-          depth={80}
-          count={8000}
-          factor={4.5}
-          saturation={0.6}
-          fade
-          speed={0.6}
-        />
+        {/* TIER 8: 3-Tier Multi-Depth Spectral Starfield & Volumetric Nebulae */}
+        <DeepSpaceSkybox />
 
-        {/* Procedural Planet Sphere with Biomes */}
+        {/* TIER 8: Distant Planetary Bodies (Gorgon, Boreas, Pyros) */}
+        <DistantPlanets />
+
+        {/* TIER 3: Main Planetary Sphere & Biomes */}
         <ProceduralPlanet />
 
-        {/* Instanced Asteroid Belt with Resource Visuals */}
-        <AsteroidField />
+        {/* TIER 3: Atmospheric Scattering Shell & Rim Halo */}
+        <PlanetAtmosphere />
 
-        {/* Colony Base Modules */}
+        {/* TIER 5: Orbiting Selenic Moon with True Solar Shadow Phases */}
+        <MoonSystem />
+
+        {/* TIER 4: Synchronized Satellite Constellation */}
+        <SatelliteConstellation />
+
+        {/* TIER 7: Orbital Stations (Apex Research Hub & Mining Depot) */}
+        <OrbitalStations />
+
+        {/* TIER 6: 4 Instanced Asteroid Belts & Orbital Space Debris */}
+        <ExpandedAsteroidBelts />
+
+        {/* TIER 6: AI Civilian Space Traffic (Cargo, Mining, Recon) */}
+        <CivilianTrafficManager />
+
+        {/* TIER 8: Alien UFO Activity & Quantum Warp Patrols */}
+        <AlienUFOActivity />
+
+        {/* TIER 1: Colony Ground Base Modules */}
         <ColonyLandingPad />
         <QuantumCoreBeacon />
 
-        {/* Player Controlled Spaceship with 3rd Person Chase / Cockpit Camera */}
+        {/* 3D World-Space Distance-Attenuated Landmark Labels */}
+        <WorldSpaceLabels />
+
+        {/* Player Controlled Spaceship with 6-DOF Flight Kinematics & Dual Camera */}
         <SpaceshipController initialPosition={[0, 8, 14]} />
       </Canvas>
     </div>

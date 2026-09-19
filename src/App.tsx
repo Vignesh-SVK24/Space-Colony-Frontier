@@ -11,6 +11,7 @@ import { RightIntelligencePanel } from './components/ui/nexus/hud/RightIntellige
 import { CenterTargetingHUD } from './components/ui/nexus/hud/CenterTargetingHUD';
 import { FloatingAlertStack } from './components/ui/nexus/hud/FloatingAlertStack';
 import { VirtualJoystick } from './components/ui/nexus/hud/VirtualJoystick';
+import { TacticalRadar3D } from './components/ui/nexus/hud/TacticalRadar3D';
 
 // Nexus Tactical Modals
 import { NexusBuildModal } from './components/ui/nexus/modals/NexusBuildModal';
@@ -104,6 +105,7 @@ export const App: FC = () => {
       <FloatingAlertStack />
       <BottomCommandDock />
       <VirtualJoystick />
+      <TacticalRadar3D />
 
       {/* Tactical Modals */}
       <NexusBuildModal />

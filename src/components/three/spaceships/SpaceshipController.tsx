@@ -38,7 +38,8 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
   const {
     setHoveredEntity,
     addAlert,
-    setFlightTelemetry
+    setFlightTelemetry,
+    setShipPosition
   } = useNexusGameStore();
 
   // Desktop keyboard listeners
@@ -200,6 +201,7 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
         isBoosting: !!boostInput,
         isBraking: !!brakeInput
       });
+      setShipPosition([ship.position.x, ship.position.y, ship.position.z]);
     }
   });
 

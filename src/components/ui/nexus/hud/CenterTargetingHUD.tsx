@@ -1,6 +1,6 @@
 import { useState, type FC } from 'react';
 import { useNexusGameStore } from '../../../../state/useNexusGameStore';
-import { Crosshair, HelpCircle, ChevronDown } from 'lucide-react';
+import { Crosshair, HelpCircle, ChevronDown, AlertTriangle } from 'lucide-react';
 
 export const CenterTargetingHUD: FC = () => {
   const {
@@ -11,15 +11,26 @@ export const CenterTargetingHUD: FC = () => {
     hudVisible,
     flightSpeed,
     isBoosting,
-    isBraking
+    isBraking,
+    shipPosition,
+    weatherEvent
   } = useNexusGameStore();
 
   const [controlsOpen, setControlsOpen] = useState(true);
 
   return (
     <div className="fixed inset-0 z-10 pointer-events-none flex flex-col justify-between items-center p-4 sm:p-6 font-mono select-none">
-      {/* Top buffer spacing */}
-      <div className="h-10" />
+      {/* Top Space Weather Alert Banner */}
+      {hudVisible && weatherEvent !== 'CALM' ? (
+        <div className="mt-8 flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-950/85 backdrop-blur-md border border-amber-500/50 text-amber-300 text-xs shadow-lg animate-pulse">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-[10px] uppercase font-bold tracking-wider">
+            SPACE WEATHER ADVISORY: {weatherEvent.replace(/_/g, ' ')}
+          </span>
+        </div>
+      ) : (
+        <div className="h-10" />
+      )}
 
       {/* Center Holographic Reticle & Flight Telemetry */}
       <div className="relative flex items-center justify-center">
@@ -52,6 +63,26 @@ export const CenterTargetingHUD: FC = () => {
                 }`}
                 style={{ height: `${Math.min(100, (flightSpeed / 95) * 100)}%` }}
               />
+            </div>
+          </div>
+        )}
+
+        {/* Right Telemetry: 3D Vector & Orbital Altitude */}
+        {hudVisible && (
+          <div className="absolute left-20 flex items-center gap-2 pl-3 py-1 text-left">
+            <div className="w-1 h-8 rounded-full bg-slate-900 border border-cyan-500/20 overflow-hidden flex flex-col justify-end">
+              <div className="w-full bg-cyan-400 transition-all duration-100" style={{ height: '70%' }} />
+            </div>
+            <div className="flex flex-col items-start">
+              <div className="flex items-baseline gap-1">
+                <span className="text-[10px] text-cyan-300 font-bold tracking-wider">
+                  ALT {(Math.max(10, shipPosition[1] * 2.5)).toFixed(1)}
+                </span>
+                <span className="text-[8px] text-slate-400 font-bold">KM</span>
+              </div>
+              <span className="text-[8px] font-mono text-slate-400 whitespace-nowrap">
+                X {(shipPosition[0] >= 0 ? '+' : '') + shipPosition[0].toFixed(1)} Z {(shipPosition[2] >= 0 ? '+' : '') + shipPosition[2].toFixed(1)}
+              </span>
             </div>
           </div>
         )}
