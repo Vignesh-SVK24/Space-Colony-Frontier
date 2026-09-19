@@ -10,6 +10,7 @@ import { LeftOperationsPanel } from './components/ui/nexus/hud/LeftOperationsPan
 import { RightIntelligencePanel } from './components/ui/nexus/hud/RightIntelligencePanel';
 import { CenterTargetingHUD } from './components/ui/nexus/hud/CenterTargetingHUD';
 import { FloatingAlertStack } from './components/ui/nexus/hud/FloatingAlertStack';
+import { VirtualJoystick } from './components/ui/nexus/hud/VirtualJoystick';
 
 // Nexus Tactical Modals
 import { NexusBuildModal } from './components/ui/nexus/modals/NexusBuildModal';
@@ -95,6 +96,7 @@ export const App: FC = () => {
       <CenterTargetingHUD />
       <FloatingAlertStack />
       <BottomCommandDock />
+      <VirtualJoystick />
 
       {/* Tactical Modals */}
       <NexusBuildModal />

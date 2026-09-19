@@ -1,23 +1,73 @@
-import { useRef, type FC } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Stars } from '@react-three/drei';
+import { type FC } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { Stars } from '@react-three/drei';
 import * as THREE from 'three';
+import { SpaceshipController } from '../spaceships/SpaceshipController';
+import { ProceduralPlanet } from '../planets/ProceduralPlanet';
+import { AsteroidField } from '../asteroids/AsteroidField';
 import { useNexusGameStore } from '../../../state/useNexusGameStore';
 
-function QuantumCoreBeacon() {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const ringRef = useRef<THREE.Mesh>(null);
+function ColonyLandingPad() {
   const { selectEntity, setHoveredEntity } = useNexusGameStore();
 
-  useFrame((_, delta) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y += delta * 0.8;
-      meshRef.current.rotation.x += delta * 0.4;
-    }
-    if (ringRef.current) {
-      ringRef.current.rotation.z -= delta * 0.6;
-    }
-  });
+  const handleClick = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    selectEntity({
+      id: 'pad-01',
+      name: 'PRIMARY LANDING PAD',
+      type: 'building',
+      status: 'CLEAR FOR DESCENT',
+      distanceKm: 0.1,
+      metrics: [
+        { label: 'BERTH', value: 'ALPHA-1' },
+        { label: 'STATUS', value: 'ACTIVE' },
+        { label: 'BEACON', value: 'LOCKED' },
+        { label: 'REFUEL', value: 'READY' }
+      ],
+      actions: [
+        { id: 'call_ship', label: 'SUMMON RECON CRAFT', variant: 'primary' },
+        { id: 'pad_lights', label: 'TOGGLE RUNWAY LIGHTS', variant: 'secondary' }
+      ]
+    });
+  };
+
+  return (
+    <group position={[0, -1.4, 0]}>
+      {/* Octagonal Landing Tarmac */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        receiveShadow
+        onClick={handleClick}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHoveredEntity({
+            name: 'PRIMARY LANDING PAD',
+            type: 'COLONY FLIGHT DECK',
+            distanceM: 40,
+            actionPrompt: 'PRESS [SPACE] TO HOVER / [E] TO LAND'
+          });
+        }}
+        onPointerOut={() => setHoveredEntity(null)}
+      >
+        <cylinderGeometry args={[5.5, 5.8, 0.3, 8]} />
+        <meshStandardMaterial
+          color="#1e293b"
+          roughness={0.6}
+          metalness={0.5}
+        />
+      </mesh>
+
+      {/* Runway Approach Light Strip */}
+      <mesh position={[0, 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[4.2, 4.4, 8]} />
+        <meshBasicMaterial color="#38bdf8" />
+      </mesh>
+    </group>
+  );
+}
+
+function QuantumCoreBeacon() {
+  const { selectEntity, setHoveredEntity } = useNexusGameStore();
 
   const handleClick = (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
@@ -40,40 +90,33 @@ function QuantumCoreBeacon() {
     });
   };
 
-  const handlePointerOver = (e: { stopPropagation: () => void }) => {
-    e.stopPropagation();
-    setHoveredEntity({
-      name: 'QUANTUM CORE BEACON',
-      type: 'COLONY INFRASTRUCTURE',
-      distanceM: 45,
-      actionPrompt: 'CLICK TO INSPECT BEACON'
-    });
-  };
-
-  const handlePointerOut = () => {
-    setHoveredEntity(null);
-  };
-
   return (
     <group
-      position={[0, 1.5, 0]}
+      position={[0, 2.2, 0]}
       onClick={handleClick}
-      onPointerOver={handlePointerOver}
-      onPointerOut={handlePointerOut}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        setHoveredEntity({
+          name: 'QUANTUM CORE BEACON',
+          type: 'COLONY POWER CORE',
+          distanceM: 50,
+          actionPrompt: 'CLICK TO INSPECT BEACON'
+        });
+      }}
+      onPointerOut={() => setHoveredEntity(null)}
     >
-      <mesh ref={meshRef}>
-        <octahedronGeometry args={[1.2, 0]} />
+      <mesh castShadow>
+        <octahedronGeometry args={[1.3, 0]} />
         <meshStandardMaterial
           color="#38bdf8"
           roughness={0.2}
           metalness={0.8}
           emissive="#0284c7"
-          emissiveIntensity={0.8}
+          emissiveIntensity={0.9}
         />
       </mesh>
-
-      <mesh ref={ringRef} rotation={[Math.PI / 3, 0, 0]}>
-        <torusGeometry args={[2.2, 0.08, 16, 64]} />
+      <mesh rotation={[Math.PI / 3, 0, 0]}>
+        <torusGeometry args={[2.4, 0.08, 16, 64]} />
         <meshStandardMaterial
           color="#38bdf8"
           emissive="#38bdf8"
@@ -84,168 +127,57 @@ function QuantumCoreBeacon() {
   );
 }
 
-function LandingPad() {
-  const { selectEntity, setHoveredEntity } = useNexusGameStore();
-
-  const handleClick = (e: { stopPropagation: () => void }) => {
-    e.stopPropagation();
-    selectEntity({
-      id: 'pad-01',
-      name: 'PRIMARY LANDING PAD',
-      type: 'building',
-      status: 'CLEAR FOR DESCENT',
-      distanceKm: 0.2,
-      metrics: [
-        { label: 'BERTH', value: 'ALPHA-1' },
-        { label: 'STATUS', value: 'ACTIVE' },
-        { label: 'BEACON', value: 'LOCKED' },
-        { label: 'REFUEL', value: 'READY' }
-      ],
-      actions: [
-        { id: 'call_ship', label: 'SUMMON RECON CRAFT', variant: 'primary' },
-        { id: 'pad_lights', label: 'TOGGLE RUNWAY LIGHTS', variant: 'secondary' }
-      ]
-    });
-  };
-
-  return (
-    <mesh
-      position={[0, -1.5, 0]}
-      rotation={[-Math.PI / 2, 0, 0]}
-      receiveShadow
-      onClick={handleClick}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        setHoveredEntity({
-          name: 'PRIMARY LANDING PAD',
-          type: 'FLIGHT DECK',
-          distanceM: 70,
-          actionPrompt: 'CLICK TO INSPECT PAD'
-        });
-      }}
-      onPointerOut={() => setHoveredEntity(null)}
-    >
-      <cylinderGeometry args={[4.5, 4.8, 0.25, 8]} />
-      <meshStandardMaterial
-        color="#1e293b"
-        roughness={0.6}
-        metalness={0.5}
-      />
-    </mesh>
-  );
-}
-
-function TitaniumAsteroid() {
-  const asteroidRef = useRef<THREE.Mesh>(null);
-  const { selectEntity, setHoveredEntity } = useNexusGameStore();
-
-  useFrame((_, delta) => {
-    if (asteroidRef.current) {
-      asteroidRef.current.rotation.y += delta * 0.2;
-      asteroidRef.current.rotation.x += delta * 0.1;
-    }
-  });
-
-  const handleClick = (e: { stopPropagation: () => void }) => {
-    e.stopPropagation();
-    selectEntity({
-      id: 'ast-047',
-      name: 'TITANIUM ASTEROID-047',
-      type: 'asteroid',
-      status: 'MINABLE',
-      distanceKm: 2.4,
-      metrics: [
-        { label: 'TYPE', value: 'TITANIUM-RICH' },
-        { label: 'EST. YIELD', value: '840', unit: 'MT' },
-        { label: 'PURITY', value: '94.2', unit: '%' },
-        { label: 'DENSITY', value: 'HIGH' }
-      ],
-      actions: [
-        { id: 'scan', label: 'DEEP SPECTRAL SCAN', variant: 'primary' },
-        { id: 'mine', label: 'DISPATCH MINING DRONES', variant: 'secondary' }
-      ]
-    });
-  };
-
-  return (
-    <group position={[8, 3, -6]}>
-      <mesh
-        ref={asteroidRef}
-        onClick={handleClick}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          setHoveredEntity({
-            name: 'TITANIUM ASTEROID-047',
-            type: 'RESOURCE ASTEROID',
-            distanceM: 420,
-            actionPrompt: 'PRESS [E] OR CLICK TO SCAN'
-          });
-        }}
-        onPointerOut={() => setHoveredEntity(null)}
-      >
-        <dodecahedronGeometry args={[1.6, 1]} />
-        <meshStandardMaterial
-          color="#475569"
-          roughness={0.8}
-          metalness={0.7}
-          emissive="#64748b"
-          emissiveIntensity={0.1}
-        />
-      </mesh>
-
-      {/* Target Marker Ring */}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[2.2, 2.25, 32]} />
-        <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} transparent opacity={0.4} />
-      </mesh>
-    </group>
-  );
-}
-
 export const SceneRoot: FC = () => {
   return (
     <div className="absolute inset-0 w-full h-full">
       <Canvas
-        camera={{ position: [0, 4, 11], fov: 55 }}
+        camera={{ position: [0, 8, 20], fov: 55 }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
         onCreated={({ gl, scene }) => {
-          gl.setClearColor(new THREE.Color('#030712'));
-          scene.fog = new THREE.FogExp2('#030712', 0.015);
+          gl.setClearColor(new THREE.Color('#02040a'));
+          scene.fog = new THREE.FogExp2('#02040a', 0.004);
         }}
       >
-        <ambientLight intensity={0.35} />
+        {/* Cinematic Directional Sunlight with Strong Contrast */}
         <directionalLight
-          position={[12, 22, 16]}
-          intensity={1.6}
+          position={[40, 70, 50]}
+          intensity={2.2}
           castShadow
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
+          shadow-bias={-0.0001}
         />
-        <pointLight position={[0, 2, 0]} intensity={2.5} color="#38bdf8" distance={15} />
 
+        {/* Ambient & Fill Light */}
+        <ambientLight intensity={0.25} />
+        <hemisphereLight args={['#38bdf8', '#0f172a', 0.35]} />
+
+        {/* Local Colony Point Light */}
+        <pointLight position={[0, 3, 0]} intensity={3.0} color="#38bdf8" distance={25} />
+
+        {/* Dense Twinkling Starfield */}
         <Stars
-          radius={140}
-          depth={60}
-          count={6000}
-          factor={4}
-          saturation={0.5}
+          radius={220}
+          depth={80}
+          count={8000}
+          factor={4.5}
+          saturation={0.6}
           fade
-          speed={0.8}
+          speed={0.6}
         />
 
-        <gridHelper args={[40, 40, '#0284c7', '#0f172a']} position={[0, -0.1, 0]} />
+        {/* Procedural Planet Sphere with Biomes */}
+        <ProceduralPlanet />
 
+        {/* Instanced Asteroid Belt with Resource Visuals */}
+        <AsteroidField />
+
+        {/* Colony Base Modules */}
+        <ColonyLandingPad />
         <QuantumCoreBeacon />
-        <LandingPad />
-        <TitaniumAsteroid />
 
-        <OrbitControls
-          enableDamping
-          dampingFactor={0.05}
-          minDistance={3}
-          maxDistance={35}
-          maxPolarAngle={Math.PI / 2.05}
-        />
+        {/* Player Controlled Spaceship with 3rd Person Chase / Cockpit Camera */}
+        <SpaceshipController initialPosition={[0, 8, 14]} />
       </Canvas>
     </div>
   );

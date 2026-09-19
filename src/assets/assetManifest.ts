@@ -5,6 +5,13 @@ export interface AssetEntry {
   license: string;
   scale?: [number, number, number];
   rotation?: [number, number, number];
+  rotationCorrection?: [number, number, number];
+  materialChannels?: {
+    primaryHull?: string;
+    secondaryHull?: string;
+    cockpitGlass?: string;
+    engineGlow?: string;
+  };
 }
 
 export interface AssetManifest {
@@ -13,41 +20,41 @@ export interface AssetManifest {
 }
 
 export const ASSET_MANIFEST: AssetManifest = {
-  version: '1.0.0',
+  version: '1.1.0',
   assets: {
     ship_player: {
-      path: 'assets/models/spacecraft/ship_player.glb',
+      path: 'assets/models/spaceships/spaceship_explorer.glb',
       type: 'model',
       fallback: 'procedural',
-      license: 'Procedural / CC0',
+      license: 'CC0 Universal',
       scale: [1, 1, 1]
     },
-    building_habitat_dome: {
-      path: 'assets/models/buildings/habitat_dome.glb',
+    spaceship_explorer: {
+      path: 'assets/models/spaceships/spaceship_explorer.glb',
       type: 'model',
       fallback: 'procedural',
-      license: 'Procedural / CC0',
-      scale: [1, 1, 1]
+      license: 'CC0 Universal',
+      scale: [1, 1, 1],
+      rotationCorrection: [0, Math.PI, 0],
+      materialChannels: {
+        primaryHull: 'Hull_Primary',
+        secondaryHull: 'Hull_Secondary',
+        cockpitGlass: 'Canopy_Glass',
+        engineGlow: 'Thruster_Glow'
+      }
     },
-    building_solar_panel: {
-      path: 'assets/models/buildings/solar_panel.glb',
+    asteroid_iron: {
+      path: 'assets/models/asteroids/asteroid_iron.glb',
       type: 'model',
       fallback: 'procedural',
-      license: 'Procedural / CC0',
-      scale: [1, 1, 1]
-    },
-    building_command_center: {
-      path: 'assets/models/buildings/command_center.glb',
-      type: 'model',
-      fallback: 'procedural',
-      license: 'Procedural / CC0',
+      license: 'CC0 Universal',
       scale: [1, 1, 1]
     },
     ufo_scout: {
-      path: 'assets/models/aliens/ufo_scout.glb',
+      path: 'assets/models/ufo/ufo_scout.glb',
       type: 'model',
       fallback: 'procedural',
-      license: 'Procedural / CC0',
+      license: 'CC0 Universal',
       scale: [1, 1, 1]
     }
   }
