@@ -4,9 +4,9 @@ import { AlertTriangle, Info, CheckCircle, Radio, Sparkles, X } from 'lucide-rea
 import { clsx } from 'clsx';
 
 export const FloatingAlertStack: FC = () => {
-  const { alerts, dismissAlert } = useNexusGameStore();
+  const { alerts, dismissAlert, hudVisible } = useNexusGameStore();
 
-  if (alerts.length === 0) return null;
+  if (!hudVisible || alerts.length === 0) return null;
 
   const typeConfig = {
     info: { border: 'border-cyan-500/40 bg-[#08131d]/90', text: 'text-cyan-300', icon: <Info className="w-4 h-4 text-cyan-400" /> },

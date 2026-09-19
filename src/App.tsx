@@ -29,7 +29,8 @@ export const App: FC = () => {
     setTimeMultiplier,
     tickSimulation,
     startScan,
-    hoveredEntity
+    hoveredEntity,
+    toggleHud
   } = useNexusGameStore();
 
   // Keyboard shortcut listener
@@ -45,9 +46,15 @@ export const App: FC = () => {
         return;
       }
 
-      if (e.code === 'Space') {
-        e.preventDefault();
+      // 'P' pauses/resumes simulation (leaving Space exclusively for flight brake)
+      if (key === 'P') {
         setTimeMultiplier(timeMultiplier === 0 ? 1 : 0);
+        return;
+      }
+
+      // 'H' toggles cinematic mode / HUD visibility
+      if (key === 'H') {
+        toggleHud();
         return;
       }
 
@@ -58,7 +65,7 @@ export const App: FC = () => {
       if (key === 'B') activeModal === 'build' ? closeModal() : openModal('build');
       if (key === 'T') activeModal === 'research' ? closeModal() : openModal('research');
       if (key === 'M') activeModal === 'map' ? closeModal() : openModal('map');
-      if (key === 'H') activeModal === 'ship' ? closeModal() : openModal('ship');
+      if (key === 'K') activeModal === 'ship' ? closeModal() : openModal('ship');
       if (key === 'G') activeModal === 'colony' ? closeModal() : openModal('colony');
       if (key === 'X') activeModal === 'alien' ? closeModal() : openModal('alien');
 
@@ -69,7 +76,7 @@ export const App: FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeModal, openModal, closeModal, timeMultiplier, setTimeMultiplier, startScan, hoveredEntity]);
+  }, [activeModal, openModal, closeModal, timeMultiplier, setTimeMultiplier, startScan, hoveredEntity, toggleHud]);
 
   // Simulation tick loop
   useEffect(() => {

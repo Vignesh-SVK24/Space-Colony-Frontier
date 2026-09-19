@@ -18,7 +18,7 @@ export interface ColonyVitals {
   health: number; // 0-100
   morale: number; // 0-100
   security: number; // 0-100
-  temperature: number; // ?C
+  temperature: number; // °C
   overallStatus: 'OPTIMAL' | 'STABLE' | 'WARNING' | 'CRITICAL';
 }
 
@@ -89,11 +89,19 @@ interface NexusGameState {
   // Alerts
   alerts: NexusAlertItem[];
 
+  // Gaming HUD visibility & flight telemetry
+  hudVisible: boolean;
+  flightSpeed: number;
+  isBoosting: boolean;
+  isBraking: boolean;
+
   // Actions
   setTimeMultiplier: (multiplier: 0 | 1 | 2 | 5) => void;
   setCameraMode: (mode: number) => void;
   openModal: (modal: ModalView) => void;
   closeModal: () => void;
+  toggleHud: () => void;
+  setFlightTelemetry: (telemetry: { speed: number; isBoosting: boolean; isBraking: boolean }) => void;
   selectEntity: (entity: SelectedEntity) => void;
   clearSelection: () => void;
   setHoveredEntity: (entity: { name: string; type: string; distanceM: number; actionPrompt?: string } | null) => void;
@@ -194,40 +202,18 @@ export const useNexusGameStore = create<NexusGameState>((set, get) => ({
     ]
   },
 
-  hoveredEntity: {
-    name: 'TITANIUM ASTEROID-047',
-    type: 'RESOURCE NODE',
-    distanceM: 420,
-    actionPrompt: 'PRESS [E] TO SCAN'
-  },
+  hoveredEntity: null,
   scanProgress: 0,
   isScanning: false,
 
   activeModal: null,
 
-  alerts: [
-    {
-      id: 'alt-1',
-      type: 'alien',
-      title: 'UNKNOWN CONTACT DETECTED',
-      message: 'Unidentified craft UFO-X17 entered orbital perimeter.',
-      timestamp: '14:35'
-    },
-    {
-      id: 'alt-2',
-      type: 'discovery',
-      title: 'RARE TITANIUM DEPOSIT',
-      message: 'Exploration scan verified deep vein at Crater Edge (Yield: 840).',
-      timestamp: '14:22'
-    },
-    {
-      id: 'alt-3',
-      type: 'system',
-      title: 'LIFE SUPPORT STABLE',
-      message: 'Oxygen reclamation running at 99.4% efficiency.',
-      timestamp: '14:00'
-    }
-  ],
+  alerts: [],
+
+  hudVisible: true,
+  flightSpeed: 0,
+  isBoosting: false,
+  isBraking: false,
 
   setTimeMultiplier: (multiplier) => {
     nexusAudio.playConfirm();
@@ -247,6 +233,19 @@ export const useNexusGameStore = create<NexusGameState>((set, get) => ({
   closeModal: () => {
     nexusAudio.playClick(900);
     set({ activeModal: null });
+  },
+
+  toggleHud: () => {
+    nexusAudio.playClick(1200);
+    set((state) => ({ hudVisible: !state.hudVisible }));
+  },
+
+  setFlightTelemetry: (telemetry) => {
+    set({
+      flightSpeed: Math.round(telemetry.speed),
+      isBoosting: telemetry.isBoosting,
+      isBraking: telemetry.isBraking
+    });
   },
 
   selectEntity: (entity) => {

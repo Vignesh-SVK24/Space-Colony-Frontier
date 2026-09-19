@@ -33,10 +33,12 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
 
   // Key tracking state
   const keys = useRef<Record<string, boolean>>({});
+  const lastTelemetryTime = useRef(0);
 
   const {
     setHoveredEntity,
-    addAlert
+    addAlert,
+    setFlightTelemetry
   } = useNexusGameStore();
 
   // Desktop keyboard listeners
@@ -72,7 +74,7 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
     };
   }, [cameraMode, addAlert]);
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     const ship = shipGroupRef.current;
     if (!ship) return;
 
@@ -188,6 +190,16 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
       camera.position.copy(ship.position).add(cockpitOffset);
       const lookTarget = ship.position.clone().add(forwardDir.clone().multiplyScalar(40));
       camera.lookAt(lookTarget);
+    }
+
+    // 8. Throttled UI Telemetry Sync
+    if (state.clock.elapsedTime - lastTelemetryTime.current > 0.1) {
+      lastTelemetryTime.current = state.clock.elapsedTime;
+      setFlightTelemetry({
+        speed: currentSpeed.current,
+        isBoosting: !!boostInput,
+        isBraking: !!brakeInput
+      });
     }
   });
 

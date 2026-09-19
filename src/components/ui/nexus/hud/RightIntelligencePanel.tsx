@@ -6,9 +6,9 @@ import { NexusBadge } from '../NexusStatus';
 import { Crosshair } from 'lucide-react';
 
 export const RightIntelligencePanel: FC = () => {
-  const { selectedEntity, executeEntityAction, clearSelection } = useNexusGameStore();
+  const { selectedEntity, executeEntityAction, clearSelection, hudVisible } = useNexusGameStore();
 
-  if (selectedEntity.type === 'none') {
+  if (!hudVisible || selectedEntity.type === 'none') {
     return null;
   }
 

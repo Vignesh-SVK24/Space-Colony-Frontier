@@ -4,7 +4,7 @@ import { useNexusGameStore } from '../../../../state/useNexusGameStore';
 import { nexusAudio } from '../../../../utils/nexusAudio';
 
 export const VirtualJoystick: FC = () => {
-  const { startScan, addAlert } = useNexusGameStore();
+  const { startScan, addAlert, hudVisible } = useNexusGameStore();
   const [touchActive, setTouchActive] = useState(false);
 
   const handleBoost = () => {
@@ -15,6 +15,8 @@ export const VirtualJoystick: FC = () => {
   const handleBrake = () => {
     nexusAudio.playClick(900);
   };
+
+  if (!hudVisible) return null;
 
   return (
     <div className="md:hidden fixed inset-x-0 bottom-16 z-25 pointer-events-none px-4 flex justify-between items-end font-mono select-none">
