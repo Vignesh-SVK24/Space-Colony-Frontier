@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  color-scheme: dark;
+  background-color: #030712;
+  color: #e2e8f0;
+}
+
+html, body, #root {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+canvas {
+  touch-action: none;
+}
+
+/* Custom scrollbars for telemetry panels */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.3);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.7);
+}
+
+.hud-panel {
+  background: rgba(10, 15, 30, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.6), inset 0 0 10px rgba(56, 189, 248, 0.05);
+}
+
+.hud-glow {
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+}
+
