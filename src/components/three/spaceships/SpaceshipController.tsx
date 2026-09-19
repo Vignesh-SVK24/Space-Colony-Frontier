@@ -14,6 +14,7 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
   initialPosition = [0, 8, 12]
 }) => {
   const shipGroupRef = useRef<THREE.Group>(null);
+  const dustRef = useRef<THREE.Points>(null);
   const { camera } = useThree();
 
   // Flight Kinematics
@@ -36,6 +37,10 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
   const lastTelemetryTime = useRef(0);
 
   const {
+    gameMode,
+    initiateLandingSequence,
+    completeTouchdown,
+    finishTakeoff,
     setHoveredEntity,
     addAlert,
     setFlightTelemetry,
@@ -59,6 +64,16 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
           message: cameraMode === 0 ? 'Cockpit Forward View engaged.' : 'Orbital Chase Camera engaged.'
         });
       }
+
+      if (k === 'E' && gameMode === 'SPACE_FLIGHT') {
+        const ship = shipGroupRef.current;
+        if (ship) {
+          const padDist = ship.position.distanceTo(new THREE.Vector3(0, -1.5, 0));
+          if (padDist < 45) {
+            initiateLandingSequence();
+          }
+        }
+      }
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
@@ -73,14 +88,93 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [cameraMode, addAlert]);
+  }, [cameraMode, addAlert, gameMode, initiateLandingSequence]);
 
   useFrame((state, delta) => {
     const ship = shipGroupRef.current;
     if (!ship) return;
 
-    const dt = Math.min(delta, 0.1); // Clamp to prevent delta spikes
+    const dt = Math.min(delta, 0.1);
 
+    // ==========================================
+    // 1. AUTOMATED DESCENT & LANDING SEQUENCE
+    // ==========================================
+    if (gameMode === 'DESCENDING') {
+      currentSpeed.current = THREE.MathUtils.lerp(currentSpeed.current, 0, dt * 2.5);
+      currentThrottle.current = 0.35; // Retro-thrusters firing
+
+      // Align attitude to horizontal
+      shipEuler.current.x = THREE.MathUtils.lerp(shipEuler.current.x, 0, dt * 3.0);
+      shipEuler.current.z = THREE.MathUtils.lerp(shipEuler.current.z, 0, dt * 3.0);
+      ship.rotation.copy(shipEuler.current);
+
+      // Glide down smoothly to landing pad [0, -0.2, 0]
+      ship.position.x = THREE.MathUtils.lerp(ship.position.x, 0, dt * 1.8);
+      ship.position.z = THREE.MathUtils.lerp(ship.position.z, 0, dt * 1.8);
+      ship.position.y = THREE.MathUtils.lerp(ship.position.y, -0.2, dt * 1.5);
+
+      // Landing dust plume
+      if (dustRef.current) {
+        dustRef.current.visible = true;
+        dustRef.current.rotation.y += dt * 3.0;
+      }
+
+      // Touchdown complete check
+      if (ship.position.y <= -0.1 && Math.abs(ship.position.x) < 0.8 && Math.abs(ship.position.z) < 0.8) {
+        ship.position.set(0, -0.2, 0);
+        currentThrottle.current = 0;
+        if (dustRef.current) dustRef.current.visible = false;
+        completeTouchdown();
+      }
+
+      // Camera follow during descent
+      const camTarget = ship.position.clone().add(new THREE.Vector3(0, 3.5, -9.0));
+      camera.position.lerp(camTarget, dt * 4.0);
+      camera.lookAt(ship.position.clone().add(new THREE.Vector3(0, 0.5, 2.0)));
+      return;
+    }
+
+    // ==========================================
+    // 2. AUTOMATED TAKEOFF & ASCENT SEQUENCE
+    // ==========================================
+    if (gameMode === 'TAKEOFF') {
+      currentThrottle.current = 1.0;
+      currentSpeed.current = THREE.MathUtils.lerp(currentSpeed.current, 12, dt * 3);
+
+      // Vertical climb
+      ship.position.y += dt * 7.5;
+      shipEuler.current.x = THREE.MathUtils.lerp(shipEuler.current.x, 0.35, dt * 2.0); // Slight nose up
+      ship.rotation.copy(shipEuler.current);
+
+      if (dustRef.current) {
+        dustRef.current.visible = ship.position.y < 8;
+        dustRef.current.rotation.y += dt * 5.0;
+      }
+
+      // Reached safe altitude -> restore orbital flight
+      if (ship.position.y >= 14) {
+        if (dustRef.current) dustRef.current.visible = false;
+        finishTakeoff();
+      }
+
+      // Camera follow during takeoff
+      const camTarget = ship.position.clone().add(new THREE.Vector3(0, 4.0, -12.0));
+      camera.position.lerp(camTarget, dt * 5.0);
+      camera.lookAt(ship.position.clone().add(new THREE.Vector3(0, 1.0, 10.0)));
+      return;
+    }
+
+    // Hide dust outside landing/takeoff
+    if (dustRef.current) dustRef.current.visible = false;
+
+    // Only process manual flight controls when in SPACE_FLIGHT or ORBIT
+    if (gameMode !== 'SPACE_FLIGHT' && gameMode !== 'ORBIT') {
+      return;
+    }
+
+    // ==========================================
+    // 3. 6-DOF MANUAL SPACESHIP FLIGHT
+    // ==========================================
     const k = keys.current;
     const forwardInput = (k['W'] || k['KeyW']) ? 1 : (k['S'] || k['KeyS']) ? -0.8 : 0;
     const yawInput = (k['A'] || k['KeyA']) ? 1 : (k['D'] || k['KeyD']) ? -1 : 0;
@@ -92,7 +186,6 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
     isBoostingRef.current = !!boostInput;
     isBrakingRef.current = !!brakeInput;
 
-    // 1. Acceleration / Throttle
     const targetMaxSpeed = boostInput ? SHIP_CONFIG.boostSpeed : SHIP_CONFIG.maxSpeed;
 
     if (forwardInput > 0) {
@@ -105,53 +198,44 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
       currentSpeed.current = THREE.MathUtils.lerp(currentSpeed.current, 0, dt * 5.0);
       currentThrottle.current = 0;
     } else {
-      // Natural inertial glide damping
       currentSpeed.current *= Math.pow(SHIP_CONFIG.dampingLinear, dt * 60);
       currentThrottle.current = THREE.MathUtils.lerp(currentThrottle.current, 0, dt * 3);
     }
 
-    // 2. Yaw & Natural Banking
     const yawDelta = yawInput * SHIP_CONFIG.yawSpeed * dt;
     shipEuler.current.y += yawDelta;
 
-    // Smooth banking roll during yaw turns (rolling into turn)
     const targetBank = yawInput * SHIP_CONFIG.bankFactor + rollInput * 0.8;
     bankAngle.current = THREE.MathUtils.lerp(bankAngle.current, targetBank, dt * 6.0);
     shipEuler.current.z = bankAngle.current;
 
-    // 3. Pitch
     pitchAngle.current = THREE.MathUtils.lerp(pitchAngle.current, pitchInput * 0.5, dt * 5.0);
     shipEuler.current.x = pitchAngle.current;
 
-    // Apply rotation to ship
     ship.rotation.copy(shipEuler.current);
 
-    // 4. Directional Forward Translation
     const forwardDir = new THREE.Vector3(0, 0, 1).applyEuler(shipEuler.current);
     velocity.current.copy(forwardDir).multiplyScalar(currentSpeed.current);
     ship.position.addScaledVector(velocity.current, dt);
 
-    // 5. Collision & Boundaries
-    // Boundary clamp: keep within outer perimeter
+    // Boundary clamp
     const distFromOrigin = ship.position.length();
     if (distFromOrigin > 350) {
       ship.position.clampLength(0, 349);
       currentSpeed.current *= 0.5;
     }
 
-    // 6. Proximity Interaction Check (Asteroids & Landing Pad)
+    // Landing zone detection on Aethelia-IV primary pad
     const pos = ship.position;
-    // Check distance to landing pad (at [0, -1.5, 0])
     const padDist = pos.distanceTo(new THREE.Vector3(0, -1.5, 0));
-    if (padDist < SHIP_CONFIG.interaction.colonyLandDistance) {
+    if (padDist < 45) {
       setHoveredEntity({
-        name: 'OUTPOST ALPHA LANDING BERTH',
-        type: 'COLONY LANDING DOCK',
+        name: 'AETHELIA-IV PRIMARY PAD',
+        type: 'COLONY LANDING ZONE',
         distanceM: Math.round(padDist * 10),
-        actionPrompt: 'PRESS [SPACE] TO HOVER / [E] TO LAND'
+        actionPrompt: 'SURFACE STABLE // PRESS [E] TO INITIATE DESCENT'
       });
     } else {
-      // Check distance to asteroid at [8, 3, -6]
       const astDist = pos.distanceTo(new THREE.Vector3(8, 3, -6));
       if (astDist < SHIP_CONFIG.interaction.asteroidScanDistance) {
         setHoveredEntity({
@@ -163,37 +247,31 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
       }
     }
 
-    // 7. Dynamic Camera Follow
+    // Dynamic camera follow
     if (cameraMode === 0) {
-      // Third-person chase camera
       const cameraOffset = new THREE.Vector3(0, SHIP_CONFIG.camera.chaseHeight, -SHIP_CONFIG.camera.chaseDistance);
-      if (boostInput) {
-        cameraOffset.z -= 2.0; // Camera pulls back on boost
-      }
+      if (boostInput) cameraOffset.z -= 2.0;
       cameraOffset.applyEuler(shipEuler.current);
 
       const targetCamPos = ship.position.clone().add(cameraOffset);
       camera.position.lerp(targetCamPos, SHIP_CONFIG.camera.chaseLag * (dt * 60));
 
-      // Look slightly ahead of the ship
       const lookTarget = ship.position.clone().add(forwardDir.clone().multiplyScalar(15));
       camera.lookAt(lookTarget);
 
-      // Speed FOV Kick
       const targetFov = 55 + (currentSpeed.current / SHIP_CONFIG.boostSpeed) * SHIP_CONFIG.camera.boostFovKick;
       if (camera instanceof THREE.PerspectiveCamera) {
         camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, dt * 6);
         camera.updateProjectionMatrix();
       }
     } else {
-      // First-person cockpit mode
       const cockpitOffset = new THREE.Vector3(...SHIP_CONFIG.camera.cockpitOffset).applyEuler(shipEuler.current);
       camera.position.copy(ship.position).add(cockpitOffset);
       const lookTarget = ship.position.clone().add(forwardDir.clone().multiplyScalar(40));
       camera.lookAt(lookTarget);
     }
 
-    // 8. Throttled UI Telemetry Sync
+    // UI telemetry
     if (state.clock.elapsedTime - lastTelemetryTime.current > 0.1) {
       lastTelemetryTime.current = state.clock.elapsedTime;
       setFlightTelemetry({
@@ -212,6 +290,18 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
         isBoosting={isBoostingRef.current}
         paintScheme="default"
       />
+
+      {/* Thruster Ground Dust Plume Ring */}
+      <points ref={dustRef} visible={false} position={[0, -0.8, 0]}>
+        <ringGeometry args={[1.5, 4.5, 32]} />
+        <pointsMaterial
+          size={0.4}
+          color="#38bdf8"
+          transparent
+          opacity={0.6}
+          blending={THREE.AdditiveBlending}
+        />
+      </points>
     </group>
   );
 };

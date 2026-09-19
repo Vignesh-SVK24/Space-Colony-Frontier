@@ -136,7 +136,21 @@ function QuantumCoreBeacon() {
   );
 }
 
+import { SurfaceTerrain } from '../surface/SurfaceTerrain';
+import { SurfaceVegetation } from '../surface/SurfaceVegetation';
+import { SurfacePOIs } from '../surface/SurfacePOIs';
+import { SurfaceAtmosphere } from '../surface/SurfaceAtmosphere';
+import { AstronautController } from '../characters/AstronautController';
+import { LandedSpaceship } from '../spaceships/LandedSpaceship';
+
 export const SceneRoot: FC = () => {
+  const { gameMode } = useNexusGameStore();
+  const isAstronautView =
+    gameMode === 'ASTRONAUT' ||
+    gameMode === 'LANDED' ||
+    gameMode === 'LANDING_TRANSITION' ||
+    gameMode === 'ENTERING_SHIP';
+
   return (
     <div className="absolute inset-0 w-full h-full">
       <Canvas
@@ -148,8 +162,8 @@ export const SceneRoot: FC = () => {
         }}
       >
         {/* Global Ambient & Deep Space Rim Fill */}
-        <ambientLight intensity={0.2} />
-        <hemisphereLight args={['#38bdf8', '#020617', 0.35]} />
+        <ambientLight intensity={0.25} />
+        <hemisphereLight args={['#38bdf8', '#020617', 0.4]} />
 
         {/* Local Colony Beacon Point Light */}
         <pointLight position={[0, 3, 0]} intensity={3.0} color="#38bdf8" distance={30} />
@@ -187,6 +201,12 @@ export const SceneRoot: FC = () => {
         {/* TIER 8: Alien UFO Activity & Quantum Warp Patrols */}
         <AlienUFOActivity />
 
+        {/* PLANET SURFACE SIMULATION (Aethelia-IV Terrain, Biomes, Vegetation & POIs) */}
+        <SurfaceTerrain />
+        <SurfaceVegetation />
+        <SurfacePOIs />
+        <SurfaceAtmosphere />
+
         {/* TIER 1: Colony Ground Base Modules */}
         <ColonyLandingPad />
         <QuantumCoreBeacon />
@@ -194,9 +214,17 @@ export const SceneRoot: FC = () => {
         {/* 3D World-Space Distance-Attenuated Landmark Labels */}
         <WorldSpaceLabels />
 
-        {/* Player Controlled Spaceship with 6-DOF Flight Kinematics & Dual Camera */}
-        <SpaceshipController initialPosition={[0, 8, 14]} />
+        {/* Active Player Entity: Human Astronaut or Flight Spaceship */}
+        {isAstronautView ? (
+          <>
+            <LandedSpaceship />
+            <AstronautController />
+          </>
+        ) : (
+          <SpaceshipController initialPosition={[0, 8, 14]} />
+        )}
       </Canvas>
     </div>
   );
 };
+

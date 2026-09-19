@@ -80,12 +80,75 @@ export interface NexusAlertItem {
 
 export type ModalView = 'build' | 'research' | 'map' | 'colony' | 'ship' | 'alien' | 'settings' | null;
 
+export type GameMode =
+  | 'SPACE_FLIGHT'
+  | 'ORBIT'
+  | 'DESCENDING'
+  | 'LANDING'
+  | 'LANDED'
+  | 'LANDING_TRANSITION'
+  | 'ASTRONAUT'
+  | 'ENTERING_SHIP'
+  | 'TAKEOFF_PREP'
+  | 'TAKEOFF'
+  | 'ASCENDING'
+  | 'SPACE_RETURN';
+
+export type BiomeType =
+  | 'COLONY_OUTPOST'
+  | 'ROCKY_PLATEAU'
+  | 'BIOLUMINESCENT_FOREST'
+  | 'DUSK_PLAINS'
+  | 'ANOMALY_CRATER';
+
+export interface PlanetaryPOI {
+  id: string;
+  name: string;
+  type: 'outpost' | 'terminal' | 'monolith' | 'mineral' | 'drone' | 'oxygen_station';
+  position: [number, number, number];
+  description: string;
+  discovered: boolean;
+  interacted: boolean;
+  rewardText?: string;
+}
+
+export interface ScannedTargetData {
+  name: string;
+  classification: string;
+  distanceM: number;
+  composition: string;
+  spectralSignature: string;
+  radiationLevel: string;
+  purity: string;
+}
+
 interface NexusGameState {
   // World telemetry
   solDay: number;
   solTime: string;
   timeMultiplier: 0 | 1 | 2 | 5;
   activeCameraMode: number;
+
+  // Game Mode State Machine
+  gameMode: GameMode;
+  landingProgress: number; // 0-1 during descent
+  takeoffProgress: number; // 0-1 during liftoff
+  transitionProgress: number; // 0-1 during fade transition
+  transitionMessage: string;
+
+  // Human Astronaut Telemetry
+  suitOxygen: number; // 0-100
+  suitEnergy: number; // 0-100
+  suitCondition: number; // 0-100
+  astronautPosition: [number, number, number];
+  astronautHeading: number;
+  astronautAnimationState: 'IDLE' | 'WALK' | 'RUN' | 'SCAN' | 'INTERACT' | 'BOARD';
+  astronautScannerActive: boolean;
+  activeBiome: BiomeType;
+  scannedTarget: ScannedTargetData | null;
+  planetaryPOIs: PlanetaryPOI[];
+  landedShipPosition: [number, number, number];
+  isDebugOpen: boolean;
 
   // Resources
   resources: Record<ResourceId, ResourceTelemetry>;
@@ -126,6 +189,27 @@ interface NexusGameState {
   discoveredLocations: string[];
 
   // Actions
+  setGameMode: (mode: GameMode) => void;
+  initiateLandingSequence: () => void;
+  completeTouchdown: () => void;
+  finishLandingTransition: () => void;
+  enterAstronautMode: () => void;
+  boardShip: () => void;
+  initiateTakeoffSequence: () => void;
+  finishTakeoff: () => void;
+  setAstronautTelemetry: (
+    pos: [number, number, number],
+    heading: number,
+    anim: 'IDLE' | 'WALK' | 'RUN' | 'SCAN' | 'INTERACT' | 'BOARD'
+  ) => void;
+  toggleAstronautScanner: () => void;
+  setScannedTarget: (target: ScannedTargetData | null) => void;
+  consumeOxygen: (amount: number) => void;
+  refillSuitVitals: () => void;
+  interactWithPOI: (poiId: string) => void;
+  toggleDebugPanel: () => void;
+  teleportTo: (pos: [number, number, number]) => void;
+
   setTimeMultiplier: (multiplier: 0 | 1 | 2 | 5) => void;
   setCameraMode: (mode: number) => void;
   openModal: (modal: ModalView) => void;
@@ -243,6 +327,79 @@ export const useNexusGameStore = create<NexusGameState>((set, get) => ({
 
   activeModal: null,
 
+  // Game Mode State Machine
+  gameMode: 'SPACE_FLIGHT',
+  landingProgress: 0,
+  takeoffProgress: 0,
+  transitionProgress: 0,
+  transitionMessage: '',
+
+  // Human Astronaut Telemetry
+  suitOxygen: 100,
+  suitEnergy: 100,
+  suitCondition: 100,
+  astronautPosition: [2, -1.3, 3],
+  astronautHeading: 0,
+  astronautAnimationState: 'IDLE',
+  astronautScannerActive: false,
+  activeBiome: 'COLONY_OUTPOST',
+  scannedTarget: null,
+  landedShipPosition: [0, -1.4, 0],
+  isDebugOpen: false,
+
+  planetaryPOIs: [
+    {
+      id: 'poi-terminal',
+      name: 'RESEARCH TERMINAL BRAVO',
+      type: 'terminal',
+      position: [18, -1.2, 14],
+      description: 'Automated planetary survey station. High-speed uplink to Apex Station orbital archive.',
+      discovered: false,
+      interacted: false,
+      rewardText: '+300 Research Points'
+    },
+    {
+      id: 'poi-monolith',
+      name: 'ANOMALY MONOLITH ECHO',
+      type: 'monolith',
+      position: [-38, 2.5, 45],
+      description: 'Extraterrestrial crystalline obelisk emitting low-frequency harmonic resonance.',
+      discovered: false,
+      interacted: false,
+      rewardText: '+1 Artifact Relic Fragment ? +500 XP'
+    },
+    {
+      id: 'poi-mineral',
+      name: 'TITANIUM CRUST MATRIX',
+      type: 'mineral',
+      position: [42, 1.8, -32],
+      description: 'High-purity igneous titanium-cobalt deposit ready for pneumatic extraction.',
+      discovered: false,
+      interacted: false,
+      rewardText: '+120 Titanium ? +40 Rare Minerals'
+    },
+    {
+      id: 'poi-oxygen',
+      name: 'ATMOSPHERIC SCRUBBER STATION',
+      type: 'oxygen_station',
+      position: [-14, -1.3, -12],
+      description: 'Cryogenic O2 compression station. Automatically pressurizes astronaut suit tanks.',
+      discovered: true,
+      interacted: false,
+      rewardText: 'Full Suit Oxygen Refill'
+    },
+    {
+      id: 'poi-drone',
+      name: 'CRASHED RECON PROBE DELTA',
+      type: 'drone',
+      position: [-50, 3.8, -46],
+      description: 'Deep-space telemetry probe crashed during entry sol 18. Avionics core intact.',
+      discovered: false,
+      interacted: false,
+      rewardText: '+240 Silicon ? +80 Electronics'
+    }
+  ],
+
   alerts: [],
 
   hudVisible: true,
@@ -263,6 +420,234 @@ export const useNexusGameStore = create<NexusGameState>((set, get) => ({
   radarContacts: [],
   mapScale: 'orbit',
   discoveredLocations: ['colony-alpha', 'selene-prime', 'apex-station'],
+
+  setGameMode: (mode) => set({ gameMode: mode }),
+
+  initiateLandingSequence: () => {
+    nexusAudio.playWarning();
+    set({
+      gameMode: 'DESCENDING',
+      landingProgress: 0.1
+    });
+    get().addAlert({
+      type: 'system',
+      title: 'DESCENT TRAJECTORY LOCKED',
+      message: 'Retro-thrusters engaged. Automated atmospheric landing guidance initialized.'
+    });
+  },
+
+  completeTouchdown: () => {
+    nexusAudio.playConfirm();
+    const shipPos = get().shipPosition;
+    set({
+      gameMode: 'LANDING_TRANSITION',
+      landingProgress: 1,
+      landedShipPosition: [shipPos[0], -1.4, shipPos[2]],
+      transitionProgress: 0,
+      transitionMessage: 'AETHELIA-IV TOUCHDOWN CONFIRMED // DEPLOYING EVA ASTRONAUT SUIT'
+    });
+  },
+
+  finishLandingTransition: () => {
+    const landedPos = get().landedShipPosition;
+    set({
+      gameMode: 'ASTRONAUT',
+      astronautPosition: [landedPos[0] + 2.5, -1.3, landedPos[2] + 2.5],
+      transitionProgress: 1,
+      transitionMessage: ''
+    });
+    nexusAudio.playDiscovery();
+    get().addAlert({
+      type: 'info',
+      title: 'EVA SUIT ACTIVE',
+      message: 'Ground exploration authorized. Monitor suit oxygen levels outside the colony perimeter.'
+    });
+  },
+
+  enterAstronautMode: () => {
+    const shipPos = get().shipPosition;
+    set({
+      gameMode: 'ASTRONAUT',
+      landedShipPosition: [shipPos[0], -1.4, shipPos[2]],
+      astronautPosition: [shipPos[0] + 2.5, -1.3, shipPos[2] + 2.5]
+    });
+  },
+
+  boardShip: () => {
+    nexusAudio.playConfirm();
+    set({
+      gameMode: 'ENTERING_SHIP',
+      transitionProgress: 0,
+      transitionMessage: 'BOARDING CRAFT // INITIALIZING COCKPIT AVIONICS...'
+    });
+    setTimeout(() => {
+      set({
+        gameMode: 'TAKEOFF_PREP',
+        transitionProgress: 1,
+        transitionMessage: ''
+      });
+      get().initiateTakeoffSequence();
+    }, 1200);
+  },
+
+  initiateTakeoffSequence: () => {
+    nexusAudio.playConfirm();
+    set({
+      gameMode: 'TAKEOFF',
+      takeoffProgress: 0.1
+    });
+    get().addAlert({
+      type: 'system',
+      title: 'VTOL ASCENT ENGAGED',
+      message: 'Primary thrusters firing at 100%. Breaking planetary gravity well.'
+    });
+  },
+
+  finishTakeoff: () => {
+    nexusAudio.playDiscovery();
+    set({
+      gameMode: 'SPACE_FLIGHT',
+      takeoffProgress: 1,
+      shipPosition: [0, 15, 12]
+    });
+    get().addAlert({
+      type: 'info',
+      title: 'ORBITAL INSERTION COMPLETE',
+      message: 'Atmospheric envelope cleared. 6-DOF orbital flight restored.'
+    });
+  },
+
+  setAstronautTelemetry: (pos, heading, anim) => {
+    // Biome evaluation by distance & quadrants
+    const dOrigin = Math.hypot(pos[0], pos[2]);
+    let biome: BiomeType = 'COLONY_OUTPOST';
+    if (dOrigin < 25) {
+      biome = 'COLONY_OUTPOST';
+    } else if (pos[0] > 15 && pos[2] > 0) {
+      biome = 'BIOLUMINESCENT_FOREST';
+    } else if (pos[0] < -20 && pos[2] > 15) {
+      biome = 'ANOMALY_CRATER';
+    } else if (pos[2] < -15) {
+      biome = 'ROCKY_PLATEAU';
+    } else {
+      biome = 'DUSK_PLAINS';
+    }
+
+    set({
+      astronautPosition: pos,
+      astronautHeading: heading,
+      astronautAnimationState: anim,
+      activeBiome: biome
+    });
+  },
+
+  toggleAstronautScanner: () => {
+    const current = get().astronautScannerActive;
+    if (!current) {
+      nexusAudio.playScan();
+    } else {
+      nexusAudio.playClick(900);
+    }
+    set({ astronautScannerActive: !current });
+  },
+
+  setScannedTarget: (target) => set({ scannedTarget: target }),
+
+  consumeOxygen: (amount) => {
+    const { suitOxygen, addAlert } = get();
+    const newO2 = Math.max(0, suitOxygen - amount);
+    if (suitOxygen > 20 && newO2 <= 20) {
+      nexusAudio.playWarning();
+      addAlert({
+        type: 'critical',
+        title: 'CRITICAL OXYGEN WARNING',
+        message: 'Suit life-support at 20%! Return to spacecraft or oxygen station immediately.'
+      });
+    } else if (suitOxygen > 40 && newO2 <= 40) {
+      addAlert({
+        type: 'warning',
+        title: 'OXYGEN CAUTION',
+        message: 'Suit oxygen below 40%. Plan return trajectory.'
+      });
+    }
+    set({ suitOxygen: newO2 });
+  },
+
+  refillSuitVitals: () => {
+    const { suitOxygen } = get();
+    if (suitOxygen < 98) {
+      nexusAudio.playConfirm();
+      get().addAlert({
+        type: 'success',
+        title: 'SUIT TANKS REPLENISHED',
+        message: 'Oxygen scrubber pressurized to 100% capacity.'
+      });
+    }
+    set({ suitOxygen: 100, suitEnergy: 100, suitCondition: 100 });
+  },
+
+  interactWithPOI: (poiId) => {
+    const { planetaryPOIs, resources, addAlert } = get();
+    const poiIndex = planetaryPOIs.findIndex((p) => p.id === poiId);
+    if (poiIndex === -1) return;
+
+    const poi = planetaryPOIs[poiIndex];
+    nexusAudio.playConfirm();
+
+    if (poi.type === 'oxygen_station') {
+      get().refillSuitVitals();
+      return;
+    }
+
+    if (poi.interacted) {
+      addAlert({
+        type: 'info',
+        title: `${poi.name} ALREADY ACCESSED`,
+        message: 'Telemetry databank previously synchronized.'
+      });
+      return;
+    }
+
+    // Mark interacted and grant rewards
+    const updatedPOIs = [...planetaryPOIs];
+    updatedPOIs[poiIndex] = { ...poi, interacted: true, discovered: true };
+
+    const updatedResources = { ...resources };
+    if (poi.type === 'terminal') {
+      updatedResources.research.current += 300;
+    } else if (poi.type === 'mineral') {
+      updatedResources.titanium.current = Math.min(updatedResources.titanium.capacity, updatedResources.titanium.current + 120);
+      updatedResources.rare.current = Math.min(updatedResources.rare.capacity, updatedResources.rare.current + 40);
+    } else if (poi.type === 'drone') {
+      updatedResources.silicon.current = Math.min(updatedResources.silicon.capacity, updatedResources.silicon.current + 240);
+      updatedResources.credits.current += 500;
+    } else if (poi.type === 'monolith') {
+      updatedResources.research.current += 500;
+      updatedResources.credits.current += 1000;
+    }
+
+    set({
+      planetaryPOIs: updatedPOIs,
+      resources: updatedResources
+    });
+
+    addAlert({
+      type: poi.type === 'monolith' ? 'alien' : 'discovery',
+      title: `OBJECTIVE ACCESSED: ${poi.name}`,
+      message: `${poi.description} Reward claimed: ${poi.rewardText || 'Archived'}.`
+    });
+  },
+
+  toggleDebugPanel: () => set((state) => ({ isDebugOpen: !state.isDebugOpen })),
+
+  teleportTo: (pos) => {
+    nexusAudio.playConfirm();
+    if (get().gameMode === 'ASTRONAUT') {
+      set({ astronautPosition: pos });
+    } else {
+      set({ shipPosition: pos });
+    }
+  },
 
   setTimeMultiplier: (multiplier) => {
     nexusAudio.playConfirm();
@@ -432,6 +817,27 @@ export const useNexusGameStore = create<NexusGameState>((set, get) => ({
 
     const newSolarAngle = (state.solarCycleAngle + 0.0005 * state.timeMultiplier) % (Math.PI * 2);
     const newMoonAngle = (state.moonAngle + 0.0002 * state.timeMultiplier) % (Math.PI * 2);
+
+    // Astronaut Mode Suit Vitals
+    if (state.gameMode === 'ASTRONAUT') {
+      const astroPos = state.astronautPosition;
+      const shipPos = state.landedShipPosition;
+      const distFromShip = Math.hypot(astroPos[0] - shipPos[0], astroPos[2] - shipPos[2]);
+      const distFromColony = Math.hypot(astroPos[0], astroPos[2]);
+
+      // Check proximity to oxygen station at [-14, -1.3, -12]
+      const distFromO2Station = Math.hypot(astroPos[0] - (-14), astroPos[2] - (-12));
+
+      if (distFromShip < 8 || distFromO2Station < 8) {
+        // Safe recharge zone: replenish oxygen
+        if (state.suitOxygen < 100) {
+          set({ suitOxygen: Math.min(100, state.suitOxygen + 2.0 * state.timeMultiplier) });
+        }
+      } else if (distFromColony > 30) {
+        // Harsh wilderness: consume oxygen
+        get().consumeOxygen(0.2 * state.timeMultiplier);
+      }
+    }
 
     set({
       resources: updatedResources,

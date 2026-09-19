@@ -21,6 +21,10 @@ import { NexusColonyModal } from './components/ui/nexus/modals/NexusColonyModal'
 import { NexusShipModal } from './components/ui/nexus/modals/NexusShipModal';
 import { NexusAlienModal } from './components/ui/nexus/modals/NexusAlienModal';
 
+import { LandingTransitionOverlay } from './components/ui/nexus/hud/LandingTransitionOverlay';
+import { AstronautHUD } from './components/ui/nexus/hud/AstronautHUD';
+import { AstronautDebugPanel } from './components/ui/nexus/hud/AstronautDebugPanel';
+
 export const App: FC = () => {
   const {
     activeModal,
@@ -31,13 +35,15 @@ export const App: FC = () => {
     tickSimulation,
     startScan,
     hoveredEntity,
-    toggleHud
+    toggleHud,
+    gameMode
   } = useNexusGameStore();
+
+  const isAstronaut = gameMode === 'ASTRONAUT';
 
   // Keyboard shortcut listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is in an input field
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
 
       const key = e.key.toUpperCase();
@@ -47,13 +53,11 @@ export const App: FC = () => {
         return;
       }
 
-      // 'P' pauses/resumes simulation (leaving Space exclusively for flight brake)
       if (key === 'P') {
         setTimeMultiplier(timeMultiplier === 0 ? 1 : 0);
         return;
       }
 
-      // 'H' toggles cinematic mode / HUD visibility
       if (key === 'H') {
         toggleHud();
         return;
@@ -70,14 +74,14 @@ export const App: FC = () => {
       if (key === 'G') activeModal === 'colony' ? closeModal() : openModal('colony');
       if (key === 'X') activeModal === 'alien' ? closeModal() : openModal('alien');
 
-      if (key === 'E' && hoveredEntity) {
+      if (key === 'E' && hoveredEntity && !isAstronaut) {
         startScan();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeModal, openModal, closeModal, timeMultiplier, setTimeMultiplier, startScan, hoveredEntity, toggleHud]);
+  }, [activeModal, openModal, closeModal, timeMultiplier, setTimeMultiplier, startScan, hoveredEntity, toggleHud, isAstronaut]);
 
   // Simulation tick loop
   useEffect(() => {
@@ -92,20 +96,33 @@ export const App: FC = () => {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#030712] font-mono select-none text-slate-100">
-      {/* 3D Scene Viewport (Visual Hero) */}
+      {/* 3D Scene Viewport */}
       <ErrorBoundary fallbackTitle="Nexus Viewport Failure">
         <SceneRoot />
       </ErrorBoundary>
 
-      {/* Futuristic Nexus HUD Elements */}
-      <TopCommandBar />
-      <LeftOperationsPanel />
-      <RightIntelligencePanel />
-      <CenterTargetingHUD />
-      <FloatingAlertStack />
-      <BottomCommandDock />
-      <VirtualJoystick />
-      <TacticalRadar3D />
+      {/* 2-Second Cinematic Blank Transition Overlay */}
+      <LandingTransitionOverlay />
+
+      {/* Human Astronaut Surface HUD */}
+      <AstronautHUD />
+
+      {/* Hidden Development & Simulation Debug Panel */}
+      <AstronautDebugPanel />
+
+      {/* Spaceflight Flight HUD Elements (Visible in orbit & flight modes) */}
+      {!isAstronaut && (
+        <>
+          <TopCommandBar />
+          <LeftOperationsPanel />
+          <RightIntelligencePanel />
+          <CenterTargetingHUD />
+          <FloatingAlertStack />
+          <BottomCommandDock />
+          <VirtualJoystick />
+          <TacticalRadar3D />
+        </>
+      )}
 
       {/* Tactical Modals */}
       <NexusBuildModal />
@@ -119,3 +136,4 @@ export const App: FC = () => {
 };
 
 export default App;
+
