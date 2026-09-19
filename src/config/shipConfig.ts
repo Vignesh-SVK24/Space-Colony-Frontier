@@ -13,6 +13,11 @@ export interface ShipFlightConfig {
   bankFactor: number;
   dampingLinear: number;
   dampingAngular: number;
+  verticalAcceleration: number;
+  verticalMaxSpeed: number;
+  verticalDamping: number;
+  lateralSpeed: number;
+  flightAssist: boolean;
 
   // Health and fuel
   fuelCapacity: number;
@@ -57,6 +62,11 @@ export const SHIP_CONFIG: ShipFlightConfig = {
   bankFactor: 0.6,
   dampingLinear: 0.95,
   dampingAngular: 0.90,
+  verticalAcceleration: 22.0,
+  verticalMaxSpeed: 30.0,
+  verticalDamping: 0.94,
+  lateralSpeed: 18.0,
+  flightAssist: true,
 
   fuelCapacity: 200,
   normalBurnRate: 1.0,

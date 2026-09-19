@@ -142,6 +142,7 @@ import { SurfacePOIs } from '../surface/SurfacePOIs';
 import { SurfaceAtmosphere } from '../surface/SurfaceAtmosphere';
 import { AstronautController } from '../characters/AstronautController';
 import { LandedSpaceship } from '../spaceships/LandedSpaceship';
+import { WaypointSystem3D } from '../effects/WaypointSystem3D';
 
 export const SceneRoot: FC = () => {
   const { gameMode } = useNexusGameStore();
@@ -213,6 +214,9 @@ export const SceneRoot: FC = () => {
 
         {/* 3D World-Space Distance-Attenuated Landmark Labels */}
         <WorldSpaceLabels />
+
+        {/* 3D Active Navigation Waypoint Beacon & Trajectory Line */}
+        <WaypointSystem3D />
 
         {/* Active Player Entity: Human Astronaut or Flight Spaceship */}
         {isAstronautView ? (

@@ -122,6 +122,19 @@ export interface ScannedTargetData {
   purity: string;
 }
 
+export interface ActiveWaypoint {
+  id: string;
+  name: string;
+  position: [number, number, number];
+  type: string;
+}
+
+export interface WaypointDistance {
+  horizontal: number;
+  vertical: number;
+  total: number;
+}
+
 interface NexusGameState {
   // World telemetry
   solDay: number;
@@ -175,8 +188,19 @@ interface NexusGameState {
   // Gaming HUD visibility & flight telemetry
   hudVisible: boolean;
   flightSpeed: number;
+  verticalSpeed: number; // m/s
+  altitude: number; // m or km above surface
+  heading: number; // 0-360 deg
+  pitch: number; // -90 to +90 deg
+  roll: number; // -180 to +180 deg
+  flightAssist: boolean;
+  flightWarnings: string[];
   isBoosting: boolean;
   isBraking: boolean;
+
+  // Active 3D Waypoint System
+  activeWaypoint: ActiveWaypoint | null;
+  distanceToWaypoint: WaypointDistance | null;
 
   // Celestial & Large-Scale Space Telemetry
   shipPosition: [number, number, number];
@@ -190,6 +214,20 @@ interface NexusGameState {
 
   // Actions
   setGameMode: (mode: GameMode) => void;
+  setWaypoint: (waypoint: ActiveWaypoint | null) => void;
+  clearWaypoint: () => void;
+  toggleFlightAssist: () => void;
+  setFlight3DTelemetry: (data: {
+    speed: number;
+    verticalSpeed: number;
+    altitude: number;
+    heading: number;
+    pitch: number;
+    roll: number;
+    isBoosting: boolean;
+    isBraking: boolean;
+    warnings: string[];
+  }) => void;
   initiateLandingSequence: () => void;
   completeTouchdown: () => void;
   finishLandingTransition: () => void;
@@ -404,8 +442,18 @@ export const useNexusGameStore = create<NexusGameState>((set, get) => ({
 
   hudVisible: true,
   flightSpeed: 0,
+  verticalSpeed: 0,
+  altitude: 10.5,
+  heading: 0,
+  pitch: 0,
+  roll: 0,
+  flightAssist: true,
+  flightWarnings: [],
   isBoosting: false,
   isBraking: false,
+
+  activeWaypoint: null,
+  distanceToWaypoint: null,
 
   shipPosition: [0, 8, 14],
   solarCycleAngle: 0.85,
@@ -420,6 +468,64 @@ export const useNexusGameStore = create<NexusGameState>((set, get) => ({
   radarContacts: [],
   mapScale: 'orbit',
   discoveredLocations: ['colony-alpha', 'selene-prime', 'apex-station'],
+
+  setWaypoint: (waypoint) => {
+    if (waypoint) {
+      nexusAudio.playConfirm();
+      const { shipPosition, astronautPosition, gameMode, addAlert } = get();
+      const currentPos = gameMode === 'ASTRONAUT' ? astronautPosition : shipPosition;
+      const dx = waypoint.position[0] - currentPos[0];
+      const dy = waypoint.position[1] - currentPos[1];
+      const dz = waypoint.position[2] - currentPos[2];
+      const horiz = Math.hypot(dx, dz);
+      const total = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      set({
+        activeWaypoint: waypoint,
+        distanceToWaypoint: { horizontal: horiz, vertical: dy, total }
+      });
+      addAlert({
+        type: 'info',
+        title: 'WAYPOINT LOCKED: ' + waypoint.name,
+        message: `Bearing locked. Vector distance: ${total >= 10 ? (total * 0.1).toFixed(1) + ' KM' : Math.round(total * 10) + ' M'}.`
+      });
+    } else {
+      set({ activeWaypoint: null, distanceToWaypoint: null });
+    }
+  },
+
+  clearWaypoint: () => set({ activeWaypoint: null, distanceToWaypoint: null }),
+
+  toggleFlightAssist: () => {
+    nexusAudio.playClick(1100);
+    set((state) => ({ flightAssist: !state.flightAssist }));
+  },
+
+  setFlight3DTelemetry: (data) => {
+    const { activeWaypoint, shipPosition } = get();
+    let distanceToWaypoint = get().distanceToWaypoint;
+    if (activeWaypoint) {
+      const dx = activeWaypoint.position[0] - shipPosition[0];
+      const dy = activeWaypoint.position[1] - shipPosition[1];
+      const dz = activeWaypoint.position[2] - shipPosition[2];
+      distanceToWaypoint = {
+        horizontal: Math.hypot(dx, dz),
+        vertical: dy,
+        total: Math.sqrt(dx * dx + dy * dy + dz * dz)
+      };
+    }
+    set({
+      flightSpeed: Math.round(data.speed),
+      verticalSpeed: Math.round(data.verticalSpeed * 10) / 10,
+      altitude: Math.round(data.altitude * 10) / 10,
+      heading: Math.round(data.heading),
+      pitch: Math.round(data.pitch),
+      roll: Math.round(data.roll),
+      isBoosting: data.isBoosting,
+      isBraking: data.isBraking,
+      flightWarnings: data.warnings,
+      distanceToWaypoint
+    });
+  },
 
   setGameMode: (mode) => set({ gameMode: mode }),
 
