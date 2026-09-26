@@ -213,6 +213,52 @@ export const VISUAL_THEME = {
       thrusterFlare: '#93c5fd',
       metalness: 0.85,
       roughness: 0.2
+    },
+
+    // === MULTIPLAYER BATTLE COLOR SCHEMES ===
+    battle_yellow: {
+      id: 'battle_yellow',
+      name: 'Solar Vanguard',
+      primaryHull: '#eab308',
+      secondaryHull: '#1e293b',
+      cockpitGlass: '#f59e0b',
+      engineGlow: '#f97316',
+      thrusterFlare: '#fdba74',
+      metalness: 0.7,
+      roughness: 0.35
+    },
+    battle_blue: {
+      id: 'battle_blue',
+      name: 'Frost Interceptor',
+      primaryHull: '#3b82f6',
+      secondaryHull: '#1e293b',
+      cockpitGlass: '#60a5fa',
+      engineGlow: '#2563eb',
+      thrusterFlare: '#93c5fd',
+      metalness: 0.7,
+      roughness: 0.35
+    },
+    battle_red: {
+      id: 'battle_red',
+      name: 'Crimson Raptor',
+      primaryHull: '#ef4444',
+      secondaryHull: '#1e293b',
+      cockpitGlass: '#f87171',
+      engineGlow: '#dc2626',
+      thrusterFlare: '#fca5a5',
+      metalness: 0.7,
+      roughness: 0.35
+    },
+    battle_green: {
+      id: 'battle_green',
+      name: 'Emerald Phantom',
+      primaryHull: '#22c55e',
+      secondaryHull: '#1e293b',
+      cockpitGlass: '#4ade80',
+      engineGlow: '#16a34a',
+      thrusterFlare: '#86efac',
+      metalness: 0.7,
+      roughness: 0.35
     }
   }
 } as const;

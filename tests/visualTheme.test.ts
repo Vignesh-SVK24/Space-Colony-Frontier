@@ -20,13 +20,17 @@ describe('Visual Theme & 3D Materials Tests', () => {
     expect(res.rare.emissiveIntensity).toBeGreaterThan(0.5);
   });
 
-  it('should configure 5 spaceship paint schemes', () => {
+  it('should configure spaceship paint schemes including battle variants', () => {
     const schemes = VISUAL_THEME.spaceshipPaintSchemes;
-    expect(Object.keys(schemes).length).toBe(5);
+    expect(Object.keys(schemes).length).toBeGreaterThanOrEqual(5);
     expect(schemes.default.primaryHull).toBeDefined();
     expect(schemes.stealth.primaryHull).toBeDefined();
     expect(schemes.explorer.engineGlow).toBeDefined();
     expect(schemes.mining.primaryHull).toBeDefined();
     expect(schemes.command.primaryHull).toBeDefined();
+    expect(schemes.battle_yellow.primaryHull).toBeDefined();
+    expect(schemes.battle_blue.primaryHull).toBeDefined();
+    expect(schemes.battle_red.primaryHull).toBeDefined();
+    expect(schemes.battle_green.primaryHull).toBeDefined();
   });
 });
