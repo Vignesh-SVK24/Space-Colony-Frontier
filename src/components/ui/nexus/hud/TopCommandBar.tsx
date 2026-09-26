@@ -1,6 +1,6 @@
 import { type FC } from 'react';
 import { useNexusGameStore } from '../../../../state/useNexusGameStore';
-import { Wind, Droplets, Apple, Zap, Users, Coins, Pause, Play, Radio, Volume2, VolumeX, Eye, EyeOff } from 'lucide-react';
+import { Wind, Droplets, Apple, Zap, Users, Coins, Pause, Play, Radio, Volume2, VolumeX, Eye, EyeOff, Sliders } from 'lucide-react';
 import { nexusAudio } from '../../../../utils/nexusAudio';
 import { useState } from 'react';
 
@@ -13,7 +13,10 @@ export const TopCommandBar: FC = () => {
     resources,
     colonyVitals,
     hudVisible,
-    toggleHud
+    toggleHud,
+    activeModal,
+    openModal,
+    closeModal
   } = useNexusGameStore();
 
   const [isMuted, setIsMuted] = useState(nexusAudio.getMuted());
@@ -119,6 +122,15 @@ export const TopCommandBar: FC = () => {
           className="p-1 rounded text-slate-400 hover:text-cyan-300 transition cursor-pointer"
         >
           <EyeOff className="w-3.5 h-3.5 text-slate-400 hover:text-cyan-300" />
+        </button>
+
+        {/* Graphics & Calibration Settings */}
+        <button
+          onClick={() => (activeModal === 'graphics' ? closeModal() : openModal('graphics'))}
+          title="Graphics & Performance Pipeline (O)"
+          className="p-1 rounded text-slate-400 hover:text-cyan-300 transition cursor-pointer"
+        >
+          <Sliders className="w-3.5 h-3.5 text-slate-400 hover:text-cyan-300" />
         </button>
       </div>
 

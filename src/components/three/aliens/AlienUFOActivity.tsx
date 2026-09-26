@@ -62,32 +62,47 @@ export const AlienUFOActivity: FC = () => {
       }}
       onPointerOut={() => setHoveredEntity(null)}
     >
-      {/* Central Exotic Saucer Core */}
+      {/* Central Exotic Saucer Core with reflective metamaterial alloy */}
       <mesh>
-        <cylinderGeometry args={[2.8, 0.4, 1.2, 24]} />
-        <meshStandardMaterial
-          color="#1e1b4b"
+        <cylinderGeometry args={[2.8, 0.4, 1.2, 32]} />
+        <meshPhysicalMaterial
+          color="#0f172a"
           emissive="#7c3aed"
-          emissiveIntensity={0.8}
-          metalness={0.9}
-          roughness={0.1}
+          emissiveIntensity={0.65}
+          metalness={0.98}
+          roughness={0.05}
+          clearcoat={1.0}
+          clearcoatRoughness={0.04}
+          reflectivity={1.0}
         />
       </mesh>
 
       {/* Bioluminescent Phase Ring */}
       <mesh ref={ringRef} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[3.8, 0.15, 16, 32]} />
+        <torusGeometry args={[3.8, 0.15, 16, 48]} />
         <meshStandardMaterial
           color="#2dd4bf"
           emissive="#2dd4bf"
-          emissiveIntensity={2.5}
+          emissiveIntensity={2.2}
           wireframe
         />
       </mesh>
 
+      {/* Volumetric Scanning Tractor Beam */}
+      <mesh position={[0, -3.2, 0]} rotation={[0, 0, 0]}>
+        <coneGeometry args={[2.2, 5.5, 24, 1, true]} />
+        <meshBasicMaterial
+          color="#2dd4bf"
+          transparent
+          opacity={0.16}
+          side={THREE.DoubleSide}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+
       {/* Alien Emission Light Halo */}
-      <pointLight color="#a855f7" intensity={3.5} distance={30} />
-      <pointLight color="#2dd4bf" intensity={2.0} distance={20} />
+      <pointLight color="#a855f7" intensity={3.0} distance={30} />
+      <pointLight color="#2dd4bf" intensity={2.2} distance={20} />
     </group>
   );
 };

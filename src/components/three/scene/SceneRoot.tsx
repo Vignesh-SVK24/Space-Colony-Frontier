@@ -143,25 +143,46 @@ import { SurfaceAtmosphere } from '../surface/SurfaceAtmosphere';
 import { AstronautController } from '../characters/AstronautController';
 import { LandedSpaceship } from '../spaceships/LandedSpaceship';
 import { WaypointSystem3D } from '../effects/WaypointSystem3D';
+import { CinematicPostProcessing } from './CinematicPostProcessing';
+import { generateSpaceCubeEnvironment } from '../../../utils/pbrTextureGenerator';
+import { getViewDistanceFar } from '../../../config/graphicsConfig';
 
 export const SceneRoot: FC = () => {
-  const { gameMode } = useNexusGameStore();
+  const { gameMode, graphicsSettings } = useNexusGameStore();
   const isAstronautView =
     gameMode === 'ASTRONAUT' ||
     gameMode === 'LANDED' ||
     gameMode === 'LANDING_TRANSITION' ||
     gameMode === 'ENTERING_SHIP';
 
+  const farPlane = getViewDistanceFar(graphicsSettings.viewDistance);
+
   return (
     <div className="absolute inset-0 w-full h-full">
       <Canvas
-        camera={{ position: [0, 8, 20], fov: 55 }}
-        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
+        shadows={graphicsSettings.shadows ? 'soft' : false}
+        camera={{ position: [0, 8, 20], fov: 55, far: farPlane }}
+        gl={{
+          antialias: graphicsSettings.antiAliasing,
+          alpha: false,
+          powerPreference: 'high-performance'
+        }}
         onCreated={({ gl, scene }) => {
           gl.setClearColor(new THREE.Color('#02040a'));
-          scene.fog = new THREE.FogExp2('#02040a', 0.004);
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.16;
+          gl.shadowMap.enabled = graphicsSettings.shadows;
+          gl.shadowMap.type = THREE.PCFSoftShadowMap;
+
+          // Realistic Procedural Space Cubemap for PBR specular reflections
+          scene.environment = generateSpaceCubeEnvironment();
+
+          const fogDensity = graphicsSettings.atmosphere === 'high' ? 0.0035 : 0.002;
+          scene.fog = new THREE.FogExp2('#02040a', fogDensity);
         }}
       >
+        {/* Cinematic Post-Processing Pipeline (Bloom, Vignette, Tone Mapping) */}
+        <CinematicPostProcessing />
         {/* Global Ambient & Deep Space Rim Fill */}
         <ambientLight intensity={0.25} />
         <hemisphereLight args={['#38bdf8', '#020617', 0.4]} />

@@ -1,11 +1,17 @@
 import { useMemo, type FC } from 'react';
 import * as THREE from 'three';
 import { getTerrainHeight } from './terrainMath';
+import { getTerrainRegolithNormal, getRoughnessNoiseMap } from '../../../utils/pbrTextureGenerator';
+import { useNexusGameStore } from '../../../state/useNexusGameStore';
 
 export const SurfaceTerrain: FC = () => {
+  const { graphicsSettings } = useNexusGameStore();
+  const regolithNormal = useMemo(() => getTerrainRegolithNormal(), []);
+  const roughnessMap = useMemo(() => getRoughnessNoiseMap(), []);
+
   const { geometry } = useMemo(() => {
     const size = 300;
-    const segments = 120;
+    const segments = graphicsSettings.preset === 'ultra' ? 150 : 120;
     const geom = new THREE.PlaneGeometry(size, size, segments, segments);
     geom.rotateX(-Math.PI / 2);
 
@@ -53,14 +59,17 @@ export const SurfaceTerrain: FC = () => {
     geom.computeVertexNormals();
 
     return { geometry: geom };
-  }, []);
+  }, [graphicsSettings.preset]);
 
   return (
-    <mesh geometry={geometry} receiveShadow>
+    <mesh geometry={geometry} receiveShadow castShadow>
       <meshStandardMaterial
         vertexColors
-        roughness={0.88}
-        metalness={0.12}
+        roughness={0.85}
+        metalness={0.15}
+        normalMap={regolithNormal}
+        roughnessMap={roughnessMap}
+        wireframe={graphicsSettings.wireframe}
       />
     </mesh>
   );

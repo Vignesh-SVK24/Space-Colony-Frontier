@@ -3,9 +3,12 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useNexusGameStore } from '../../../state/useNexusGameStore';
 
+import { getMoonCraterNormal } from '../../../utils/pbrTextureGenerator';
+
 export const MoonSystem: FC = () => {
   const moonGroupRef = useRef<THREE.Group>(null);
   const moonMeshRef = useRef<THREE.Mesh>(null);
+  const moonNormal = getMoonCraterNormal();
 
   const { selectEntity, setHoveredEntity, moonAngle, recordDiscovery } = useNexusGameStore();
 
@@ -62,11 +65,12 @@ export const MoonSystem: FC = () => {
         }}
         onPointerOut={() => setHoveredEntity(null)}
       >
-        <sphereGeometry args={[14, 32, 32]} />
+        <sphereGeometry args={[14, 48, 48]} />
         <meshStandardMaterial
           color="#cbd5e1"
-          roughness={0.85}
-          metalness={0.15}
+          roughness={0.88}
+          metalness={0.12}
+          normalMap={moonNormal}
         />
       </mesh>
 

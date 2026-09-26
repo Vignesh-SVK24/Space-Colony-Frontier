@@ -9,8 +9,12 @@ export const SunSystem: FC = () => {
   const flareRef = useRef<THREE.Points>(null);
   const lightRef = useRef<THREE.DirectionalLight>(null);
 
-  const { weatherEvent, solarCycleAngle } = useNexusGameStore();
+  const { weatherEvent, solarCycleAngle, graphicsSettings } = useNexusGameStore();
   const isSolarStorm = weatherEvent === 'SOLAR_STORM';
+
+  const shadowRes = graphicsSettings.shadowQuality === 'ultra' ? 4096 :
+                    graphicsSettings.shadowQuality === 'high' ? 2048 : 1024;
+  const isCastingShadow = graphicsSettings.shadows && graphicsSettings.shadowQuality !== 'off';
 
   // Dynamic Sun Position based on celestial solarCycleAngle
   const sunDistance = 450;
@@ -38,18 +42,18 @@ export const SunSystem: FC = () => {
       {/* Primary Directional Solar Light */}
       <directionalLight
         ref={lightRef}
-        intensity={isSolarStorm ? 3.8 : 2.5}
+        intensity={isSolarStorm ? 3.8 : 2.6}
         color={isSolarStorm ? '#ffd08a' : '#fff8ea'}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        castShadow={isCastingShadow}
+        shadow-mapSize-width={shadowRes}
+        shadow-mapSize-height={shadowRes}
         shadow-camera-near={10}
         shadow-camera-far={1000}
-        shadow-camera-left={-200}
-        shadow-camera-right={200}
-        shadow-camera-top={200}
-        shadow-camera-bottom={-200}
-        shadow-bias={-0.0001}
+        shadow-camera-left={-220}
+        shadow-camera-right={220}
+        shadow-camera-top={220}
+        shadow-camera-bottom={-220}
+        shadow-bias={-0.00015}
       />
 
       {/* Central Solar Core */}

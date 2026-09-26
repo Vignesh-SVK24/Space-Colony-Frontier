@@ -2,6 +2,7 @@ import { useMemo, useRef, useEffect, type FC } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useNexusGameStore } from '../../../state/useNexusGameStore';
+import { getAsteroidFacetNormal } from '../../../utils/pbrTextureGenerator';
 
 export const ExpandedAsteroidBelts: FC = () => {
   const ironMeshRef = useRef<THREE.InstancedMesh>(null);
@@ -10,6 +11,7 @@ export const ExpandedAsteroidBelts: FC = () => {
   const debrisMeshRef = useRef<THREE.InstancedMesh>(null);
 
   const { selectEntity, setHoveredEntity } = useNexusGameStore();
+  const facetNormal = useMemo(() => getAsteroidFacetNormal(), []);
 
   // Sector Alpha: Iron Asteroids (Ring radius 110-140)
   const ironCount = 75;
@@ -149,7 +151,7 @@ export const ExpandedAsteroidBelts: FC = () => {
         onPointerOut={() => setHoveredEntity(null)}
       >
         <dodecahedronGeometry args={[1, 1]} />
-        <meshStandardMaterial color="#64748b" roughness={0.7} metalness={0.7} />
+        <meshStandardMaterial color="#475569" roughness={0.7} metalness={0.8} normalMap={facetNormal} />
       </instancedMesh>
 
       {/* 2. Belt Beta: Titanium / Rare Mineral Belt */}
@@ -186,7 +188,7 @@ export const ExpandedAsteroidBelts: FC = () => {
         onPointerOut={() => setHoveredEntity(null)}
       >
         <octahedronGeometry args={[1, 1]} />
-        <meshStandardMaterial color="#94a3b8" roughness={0.3} metalness={0.9} />
+        <meshStandardMaterial color="#94a3b8" roughness={0.25} metalness={0.95} normalMap={facetNormal} />
       </instancedMesh>
 
       {/* 3. Belt Gamma: Glacial Water Ice Cluster */}
@@ -224,11 +226,12 @@ export const ExpandedAsteroidBelts: FC = () => {
       >
         <icosahedronGeometry args={[1, 0]} />
         <meshStandardMaterial
-          color="#a5f3fc"
-          roughness={0.15}
-          metalness={0.1}
+          color="#7dd3fc"
+          roughness={0.12}
+          metalness={0.15}
           transparent
-          opacity={0.85}
+          opacity={0.88}
+          normalMap={facetNormal}
         />
       </instancedMesh>
 

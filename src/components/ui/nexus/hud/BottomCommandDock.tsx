@@ -1,6 +1,6 @@
 import { type FC } from 'react';
 import { useNexusGameStore } from '../../../../state/useNexusGameStore';
-import { Hammer, Cpu, Compass, Box, Rocket, Building2 } from 'lucide-react';
+import { Hammer, Cpu, Compass, Box, Rocket, Building2, Sliders } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export const BottomCommandDock: FC = () => {
@@ -12,7 +12,8 @@ export const BottomCommandDock: FC = () => {
     { id: 'map' as const, label: 'ORBIT', icon: <Compass className="w-3.5 h-3.5 sm:w-4 sm:h-4" />, shortcut: 'M' },
     { id: 'ship' as const, label: 'HANGAR', icon: <Rocket className="w-3.5 h-3.5 sm:w-4 sm:h-4" />, shortcut: 'K' },
     { id: 'colony' as const, label: 'COLONY', icon: <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />, shortcut: 'G' },
-    { id: 'alien' as const, label: 'ALIEN', icon: <Box className="w-3.5 h-3.5 sm:w-4 sm:h-4" />, shortcut: 'X' }
+    { id: 'alien' as const, label: 'ALIEN', icon: <Box className="w-3.5 h-3.5 sm:w-4 sm:h-4" />, shortcut: 'X' },
+    { id: 'graphics' as const, label: 'GFX', icon: <Sliders className="w-3.5 h-3.5 sm:w-4 sm:h-4" />, shortcut: 'O' }
   ];
 
   const handleToggle = (id: typeof dockItems[number]['id']) => {

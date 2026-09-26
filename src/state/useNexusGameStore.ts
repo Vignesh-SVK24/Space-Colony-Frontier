@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { ResourceId } from '../config/resourceConfig';
 import { nexusAudio } from '../utils/nexusAudio';
+import { GraphicsSettings, QualityPreset, GRAPHICS_PRESETS } from '../config/graphicsConfig';
 
 export interface ResourceTelemetry {
   id: ResourceId;
@@ -78,7 +79,7 @@ export interface NexusAlertItem {
   timestamp: string;
 }
 
-export type ModalView = 'build' | 'research' | 'map' | 'colony' | 'ship' | 'alien' | 'settings' | null;
+export type ModalView = 'build' | 'research' | 'map' | 'colony' | 'ship' | 'alien' | 'settings' | 'graphics' | null;
 
 export type GameMode =
   | 'SPACE_FLIGHT'
@@ -267,6 +268,13 @@ interface NexusGameState {
   addAlert: (alert: Omit<NexusAlertItem, 'id' | 'timestamp'>) => void;
   executeEntityAction: (actionId: string) => void;
   tickSimulation: () => void;
+
+  // Graphics Pipeline Settings
+  graphicsSettings: GraphicsSettings;
+  setGraphicsQuality: (preset: QualityPreset) => void;
+  updateGraphicsSettings: (partial: Partial<GraphicsSettings>) => void;
+  toggleGraphicsDebug: () => void;
+  toggleWireframe: () => void;
 }
 
 export const useNexusGameStore = create<NexusGameState>((set, get) => ({
@@ -468,6 +476,7 @@ export const useNexusGameStore = create<NexusGameState>((set, get) => ({
   radarContacts: [],
   mapScale: 'orbit',
   discoveredLocations: ['colony-alpha', 'selene-prime', 'apex-station'],
+  graphicsSettings: GRAPHICS_PRESETS.high,
 
   setWaypoint: (waypoint) => {
     if (waypoint) {
@@ -950,5 +959,35 @@ export const useNexusGameStore = create<NexusGameState>((set, get) => ({
       solarCycleAngle: newSolarAngle,
       moonAngle: newMoonAngle
     });
-  }
+  },
+
+  setGraphicsQuality: (preset) =>
+    set((s) => ({
+      graphicsSettings: {
+        ...GRAPHICS_PRESETS[preset],
+        debugMode: s.graphicsSettings.debugMode,
+        wireframe: s.graphicsSettings.wireframe
+      }
+    })),
+
+  updateGraphicsSettings: (partial) =>
+    set((s) => ({
+      graphicsSettings: { ...s.graphicsSettings, ...partial }
+    })),
+
+  toggleGraphicsDebug: () =>
+    set((s) => ({
+      graphicsSettings: {
+        ...s.graphicsSettings,
+        debugMode: !s.graphicsSettings.debugMode
+      }
+    })),
+
+  toggleWireframe: () =>
+    set((s) => ({
+      graphicsSettings: {
+        ...s.graphicsSettings,
+        wireframe: !s.graphicsSettings.wireframe
+      }
+    }))
 }));

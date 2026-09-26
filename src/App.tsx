@@ -20,6 +20,8 @@ import { NexusMapModal } from './components/ui/nexus/modals/NexusMapModal';
 import { NexusColonyModal } from './components/ui/nexus/modals/NexusColonyModal';
 import { NexusShipModal } from './components/ui/nexus/modals/NexusShipModal';
 import { NexusAlienModal } from './components/ui/nexus/modals/NexusAlienModal';
+import { NexusGraphicsModal } from './components/ui/nexus/modals/NexusGraphicsModal';
+import { GraphicsDebugPanel } from './components/ui/nexus/hud/GraphicsDebugPanel';
 
 import { LandingTransitionOverlay } from './components/ui/nexus/hud/LandingTransitionOverlay';
 import { AstronautHUD } from './components/ui/nexus/hud/AstronautHUD';
@@ -73,6 +75,7 @@ export const App: FC = () => {
       if (key === 'K') activeModal === 'ship' ? closeModal() : openModal('ship');
       if (key === 'G') activeModal === 'colony' ? closeModal() : openModal('colony');
       if (key === 'X') activeModal === 'alien' ? closeModal() : openModal('alien');
+      if (key === 'O') activeModal === 'graphics' ? closeModal() : openModal('graphics');
 
       if (key === 'E' && hoveredEntity && !isAstronaut) {
         startScan();
@@ -131,6 +134,10 @@ export const App: FC = () => {
       <NexusColonyModal />
       <NexusShipModal />
       <NexusAlienModal />
+      <NexusGraphicsModal />
+
+      {/* Developer Graphics Diagnostic Monitor */}
+      <GraphicsDebugPanel />
     </div>
   );
 };
