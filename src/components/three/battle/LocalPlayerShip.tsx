@@ -6,12 +6,16 @@ import { SHIP_CONFIG } from '../../../config/shipConfig';
 import { SpaceshipPaintSchemeKey } from '../../../config/visualTheme';
 import { sendInput, sendShoot } from '../../../multiplayer/socketClient';
 import { useMultiplayerStore } from '../../../multiplayer/useMultiplayerStore';
+import { nexusAudio } from '../../../utils/nexusAudio';
 
 export const LocalPlayerShip: React.FC = () => {
   const group = useRef<THREE.Group>(null);
   const { camera } = useThree();
+  const isSolo = useMultiplayerStore(state => state.isSolo);
   const playerColor = useMultiplayerStore(state => state.playerColor);
   const selfState = useMultiplayerStore(state => state.selfState);
+  const updateSoloSelf = useMultiplayerStore(state => state.updateSoloSelf);
+  const addSoloProjectile = useMultiplayerStore(state => state.addSoloProjectile);
   
   const [keys, setKeys] = useState<Record<string, boolean>>({});
   const [isMouseDown, setIsMouseDown] = useState(false);
@@ -54,7 +58,7 @@ export const LocalPlayerShip: React.FC = () => {
   useFrame((_, delta) => {
     if (!group.current) return;
 
-    // Initialize position from server on first snapshot
+    // Initialize position from server or solo initial
     if (selfState && !initialPosSet.current) {
       group.current.position.set(selfState.position[0], selfState.position[1], selfState.position[2]);
       rotationEuler.current.set(selfState.rotation[0], selfState.rotation[1], selfState.rotation[2], 'YXZ');
@@ -73,7 +77,7 @@ export const LocalPlayerShip: React.FC = () => {
     const rollInput = (keys['KeyQ'] || keys['Q']) ? 1 : (keys['KeyE'] || keys['E']) ? -1 : 0;
     const pitchInput = (keys['KeyR'] || keys['R']) ? 1 : (keys['KeyF'] || keys['F']) ? -1 : 0;
 
-    const ascendInput = (keys['Space'] || keys[' ']) ? 1 : 0;
+    const ascendInput = (keys['KeyE'] || keys['PageUp'] || keys['Equal']) ? 1 : 0;
     const descendInput = (keys['KeyZ'] || keys['Z'] || keys['ControlLeft'] || keys['ControlRight']) ? 1 : 0;
     const verticalInput = ascendInput - descendInput;
 
@@ -134,24 +138,50 @@ export const LocalPlayerShip: React.FC = () => {
     const lookTarget = group.current.position.clone().add(forwardDir.clone().multiplyScalar(20));
     camera.lookAt(lookTarget);
 
-    // Networking input transmit at ~30Hz
     const now = performance.now();
-    if (now - lastSendTime.current > 33) {
-      sendInput({
-        thrust: forwardInput,
-        yaw: yawInput,
-        pitch: pitchInput,
-        roll: rollInput,
-        vertical: verticalInput,
-        boost: isBoosting,
-        brake: isBraking
-      });
-      lastSendTime.current = now;
+
+    // Solo mode self update vs Multiplayer socket input
+    if (isSolo) {
+      updateSoloSelf(
+        [group.current.position.x, group.current.position.y, group.current.position.z],
+        [rotationEuler.current.x, rotationEuler.current.y, rotationEuler.current.z],
+        [forwardDir.x * velocity.current.z, forwardDir.y * velocity.current.z, forwardDir.z * velocity.current.z],
+        selfState?.hp ?? 100,
+        isBoosting,
+        Math.min(Math.abs(velocity.current.z) / SHIP_CONFIG.maxSpeed, 1)
+      );
+    } else {
+      if (now - lastSendTime.current > 33) {
+        sendInput({
+          thrust: forwardInput,
+          yaw: yawInput,
+          pitch: pitchInput,
+          roll: rollInput,
+          vertical: verticalInput,
+          boost: isBoosting,
+          brake: isBraking
+        });
+        lastSendTime.current = now;
+      }
     }
     
-    // Shooting
-    if (isMouseDown && now - lastShootTime.current > 300) {
-      sendShoot();
+    // Shooting (Left-click, Space, or J)
+    const isShooting = isMouseDown || keys['Space'] || keys[' '];
+    if (isShooting && now - lastShootTime.current > 280) {
+      if (isSolo) {
+        const laserDir = forwardDir.clone().multiplyScalar(150);
+        addSoloProjectile({
+          id: `solo_laser_${Math.random()}`,
+          ownerId: 'solo_player',
+          position: [group.current.position.x, group.current.position.y + 0.2, group.current.position.z],
+          direction: [laserDir.x, laserDir.y, laserDir.z],
+          color: playerColor,
+          createdAt: Date.now()
+        });
+        nexusAudio.playLaser();
+      } else {
+        sendShoot();
+      }
       lastShootTime.current = now;
     }
   });

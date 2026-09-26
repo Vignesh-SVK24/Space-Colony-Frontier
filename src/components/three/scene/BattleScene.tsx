@@ -11,16 +11,20 @@ import { LocalPlayerShip } from '../battle/LocalPlayerShip';
 import { RemotePlayerShip } from '../battle/RemotePlayerShip';
 import { LaserProjectiles } from '../battle/LaserProjectiles';
 import { BattleArena } from '../battle/BattleArena';
+import { SoloAIBot } from '../battle/SoloAIBot';
 import { generateSpaceCubeEnvironment } from '../../../utils/pbrTextureGenerator';
 import { getViewDistanceFar } from '../../../config/graphicsConfig';
 import { useNexusGameStore } from '../../../state/useNexusGameStore';
+import { useMultiplayerStore } from '../../../multiplayer/useMultiplayerStore';
 
 export const BattleScene: React.FC = () => {
   const graphicsSettings = useNexusGameStore((state) => state.graphicsSettings);
+  const isSolo = useMultiplayerStore((state) => state.isSolo);
   const far = getViewDistanceFar(graphicsSettings.viewDistance);
 
   return (
     <Canvas
+      dpr={[1, 2]}
       shadows={graphicsSettings.shadows ? 'soft' : false}
       camera={{ fov: 55, near: 0.1, far }}
       gl={{
@@ -49,6 +53,7 @@ export const BattleScene: React.FC = () => {
       <LocalPlayerShip />
       <RemotePlayerShip />
       <LaserProjectiles />
+      {isSolo && <SoloAIBot />}
       
       {/* Post Processing */}
       <CinematicPostProcessing />
