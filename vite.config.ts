@@ -7,6 +7,9 @@ export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss()],
   assetsInclude: ['**/*.glb', '**/*.gltf', '**/*.wasm'],
+  build: {
+    outDir: 'docs',
+  },
   server: {
     port: 5173,
     host: true,

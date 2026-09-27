@@ -89,7 +89,7 @@ export const LandingPage: React.FC = () => {
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#030712]">
         {/* Fallback image: visible before video loads or if video fails */}
         <img
-          src="/space_landing_bg.jpg"
+          src={`${import.meta.env.BASE_URL}space_landing_bg.jpg`}
           alt="Deep Space Vista"
           className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000 ${
             videoLoaded && !videoError ? 'opacity-0' : 'opacity-100'
@@ -101,8 +101,8 @@ export const LandingPage: React.FC = () => {
         {!videoError && (
           <video
             ref={videoRef}
-            src="/assets/video/gemini_generated_video_2973b38a.mp4"
-            poster="/space_landing_bg.jpg"
+            src={`${import.meta.env.BASE_URL}assets/video/gemini_generated_video_2973b38a.mp4`}
+            poster={`${import.meta.env.BASE_URL}space_landing_bg.jpg`}
             autoPlay
             loop
             muted
