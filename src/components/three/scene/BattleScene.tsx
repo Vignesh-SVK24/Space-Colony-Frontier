@@ -10,6 +10,8 @@ import { CinematicPostProcessing } from './CinematicPostProcessing';
 import { LocalPlayerShip } from '../battle/LocalPlayerShip';
 import { RemotePlayerShip } from '../battle/RemotePlayerShip';
 import { LaserProjectiles } from '../battle/LaserProjectiles';
+import { LaserBeam3D } from '../battle/LaserBeam3D';
+import { LeadReticle3D } from '../battle/LeadReticle3D';
 import { BattleArena } from '../battle/BattleArena';
 import { SoloAIBot } from '../battle/SoloAIBot';
 import { generateSpaceCubeEnvironment } from '../../../utils/pbrTextureGenerator';
@@ -53,7 +55,10 @@ export const BattleScene: React.FC = () => {
       <LocalPlayerShip />
       <RemotePlayerShip />
       <LaserProjectiles />
+      <LaserBeam3D />
+      <LeadReticle3D />
       {isSolo && <SoloAIBot />}
+
       
       {/* Post Processing */}
       <CinematicPostProcessing />

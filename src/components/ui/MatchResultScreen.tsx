@@ -1,6 +1,6 @@
 import React from 'react';
 import { useMultiplayerStore } from '../../multiplayer/useMultiplayerStore';
-import { disconnect } from '../../multiplayer/socketClient';
+import { disconnect, requestRematch } from '../../multiplayer/socketClient';
 import { Crosshair, ShieldAlert, Target, Clock, Trophy, Skull, RotateCcw, Home } from 'lucide-react';
 
 export const MatchResultScreen: React.FC = () => {
@@ -21,7 +21,7 @@ export const MatchResultScreen: React.FC = () => {
     if (isSolo) {
       startSoloGame();
     } else {
-      reset();
+      requestRematch();
     }
   };
 

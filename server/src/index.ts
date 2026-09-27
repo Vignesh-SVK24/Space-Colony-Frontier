@@ -6,7 +6,7 @@ import { RoomManager } from './RoomManager.js';
 import { CombatSystem } from './CombatSystem.js';
 import { CollisionSystem } from './CollisionSystem.js';
 import { GameLoop } from './GameLoop.js';
-import { PlayerInput } from './types.js';
+import { PlayerInput, RoomState } from './types.js';
 
 const app = express();
 app.use(cors());
@@ -25,35 +25,60 @@ const collisionSystem = new CollisionSystem();
 const gameLoop = new GameLoop(io, roomManager, combatSystem, collisionSystem);
 
 io.on('connection', (socket) => {
-    console.log(`Player connected: ${socket.id}`);
+    console.log(`[Server] Player connected: ${socket.id}`);
 
-    socket.on('create_room', (data: { playerName: string, playerColor: string }) => {
+    socket.on('create_room', (data: { playerName: string; playerColor: string }) => {
         roomManager.createRoom(socket, data.playerName, data.playerColor);
     });
 
-    socket.on('join_room', (data: { roomCode: string, playerName: string, playerColor: string }) => {
+    socket.on('join_room', (data: { roomCode: string; playerName: string; playerColor: string }) => {
         roomManager.joinRoom(socket, data.roomCode, data.playerName, data.playerColor);
     });
 
     socket.on('player_input', (input: PlayerInput) => {
         const room = roomManager.getRoomForPlayer(socket.id);
-        if (room && room.state === 'BATTLE') {
+        if (room && room.state === RoomState.BATTLE) {
             const player = room.players.get(socket.id);
-            if (player) {
+            if (player && player.hp > 0) {
                 player.lastInput = input;
             }
         }
     });
 
-    socket.on('shoot', () => {
+    // Authoritative Bullet Firing
+    socket.on('shoot', (data?: { origin?: { x: number; y: number; z: number }; direction?: { x: number; y: number; z: number } }) => {
         const room = roomManager.getRoomForPlayer(socket.id);
         if (room) {
-            combatSystem.shoot(room, socket.id);
+            combatSystem.shoot(room, socket.id, data?.origin, data?.direction);
+        }
+    });
+
+    socket.on('fire_bullet', (data?: { origin?: { x: number; y: number; z: number }; direction?: { x: number; y: number; z: number } }) => {
+        const room = roomManager.getRoomForPlayer(socket.id);
+        if (room) {
+            combatSystem.shoot(room, socket.id, data?.origin, data?.direction);
+        }
+    });
+
+    // Authoritative Laser Beam (5-Second Recharge)
+    socket.on('fire_laser', (data?: { origin?: { x: number; y: number; z: number }; direction?: { x: number; y: number; z: number } }) => {
+        const room = roomManager.getRoomForPlayer(socket.id);
+        if (room) {
+            combatSystem.fireLaser(room, socket.id, data?.origin, data?.direction);
+        }
+    });
+
+    // Instant Rematch Request
+    socket.on('request_rematch', () => {
+        const room = roomManager.getRoomForPlayer(socket.id);
+        if (room) {
+            console.log(`[Server] Rematch requested in room ${room.code}`);
+            roomManager.resetMatch(room.id);
         }
     });
 
     socket.on('disconnect', () => {
-        console.log(`Player disconnected: ${socket.id}`);
+        console.log(`[Server] Player disconnected: ${socket.id}`);
         roomManager.handleDisconnect(socket);
     });
 });

@@ -35,6 +35,31 @@ export interface ProjectileState {
   createdAt: number;
 }
 
+export interface LaserEvent {
+  shooterId: string;
+  start: [number, number, number];
+  end: [number, number, number];
+  blocked: boolean;
+  hitTargetId?: string;
+  color: BattleColor;
+  timestamp: number;
+}
+
+export interface DamageEvent {
+  targetId: string;
+  attackerId: string;
+  damage: number;
+  newHp: number;
+  weapon: 'bullet' | 'laser' | 'collision';
+  timestamp: number;
+}
+
+export interface LeadIndicatorInfo {
+  worldPos: [number, number, number];
+  distance: number;
+  visible: boolean;
+}
+
 export interface RoomInfo {
   code: string;
   players: { id: string; name: string; color: BattleColor }[];
@@ -64,4 +89,5 @@ export interface HitEvent {
   shooterId: string;
   damage: number;
   newHp: number;
+  weapon?: 'bullet' | 'laser' | 'collision';
 }

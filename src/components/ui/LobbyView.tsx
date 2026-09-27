@@ -53,7 +53,7 @@ export const LobbyView: React.FC = () => {
           </button>
 
           <p className="text-[10px] text-gray-500 mt-2 tracking-wider uppercase">
-            {copied ? 'Code copied to clipboard!' : 'Share this 4-character code with opponent'}
+            {copied ? 'Code copied to clipboard!' : 'Share this 6-character room code with opponent'}
           </p>
         </div>
 

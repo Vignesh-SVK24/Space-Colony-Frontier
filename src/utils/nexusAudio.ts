@@ -224,6 +224,55 @@ class NexusAudioEngine {
       });
     } catch {}
   }
+
+  /** Vessel explosion rumble SFX */
+  public playExplosion() {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(90, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(25, ctx.currentTime + 0.45);
+
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.45);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.45);
+    } catch {}
+  }
+
+  /** Defeat sombre tone */
+  public playDefeat() {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      [330, 293.66, 261.63, 220].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.15);
+
+        gain.gain.setValueAtTime(0.06, ctx.currentTime + i * 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.15 + 0.4);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(ctx.currentTime + i * 0.15);
+        osc.stop(ctx.currentTime + i * 0.15 + 0.4);
+      });
+    } catch {}
+  }
 }
 
 export const nexusAudio = new NexusAudioEngine();

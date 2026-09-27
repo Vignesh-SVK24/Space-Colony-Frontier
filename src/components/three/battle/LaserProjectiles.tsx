@@ -18,15 +18,19 @@ export const LaserProjectiles: React.FC = () => {
   useFrame((_, delta) => {
     if (!group.current) return;
     
-    // Client-side prediction
+    // Client-side prediction & interpolation with authoritative position
     projectiles.forEach(p => {
       let loc = localProjectiles.current.get(p.id);
+      const incomingPos = new THREE.Vector3().fromArray(p.position);
+      const incomingDir = new THREE.Vector3().fromArray(p.direction).normalize();
+
       if (!loc) {
-        loc = { pos: new THREE.Vector3().fromArray(p.position), dir: new THREE.Vector3().fromArray(p.direction).normalize() };
+        loc = { pos: incomingPos.clone(), dir: incomingDir };
         localProjectiles.current.set(p.id, loc);
       } else {
-        // Assume laser speed of 200 units/sec
-        loc.pos.addScaledVector(loc.dir, 200 * delta);
+        // Reconcile toward authoritative snapshot position and advance
+        loc.pos.lerp(incomingPos, Math.min(1, delta * 15));
+        loc.pos.addScaledVector(loc.dir, 145 * delta);
       }
     });
 
