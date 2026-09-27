@@ -84,7 +84,7 @@ export const LandingPage: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-[100dvh] w-full bg-[#030712] font-mono text-gray-100 overflow-y-auto overflow-x-hidden select-none">
+    <div className="relative flex flex-col min-h-screen w-full overflow-hidden bg-[#030712] font-mono text-gray-100 overflow-y-auto overflow-x-hidden select-none">
       
       {/* ========================================================================= */}
       {/* LAYER 1: Full Cinematic Deep-Space Background Video                      */}
@@ -138,9 +138,9 @@ export const LandingPage: React.FC = () => {
       {/* ========================================================================= */}
       {/* LAYER 3: Landing Page UI & Interactive Panels                             */}
       {/* ========================================================================= */}
-      <div className="relative z-10 flex flex-col-reverse lg:flex-row min-h-[100dvh] w-full">
+      <div className="relative z-10 flex flex-col-reverse lg:flex-row min-h-screen w-full">
         {/* Left Operations Panel: Mode Selection & Setup */}
-        <div className="flex-1 p-4 sm:p-8 lg:p-12 flex flex-col justify-center max-w-xl mx-auto w-full border-t lg:border-t-0 lg:border-r border-cyan-500/20 bg-black/45 lg:bg-black/35 backdrop-blur-md z-10">
+        <div className="flex-1 p-4 sm:p-8 lg:p-12 flex flex-col justify-center max-w-xl mx-auto w-full overflow-y-auto border-t lg:border-t-0 lg:border-r border-cyan-500/20 bg-black/45 lg:bg-black/35 backdrop-blur-md z-10">
           
           {/* Title Header with Fullscreen Toggle */}
           <div className="mb-6 sm:mb-8 flex items-start justify-between">
@@ -406,7 +406,7 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Create Room Button */}
-            <button 
+            <button type="button"
               onClick={handleCreate}
               className="w-full bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white font-bold py-3.5 px-4 rounded-lg uppercase tracking-widest text-xs sm:text-sm transition-all shadow-[0_0_15px_rgba(2,132,199,0.25)] flex items-center justify-center gap-2 cursor-pointer"
             >
