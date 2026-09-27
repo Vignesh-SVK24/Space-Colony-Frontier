@@ -4,16 +4,20 @@ import * as THREE from 'three';
 import { SpaceshipModel } from '../spaceships/SpaceshipModel';
 import { SpaceshipPaintSchemeKey } from '../../../config/visualTheme';
 import { useMultiplayerStore } from '../../../multiplayer/useMultiplayerStore';
+import { PlayerState } from '../../../multiplayer/types';
 
-export const RemotePlayerShip: React.FC = () => {
+interface RemotePlayerShipProps {
+  player: PlayerState;
+}
+
+export const RemotePlayerShip: React.FC<RemotePlayerShipProps> = ({ player }) => {
   const group = useRef<THREE.Group>(null);
-  const opponentState = useMultiplayerStore(state => state.opponentState);
   
   const targetPos = useRef(new THREE.Vector3());
   const targetQuat = useRef(new THREE.Quaternion());
 
   const getPaintScheme = (color: string): SpaceshipPaintSchemeKey => {
-    switch(color) {
+    switch (color) {
       case 'yellow': return 'battle_yellow';
       case 'blue': return 'battle_blue';
       case 'red': return 'battle_red';
@@ -23,48 +27,50 @@ export const RemotePlayerShip: React.FC = () => {
   };
 
   const nameTexture = useMemo(() => {
-    if (!opponentState) return null;
+    if (!player) return null;
     if (typeof document === 'undefined') return null;
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 128;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
       ctx.fillRect(0, 0, 512, 128);
-      ctx.font = 'bold 48px monospace';
-      ctx.fillStyle = 'white';
+      ctx.font = 'bold 44px monospace';
+      ctx.fillStyle = player.alive ? 'white' : '#ef4444';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(opponentState.name || 'Opponent', 256, 40);
+      ctx.fillText(player.alive ? (player.name || 'Pilot') : `${player.name || 'Pilot'} [ELIMINATED]`, 256, 38);
       
       // HP Bar
-      const hpPercent = Math.max(0, opponentState.hp / 100);
-      ctx.fillStyle = 'red';
-      ctx.fillRect(56, 70, 400, 20);
-      ctx.fillStyle = hpPercent > 0.6 ? 'lime' : hpPercent > 0.3 ? 'yellow' : 'red';
-      ctx.fillRect(56, 70, 400 * hpPercent, 20);
+      const hpPercent = Math.max(0, player.hp / 100);
+      ctx.fillStyle = '#450a0a';
+      ctx.fillRect(56, 74, 400, 22);
+      ctx.fillStyle = hpPercent > 0.6 ? '#22c55e' : hpPercent > 0.3 ? '#eab308' : '#ef4444';
+      ctx.fillRect(56, 74, 400 * hpPercent, 22);
     }
     const tex = new THREE.CanvasTexture(canvas);
     tex.needsUpdate = true;
     return tex;
-  }, [opponentState?.name, opponentState?.hp]);
+  }, [player?.name, player?.hp, player?.alive]);
 
   useFrame((_, delta) => {
-    if (!group.current || !opponentState) return;
+    if (!group.current || !player) return;
     
-    targetPos.current.set(opponentState.position[0], opponentState.position[1], opponentState.position[2]);
-    const euler = new THREE.Euler(opponentState.rotation[0], opponentState.rotation[1], opponentState.rotation[2], 'YXZ');
+    targetPos.current.set(player.position[0], player.position[1], player.position[2]);
+    const euler = new THREE.Euler(player.rotation[0], player.rotation[1], player.rotation[2], 'YXZ');
     targetQuat.current.setFromEuler(euler);
 
-    group.current.position.lerp(targetPos.current, delta * 10);
-    group.current.quaternion.slerp(targetQuat.current, delta * 10);
+    group.current.position.lerp(targetPos.current, delta * 12);
+    group.current.quaternion.slerp(targetQuat.current, delta * 12);
   });
 
-  if (!opponentState) return null;
+  if (!player) return null;
+  // If destroyed in battle royale, ship is removed from arena
+  if (!player.alive && player.hp <= 0) return null;
 
-  const velMag = opponentState.velocity
-    ? Math.hypot(opponentState.velocity[0], opponentState.velocity[1], opponentState.velocity[2])
+  const velMag = player.velocity
+    ? Math.hypot(player.velocity[0], player.velocity[1], player.velocity[2])
     : 0;
 
   const showCombatHitboxes = useMultiplayerStore(state => state.showCombatHitboxes);
@@ -72,13 +78,13 @@ export const RemotePlayerShip: React.FC = () => {
   return (
     <group ref={group}>
       <SpaceshipModel 
-        paintScheme={getPaintScheme(opponentState.color)} 
+        paintScheme={getPaintScheme(player.color)} 
         throttle={Math.min(velMag / 50, 1)}
-        isBoosting={opponentState.isBoosting}
-        damaged={opponentState.hp < 40}
+        isBoosting={player.isBoosting}
+        damaged={player.hp < 40}
       />
       {nameTexture && (
-        <sprite position={[0, 4, 0]} scale={[8, 2, 1]}>
+        <sprite position={[0, 4.5, 0]} scale={[8, 2, 1]}>
           <spriteMaterial map={nameTexture} sizeAttenuation={true} depthTest={false} />
         </sprite>
       )}

@@ -2,12 +2,12 @@ import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMultiplayerStore } from '../../multiplayer/useMultiplayerStore';
-import { createRoom, joinRoom } from '../../multiplayer/socketClient';
+import { createRoom, joinRoom, updateServerUrl } from '../../multiplayer/socketClient';
 import { BattleColor } from '../../multiplayer/types';
 import { SpaceshipModel } from '../three/spaceships/SpaceshipModel';
 import { SpaceshipPaintSchemeKey } from '../../config/visualTheme';
 import { CombatDifficulty } from '../../config/combatConfig';
-import { AlertCircle, Bot, Users, Sparkles, ArrowRight, ArrowLeft, Zap, Maximize, Minimize } from 'lucide-react';
+import { AlertCircle, Bot, Users, Sparkles, ArrowRight, ArrowLeft, Zap, Maximize, Minimize, Server, Edit2 } from 'lucide-react';
 import { enterFullscreen, toggleFullscreen, useFullscreen } from '../../utils/fullscreenHelper';
 
 const COLORS: Record<BattleColor, { hex: string; label: string; scheme: SpaceshipPaintSchemeKey }> = {
@@ -43,10 +43,13 @@ export const LandingPage: React.FC = () => {
     playerColor,
     setPlayerColor,
     error,
+    serverUrl,
     startSoloGame
   } = useMultiplayerStore();
 
   const [joinCode, setJoinCode] = React.useState('');
+  const [editingServer, setEditingServer] = React.useState(false);
+  const [customServerUrl, setCustomServerUrl] = React.useState(serverUrl);
   const { isFullscreen } = useFullscreen();
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -435,6 +438,61 @@ export const LandingPage: React.FC = () => {
               >
                 Join Room
               </button>
+            </div>
+
+            {/* 4-Player Battle Note */}
+            <p className="text-[11px] text-gray-400 text-center uppercase tracking-wider">
+              Up to <span className="text-sky-400 font-bold">4 players</span> can join the same room match!
+            </p>
+
+            {/* Error Banner */}
+            {error && (
+              <div className="p-3 bg-red-950/80 border border-red-500/50 rounded-lg text-red-300 text-xs flex items-center gap-2">
+                <AlertCircle size={16} className="text-red-400 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Server Connection Bar */}
+            <div className="pt-2 border-t border-gray-800/80">
+              <div className="flex items-center justify-between text-[10px] text-gray-400 bg-gray-950/60 p-2.5 rounded-lg border border-gray-800">
+                <div className="flex items-center gap-1.5 truncate">
+                  <Server size={12} className="text-sky-400 shrink-0" />
+                  <span className="truncate">Server: <span className="text-gray-300">{serverUrl}</span></span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingServer(!editingServer)}
+                  className="text-sky-400 hover:text-sky-300 uppercase tracking-wider font-bold ml-2 shrink-0 cursor-pointer flex items-center gap-1"
+                >
+                  <Edit2 size={10} />
+                  <span>{editingServer ? 'Close' : 'Configure'}</span>
+                </button>
+              </div>
+
+              {editingServer && (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={customServerUrl}
+                    onChange={(e) => setCustomServerUrl(e.target.value)}
+                    placeholder="http://localhost:3001"
+                    className="flex-1 bg-gray-950 border border-gray-700 text-xs px-2.5 py-1.5 rounded text-white font-mono focus:border-sky-400 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (customServerUrl.trim()) {
+                        updateServerUrl(customServerUrl.trim());
+                        setEditingServer(false);
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded uppercase tracking-wider cursor-pointer"
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
             </div>
 
           </div>

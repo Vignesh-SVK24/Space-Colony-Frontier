@@ -17,8 +17,8 @@ let socket: Socket | null = null;
 export const connectToServer = () => {
   if (socket?.connected) return;
   
-  const hostname = window.location.hostname || 'localhost';
-  socket = io(`http://${hostname}:3001`, {
+  const targetUrl = useMultiplayerStore.getState().serverUrl || `http://${(typeof window !== 'undefined' && window.location.hostname) || 'localhost'}:3001`;
+  socket = io(targetUrl, {
     autoConnect: true,
     transports: ['websocket', 'polling']
   });
@@ -36,16 +36,19 @@ export const connectToServer = () => {
   });
 
   socket.on('connect_error', () => {
-    useMultiplayerStore.getState().setError('Failed to connect to battle server on port 3001');
+    useMultiplayerStore.getState().setError(`Failed to connect to battle server at ${targetUrl}`);
     useMultiplayerStore.getState().setConnectionQuality('disconnected');
   });
 
-  socket.on('room_created', (data: { roomCode: string; playerId: string }) => {
+  socket.on('room_created', (data: { roomCode: string; playerId: string; playerColor?: BattleColor; players?: any[] }) => {
     useMultiplayerStore.getState().setRoomCode(data.roomCode);
     useMultiplayerStore.getState().setPlayerId(data.playerId);
     useMultiplayerStore.getState().setIsHost(true);
     useMultiplayerStore.getState().setRoomStatus('WAITING');
     useMultiplayerStore.getState().setAppView('LOBBY');
+    if (data.players && Array.isArray(data.players)) {
+      useMultiplayerStore.getState().setRoomPlayers(data.players);
+    }
   });
 
   socket.on('room_joined', (data: any) => {
@@ -55,6 +58,7 @@ export const connectToServer = () => {
       ? roomInfo.players 
       : Object.values(roomInfo?.players || {});
     
+    useMultiplayerStore.getState().setRoomPlayers(players);
     const opponent = players.find(p => p.id !== state.playerId);
     if (opponent) {
       useMultiplayerStore.getState().setOpponentInfo(opponent.name, opponent.color);
@@ -65,16 +69,38 @@ export const connectToServer = () => {
     useMultiplayerStore.getState().setAppView('LOBBY');
   });
 
+  socket.on('room_players_updated', (data: { players: any[] }) => {
+    if (Array.isArray(data?.players)) {
+      useMultiplayerStore.getState().setRoomPlayers(data.players);
+      const myId = useMultiplayerStore.getState().playerId;
+      const opponent = data.players.find((p: any) => p.id !== myId);
+      if (opponent) {
+        useMultiplayerStore.getState().setOpponentInfo(opponent.name, opponent.color);
+      }
+    }
+  });
+
   socket.on('player_joined', (player: { playerName?: string; name?: string; playerColor?: BattleColor; color?: BattleColor }) => {
     const name = player.playerName || player.name || 'Opponent';
     const color = player.playerColor || player.color || 'blue';
     useMultiplayerStore.getState().setOpponentInfo(name, color);
   });
 
-  socket.on('player_left', () => {
-    useMultiplayerStore.getState().setOpponentInfo('', null);
-    useMultiplayerStore.getState().setRoomStatus('WAITING');
-    useMultiplayerStore.getState().setError('Opponent disconnected');
+  socket.on('player_left', (data?: any) => {
+    if (data?.players && Array.isArray(data.players)) {
+      useMultiplayerStore.getState().setRoomPlayers(data.players);
+      const myId = useMultiplayerStore.getState().playerId;
+      const opponent = data.players.find((p: any) => p.id !== myId);
+      if (opponent) {
+        useMultiplayerStore.getState().setOpponentInfo(opponent.name, opponent.color);
+      } else {
+        useMultiplayerStore.getState().setOpponentInfo('', null);
+      }
+    } else {
+      useMultiplayerStore.getState().setOpponentInfo('', null);
+      useMultiplayerStore.getState().setRoomStatus('WAITING');
+      useMultiplayerStore.getState().setError('A pilot left the match');
+    }
   });
 
   socket.on('opponent_disconnected', () => {
@@ -260,6 +286,19 @@ export const sendLaser = (origin?: [number, number, number], direction?: [number
   }
 };
 
+export const startMatch = () => {
+  socket?.emit('start_match');
+};
+
+export const updateServerUrl = (url: string) => {
+  useMultiplayerStore.getState().setServerUrl(url);
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
+  connectToServer();
+};
+
 export const requestRematch = () => {
   socket?.emit('request_rematch');
 };
@@ -273,8 +312,10 @@ export const disconnect = () => {
 
 export const socketClient = {
   connectToServer,
+  updateServerUrl,
   createRoom,
   joinRoom,
+  startMatch,
   sendInput,
   sendShoot,
   sendLaser,

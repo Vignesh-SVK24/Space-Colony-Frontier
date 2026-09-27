@@ -17,6 +17,7 @@ export const LocalPlayerShip: React.FC = () => {
   const playerColor = useMultiplayerStore(state => state.playerColor);
   const selfState = useMultiplayerStore(state => state.selfState);
   const opponentState = useMultiplayerStore(state => state.opponentState);
+  const otherPlayers = useMultiplayerStore(state => state.otherPlayers);
   
   const updateSoloSelf = useMultiplayerStore(state => state.updateSoloSelf);
   const addSoloProjectile = useMultiplayerStore(state => state.addSoloProjectile);
@@ -198,30 +199,43 @@ export const LocalPlayerShip: React.FC = () => {
     }
 
     // ==========================================
-    // 3. Target Lock & Holographic Lead Indicator
+    // 3. Target Lock & Holographic Lead Indicator (Multi-Target Aware)
     // ==========================================
-    if (opponentState) {
-      const oppPos = new THREE.Vector3(...opponentState.position);
-      const toOpp = new THREE.Vector3().subVectors(oppPos, group.current.position);
-      const range = Math.floor(toOpp.length());
-      const oppDirNorm = toOpp.clone().normalize();
-      
-      // Angle between forward direction and opponent
-      const angle = forwardDir.angleTo(oppDirNorm);
-      if (angle < 0.45 && range < 250) {
-        setTargetLock({
-          id: opponentState.id,
-          name: opponentState.name,
-          distance: range,
-          hp: opponentState.hp
-        });
-      } else {
-        setTargetLock(null);
-      }
+    const candidates = (otherPlayers.length > 0 ? otherPlayers : (opponentState ? [opponentState] : []))
+      .filter(p => p && p.alive && p.hp > 0);
 
-      // Compute predictive lead reticle for moving targets
-      if (range < 220 && angle < 0.8) {
-        const oppVel = new THREE.Vector3(...opponentState.velocity);
+    let bestTarget: any = null;
+    let minAngle = 0.55;
+    let bestDist = Infinity;
+
+    for (const cand of candidates) {
+      const pos = new THREE.Vector3(...cand.position);
+      const toCand = new THREE.Vector3().subVectors(pos, group.current.position);
+      const dist = toCand.length();
+      if (dist < 260) {
+        const angle = forwardDir.angleTo(toCand.clone().normalize());
+        if (angle < minAngle) {
+          minAngle = angle;
+          bestTarget = cand;
+          bestDist = dist;
+        }
+      }
+    }
+
+    let aimDist = 120;
+    if (bestTarget) {
+      const oppPos = new THREE.Vector3(...bestTarget.position);
+      const oppVel = new THREE.Vector3(...bestTarget.velocity);
+      const range = Math.floor(bestDist);
+
+      setTargetLock({
+        id: bestTarget.id,
+        name: bestTarget.name,
+        distance: range,
+        hp: bestTarget.hp
+      });
+
+      if (range < 220) {
         const timeToHit = range / COMBAT_CONFIG.BULLET_SPEED;
         const leadWorld = oppPos.clone().add(oppVel.clone().multiplyScalar(timeToHit));
         setLeadIndicator({
@@ -232,6 +246,8 @@ export const LocalPlayerShip: React.FC = () => {
       } else {
         setLeadIndicator(null);
       }
+
+      aimDist = Math.max(15, Math.min(260, bestDist));
     } else {
       setTargetLock(null);
       setLeadIndicator(null);
@@ -250,16 +266,8 @@ export const LocalPlayerShip: React.FC = () => {
     const muzzlePos = group.current.position.clone().add(forwardDir.clone().multiplyScalar(2.0));
 
     // Camera aim ray & 3D crosshair convergence
-    // Eliminates 3.5m vertical parallax between elevated camera and muzzle
     const camDir = new THREE.Vector3();
     camera.getWorldDirection(camDir);
-
-    let aimDist = 120;
-    if (opponentState) {
-      const oppPos = new THREE.Vector3(...opponentState.position);
-      const toOpp = new THREE.Vector3().subVectors(oppPos, camera.position);
-      aimDist = Math.max(15, Math.min(260, toOpp.length()));
-    }
 
     const aimTargetPoint = camera.position.clone().addScaledVector(camDir, aimDist);
     const aimFireDir = new THREE.Vector3().subVectors(aimTargetPoint, muzzlePos).normalize();

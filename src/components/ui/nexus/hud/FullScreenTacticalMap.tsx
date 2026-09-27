@@ -10,6 +10,8 @@ export const FullScreenTacticalMap: React.FC = () => {
   const setMapOpen = useMultiplayerStore(state => state.setMapOpen);
   const selfState = useMultiplayerStore(state => state.selfState);
   const opponentState = useMultiplayerStore(state => state.opponentState);
+  const otherPlayers = useMultiplayerStore(state => state.otherPlayers);
+  const opponentList = otherPlayers.length > 0 ? otherPlayers : (opponentState ? [opponentState] : []);
 
   // Pan & Zoom State
   const [zoom, setZoom] = useState<number>(1.1);
@@ -121,7 +123,6 @@ export const FullScreenTacticalMap: React.FC = () => {
 
   // Heading angle calculation
   const playerYaw = selfState ? selfState.rotation[1] : 0;
-  const oppYaw = opponentState ? opponentState.rotation[1] : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/95 backdrop-blur-xl font-mono text-cyan-400 select-none">
@@ -365,26 +366,33 @@ export const FullScreenTacticalMap: React.FC = () => {
             </g>
           )}
 
-          {/* 4. Opponent Marker (Red) */}
-          {showPlayers && opponentState && oppScreen && (
-            <g transform={`translate(${oppScreen.x}, ${oppScreen.y})`}>
-              {/* Threat Aura */}
-              <circle cx="0" cy="0" r="16" fill="rgba(239, 68, 68, 0.18)" filter="url(#redGlow)" />
-              {/* Heading Pointer Chevron */}
-              <path
-                d="M 0 -10 L 7 8 L 0 5 L -7 8 Z"
-                fill="#ef4444"
-                transform={`rotate(${(-oppYaw * 180) / Math.PI})`}
-              />
-              {/* Opponent Info Plate */}
-              <text x="14" y="-3" fill="#ef4444" fontSize="10" fontWeight="bold">
-                {opponentState.name}
-              </text>
-              <text x="14" y="8" fill="#fda4af" fontSize="8">
-                HP: {Math.max(0, Math.floor(opponentState.hp))}% | ALT: {Math.round(opponentState.position[1])}M
-              </text>
-            </g>
-          )}
+          {/* 4. Opponent Markers */}
+          {showPlayers && opponentList.map((opp) => {
+            const oppScr = worldToScreen(opp.position[0], opp.position[2]);
+            const oppHeading = opp.rotation ? opp.rotation[1] : 0;
+            const oppColorHex = opp.color === 'yellow' ? '#eab308' : opp.color === 'blue' ? '#3b82f6' : opp.color === 'green' ? '#22c55e' : '#ef4444';
+            const isElim = !opp.alive || opp.hp <= 0;
+
+            return (
+              <g key={opp.id} transform={`translate(${oppScr.x}, ${oppScr.y})`}>
+                {/* Threat Aura */}
+                <circle cx="0" cy="0" r="16" fill={isElim ? 'rgba(100, 116, 139, 0.15)' : 'rgba(239, 68, 68, 0.18)'} filter="url(#redGlow)" />
+                {/* Heading Pointer Chevron */}
+                <path
+                  d="M 0 -10 L 7 8 L 0 5 L -7 8 Z"
+                  fill={isElim ? '#64748b' : oppColorHex}
+                  transform={`rotate(${(-oppHeading * 180) / Math.PI})`}
+                />
+                {/* Opponent Info Plate */}
+                <text x="14" y="-3" fill={isElim ? '#94a3b8' : oppColorHex} fontSize="10" fontWeight="bold">
+                  {opp.name} {isElim ? '[KIA]' : ''}
+                </text>
+                <text x="14" y="8" fill="#fda4af" fontSize="8">
+                  HP: {Math.max(0, Math.floor(opp.hp))}% | ALT: {Math.round(opp.position[1])}M
+                </text>
+              </g>
+            );
+          })}
 
           {/* 5. Player Marker (Cyan) */}
           {showPlayers && selfState && playerScreen && (

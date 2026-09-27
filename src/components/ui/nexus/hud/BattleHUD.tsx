@@ -13,6 +13,7 @@ export const BattleHUD: React.FC = () => {
     roomCode,
     selfState,
     opponentState,
+    otherPlayers,
     connectionQuality,
     isSolo,
     reset,
@@ -25,6 +26,8 @@ export const BattleHUD: React.FC = () => {
     countdown,
     roomStatus
   } = useMultiplayerStore();
+
+  const opponentList = otherPlayers.length > 0 ? otherPlayers : (opponentState ? [opponentState] : []);
 
   const { isFullscreen } = useFullscreen();
 
@@ -59,14 +62,6 @@ export const BattleHUD: React.FC = () => {
       case 'poor': return 'text-red-400';
       default: return 'text-gray-500';
     }
-  };
-  
-  const getDistance = () => {
-    if (!selfState || !opponentState) return 0;
-    const dx = selfState.position[0] - opponentState.position[0];
-    const dy = selfState.position[1] - opponentState.position[1];
-    const dz = selfState.position[2] - opponentState.position[2];
-    return Math.floor(Math.sqrt(dx*dx + dy*dy + dz*dz));
   };
 
   const handleExit = () => {
@@ -183,22 +178,61 @@ export const BattleHUD: React.FC = () => {
           </div>
         )}
 
-        {/* Top Right: Opponent Status */}
-        {opponentState && (
-          <div className="absolute top-3 sm:top-4 right-3 sm:right-4 flex flex-col items-end gap-1 z-20">
-            <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-red-400 drop-shadow">
-              {isSolo && <Bot size={14} className="text-red-400" />}
-              <span className="truncate max-w-[130px] sm:max-w-[200px]">{opponentState.name}</span>
-            </div>
-            <div className="text-[10px] sm:text-xs text-gray-300 font-semibold bg-black/60 px-2 py-0.5 rounded border border-gray-800">
-              RANGE: {getDistance()}M
-            </div>
-            <div className="w-[140px] sm:w-[220px] h-[10px] sm:h-[12px] bg-black/80 border border-red-500/50 rounded-xs overflow-hidden relative shadow-lg">
-              <div 
-                className="h-full transition-all duration-300 bg-gradient-to-r from-red-600 to-rose-500"
-                style={{ width: `${Math.max(0, Math.min(100, opponentState.hp))}%` }}
-              />
-            </div>
+        {/* Top Right: Opponents Status Stack (Up to 3 opponents) */}
+        {opponentList.length > 0 && (
+          <div className="absolute top-3 sm:top-4 right-3 sm:right-4 flex flex-col items-end gap-2 z-20">
+            {opponentList.map((opp) => {
+              const isLocked = targetLock?.id === opp.id;
+              const dist = selfState ? Math.floor(
+                Math.hypot(
+                  selfState.position[0] - opp.position[0],
+                  selfState.position[1] - opp.position[1],
+                  selfState.position[2] - opp.position[2]
+                )
+              ) : 0;
+              const isEliminated = !opp.alive || opp.hp <= 0;
+
+              return (
+                <div 
+                  key={opp.id} 
+                  className={`flex flex-col items-end gap-0.5 p-1.5 rounded-lg backdrop-blur-md transition-all ${
+                    isLocked 
+                      ? 'bg-red-950/80 border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]' 
+                      : 'bg-black/60 border border-gray-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-red-400 drop-shadow">
+                    {isSolo && <Bot size={12} className="text-red-400" />}
+                    <span 
+                      className="w-2 h-2 rounded-full shrink-0" 
+                      style={{
+                        backgroundColor: opp.color === 'yellow' ? '#eab308' : opp.color === 'blue' ? '#3b82f6' : opp.color === 'green' ? '#22c55e' : '#ef4444'
+                      }} 
+                    />
+                    <span className="truncate max-w-[110px] sm:max-w-[160px] text-white">
+                      {opp.name}
+                    </span>
+                    {isEliminated && (
+                      <span className="text-[9px] text-red-500 font-black uppercase">
+                        [KIA]
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 text-[9px] text-gray-300 font-semibold">
+                    <span>{dist}M</span>
+                    <span>HP: {Math.max(0, Math.floor(opp.hp))}</span>
+                  </div>
+
+                  <div className="w-[120px] sm:w-[160px] h-[6px] sm:h-[8px] bg-black/80 border border-red-500/40 rounded-xs overflow-hidden relative shadow">
+                    <div 
+                      className={`h-full transition-all duration-300 ${isEliminated ? 'bg-gray-700' : 'bg-gradient-to-r from-red-600 to-rose-500'}`}
+                      style={{ width: `${Math.max(0, Math.min(100, opp.hp))}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 

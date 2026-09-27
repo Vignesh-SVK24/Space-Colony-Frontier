@@ -22,7 +22,12 @@ import { useMultiplayerStore } from '../../../multiplayer/useMultiplayerStore';
 export const BattleScene: React.FC = () => {
   const graphicsSettings = useNexusGameStore((state) => state.graphicsSettings);
   const isSolo = useMultiplayerStore((state) => state.isSolo);
+  const otherPlayers = useMultiplayerStore((state) => state.otherPlayers);
+  const opponentState = useMultiplayerStore((state) => state.opponentState);
   const far = getViewDistanceFar(graphicsSettings.viewDistance);
+
+  // Render up to 3 opponents in 4-player match
+  const remoteShips = otherPlayers.length > 0 ? otherPlayers : (opponentState ? [opponentState] : []);
 
   return (
     <Canvas
@@ -53,7 +58,9 @@ export const BattleScene: React.FC = () => {
       {/* Battle Components */}
       <BattleArena />
       <LocalPlayerShip />
-      <RemotePlayerShip />
+      {remoteShips.map((ship) => (
+        <RemotePlayerShip key={ship.id} player={ship} />
+      ))}
       <LaserProjectiles />
       <LaserBeam3D />
       <LeadReticle3D />

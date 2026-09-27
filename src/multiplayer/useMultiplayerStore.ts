@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import { AppView, BattleColor, RoomStatus, GameSnapshot, PlayerState, ProjectileState, MatchStats, LaserEvent, LeadIndicatorInfo, DamageEvent, CombatTelemetryEntry } from './types';
+import { AppView, BattleColor, RoomStatus, GameSnapshot, PlayerState, ProjectileState, MatchStats, LaserEvent, LeadIndicatorInfo, DamageEvent, CombatTelemetryEntry, RoomPlayerInfo } from './types';
 import { CombatDifficulty } from '../config/combatConfig';
 
-export type { LaserEvent, LeadIndicatorInfo, DamageEvent, CombatTelemetryEntry };
+export type { LaserEvent, LeadIndicatorInfo, DamageEvent, CombatTelemetryEntry, RoomPlayerInfo };
 
 export interface TargetLockInfo {
   id: string;
@@ -26,6 +26,9 @@ interface MultiplayerState {
   opponentColor: BattleColor | null;
   selfState: PlayerState | null;
   opponentState: PlayerState | null;
+  otherPlayers: PlayerState[]; // All remote players in 4-player match
+  roomPlayers: RoomPlayerInfo[]; // All pilots in room lobby
+  serverUrl: string;
   projectiles: ProjectileState[];
   matchResult: MatchStats | null;
   connectionQuality: 'good' | 'fair' | 'poor' | 'disconnected';
@@ -76,6 +79,8 @@ interface MultiplayerState {
   setRoomStatus: (status: RoomStatus) => void;
   setPlayerId: (id: string) => void;
   setOpponentInfo: (name: string, color: BattleColor | null) => void;
+  setRoomPlayers: (players: RoomPlayerInfo[]) => void;
+  setServerUrl: (url: string) => void;
   setIsHost: (isHost: boolean) => void;
   setCountdown: (countdown: number | null) => void;
   setConnectionQuality: (quality: 'good' | 'fair' | 'poor' | 'disconnected') => void;
@@ -115,6 +120,18 @@ interface MultiplayerState {
 
 let hitConfirmTimer: any = null;
 
+const getDefaultServerUrl = () => {
+  if (typeof window === 'undefined') return 'http://localhost:3001';
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const queryServer = params.get('server');
+    if (queryServer) return queryServer;
+    const stored = localStorage.getItem('sfc_server_url');
+    if (stored) return stored;
+  } catch {}
+  return `http://${(typeof window !== 'undefined' && window.location.hostname) || 'localhost'}:3001`;
+};
+
 export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   appView: 'LANDING',
   gameModeSelection: 'SELECT',
@@ -130,6 +147,9 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   opponentColor: null,
   selfState: null,
   opponentState: null,
+  otherPlayers: [],
+  roomPlayers: [],
+  serverUrl: getDefaultServerUrl(),
   projectiles: [],
   matchResult: null,
   connectionQuality: 'disconnected',
@@ -179,14 +199,22 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
         ? { ...state.selfState, hp: event.newHp, alive: event.newHp > 0 }
         : state.selfState;
 
+      const updatedOtherPlayers = state.otherPlayers.map(p => {
+        if (p.id === event.targetId) {
+          return { ...p, hp: event.newHp, alive: event.newHp > 0 };
+        }
+        return p;
+      });
+
       const updatedOpponent = state.opponentState && !isTargetMe
         ? { ...state.opponentState, hp: event.newHp, alive: event.newHp > 0 }
-        : state.opponentState;
+        : (updatedOtherPlayers.length > 0 ? updatedOtherPlayers[0] : state.opponentState);
 
       const newLog = [telemetryEntry, ...state.combatTelemetryLog].slice(0, 15);
 
       return {
         selfState: updatedSelf,
+        otherPlayers: updatedOtherPlayers,
         opponentState: updatedOpponent,
         combatTelemetryLog: newLog,
         lastAppliedServerTick: Math.max(state.lastAppliedServerTick, tick)
@@ -210,30 +238,37 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   setRoomCode: (code) => set({ roomCode: code }),
   
   updateFromSnapshot: (snapshot) => {
-    const { playerId, lastAppliedServerTick, selfState: prevSelf, opponentState: prevOpp } = get();
+    const { playerId, lastAppliedServerTick, selfState: prevSelf } = get();
     const currentTick = snapshot.serverTick ?? 0;
     
     const rawSelf = snapshot.players.find(p => p.id === playerId) || null;
-    const rawOpponent = snapshot.players.find(p => p.id !== playerId) || null;
-
-    // HP regression protection: If snapshot tick is older than last applied damage tick, preserve authoritative HP
     const selfState = rawSelf ? {
       ...rawSelf,
       hp: currentTick < lastAppliedServerTick && prevSelf ? prevSelf.hp : rawSelf.hp,
       alive: (currentTick < lastAppliedServerTick && prevSelf ? prevSelf.hp : rawSelf.hp) > 0
     } : null;
 
-    const opponentState = rawOpponent ? {
-      ...rawOpponent,
-      hp: currentTick < lastAppliedServerTick && prevOpp ? prevOpp.hp : rawOpponent.hp,
-      alive: (currentTick < lastAppliedServerTick && prevOpp ? prevOpp.hp : rawOpponent.hp) > 0
-    } : null;
+    // Up to 3 remote opponents in 4-player match
+    const otherPlayers = snapshot.players
+      .filter(p => p.id !== playerId)
+      .map(p => {
+        const prevP = get().otherPlayers.find(op => op.id === p.id);
+        const hp = currentTick < lastAppliedServerTick && prevP ? prevP.hp : p.hp;
+        return {
+          ...p,
+          hp,
+          alive: hp > 0
+        };
+      });
+
+    const opponentState = otherPlayers.length > 0 ? otherPlayers[0] : null;
 
     set(state => {
       const newBuffer = [...state.snapshotBuffer, snapshot].slice(-2);
       return {
         snapshotBuffer: newBuffer,
         selfState,
+        otherPlayers,
         opponentState,
         projectiles: snapshot.projectiles,
         roomStatus: snapshot.roomStatus,
@@ -281,6 +316,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     opponentColor: null,
     selfState: null,
     opponentState: null,
+    otherPlayers: [],
+    roomPlayers: [],
     projectiles: [],
     matchResult: null,
     countdown: null,
@@ -302,6 +339,13 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   setRoomStatus: (status) => set({ roomStatus: status }),
   setPlayerId: (id) => set({ playerId: id }),
   setOpponentInfo: (name, color) => set({ opponentName: name, opponentColor: color }),
+  setRoomPlayers: (players) => set({ roomPlayers: players }),
+  setServerUrl: (url) => {
+    try {
+      localStorage.setItem('sfc_server_url', url);
+    } catch {}
+    set({ serverUrl: url });
+  },
   setIsHost: (isHost) => set({ isHost }),
   setCountdown: (countdown) => set({ countdown }),
   setConnectionQuality: (quality) => set({ connectionQuality: quality }),
@@ -357,6 +401,11 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
       playerColor,
       selfState: initialSelf,
       opponentState: initialOpponent,
+      otherPlayers: [initialOpponent],
+      roomPlayers: [
+        { id: 'solo_player', name, color: playerColor, isHost: true, slot: 1, ready: true },
+        { id: 'solo_ai_drone', name: `TARGET DRONE (${diffLabel})`, color: opponentCol, isHost: false, slot: 2, ready: true }
+      ],
       opponentName: `TARGET DRONE (${diffLabel})`,
       opponentColor: opponentCol,
       roomCode: 'SOLO',
@@ -398,17 +447,19 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   updateSoloOpponent: (pos, rot, vel, hp, isBoosting, throttle) => {
     set(state => {
       if (!state.opponentState) return {};
+      const updatedOpponent = {
+        ...state.opponentState,
+        position: pos,
+        rotation: rot,
+        velocity: vel,
+        hp,
+        alive: hp > 0,
+        isBoosting,
+        throttle
+      };
       return {
-        opponentState: {
-          ...state.opponentState,
-          position: pos,
-          rotation: rot,
-          velocity: vel,
-          hp,
-          alive: hp > 0,
-          isBoosting,
-          throttle
-        }
+        opponentState: updatedOpponent,
+        otherPlayers: [updatedOpponent]
       };
     });
   },
@@ -439,12 +490,14 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     set(state => {
       if (!state.opponentState) return {};
       const newHp = Math.max(0, state.opponentState.hp - damage);
+      const updatedOpp = {
+        ...state.opponentState,
+        hp: newHp,
+        alive: newHp > 0
+      };
       return {
-        opponentState: {
-          ...state.opponentState,
-          hp: newHp,
-          alive: newHp > 0
-        }
+        opponentState: updatedOpp,
+        otherPlayers: [updatedOpp]
       };
     });
   }

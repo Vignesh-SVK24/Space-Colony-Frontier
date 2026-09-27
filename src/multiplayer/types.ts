@@ -77,9 +77,18 @@ export interface LeadIndicatorInfo {
   visible: boolean;
 }
 
+export interface RoomPlayerInfo {
+  id: string;
+  name: string;
+  color: BattleColor;
+  ready?: boolean;
+  isHost?: boolean;
+  slot?: number;
+}
+
 export interface RoomInfo {
   code: string;
-  players: { id: string; name: string; color: BattleColor }[];
+  players: RoomPlayerInfo[];
   status: RoomStatus;
 }
 

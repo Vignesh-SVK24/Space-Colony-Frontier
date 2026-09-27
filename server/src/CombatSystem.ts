@@ -373,23 +373,33 @@ export class CombatSystem {
         this.io.to(room.id).emit('DAMAGE_APPLIED', damageEvent);
 
         if (target.hp <= 0) {
-            room.state = RoomState.FINISHED;
-            room.winnerId = attackerId;
+            const alivePlayers = Array.from(room.players.values()).filter(p => p.hp > 0);
 
             this.io.to(room.id).emit('player_eliminated', {
                 eliminatedId: targetId,
-                winnerId: attackerId
+                winnerId: attackerId,
+                remainingAliveCount: alivePlayers.length
             });
 
-            const matchDuration = Math.max(1, Math.floor((now - (room.battleStartTime || room.createdAt)) / 1000));
-            this.io.to(room.id).emit('match_end', {
-                winnerId: attackerId,
-                loserId: targetId,
-                stats: {
-                    damageDealt: 100,
-                    matchDuration
-                }
-            });
+            // Match ends only when 1 or fewer players remain alive
+            if (alivePlayers.length <= 1) {
+                room.state = RoomState.FINISHED;
+                const winner = alivePlayers.length === 1 ? alivePlayers[0] : room.players.get(attackerId);
+                const winnerId = winner ? winner.id : attackerId;
+                const winnerName = winner ? winner.name : 'Champion Pilot';
+                room.winnerId = winnerId;
+
+                const matchDuration = Math.max(1, Math.floor((now - (room.battleStartTime || room.createdAt)) / 1000));
+                this.io.to(room.id).emit('match_end', {
+                    winnerId,
+                    winnerName,
+                    loserId: targetId,
+                    stats: {
+                        damageDealt: 100,
+                        matchDuration
+                    }
+                });
+            }
         }
     }
 }

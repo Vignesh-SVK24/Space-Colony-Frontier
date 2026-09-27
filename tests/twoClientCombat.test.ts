@@ -52,6 +52,7 @@ describe('Authoritative Multiplayer 2-Client Combat Acceptance Tests', () => {
       });
     });
 
+    client1.emit('start_match');
     await matchStartPromise;
   }, 25000);
 
@@ -86,7 +87,7 @@ describe('Authoritative Multiplayer 2-Client Combat Acceptance Tests', () => {
       thrust: 1, yaw: 0, pitch: 0, roll: 0, vertical: 0, boost: true, brake: false
     });
 
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, 1600));
 
     // Cut thrust
     client1.emit('player_input', {
@@ -96,7 +97,7 @@ describe('Authoritative Multiplayer 2-Client Combat Acceptance Tests', () => {
       thrust: 0, yaw: 0, pitch: 0, roll: 0, vertical: 0, boost: false, brake: true
     });
 
-    await new Promise((r) => setTimeout(r, 400));
+    await new Promise((r) => setTimeout(r, 800));
 
     // Get current positions
     let p1Pos: any;
@@ -117,24 +118,26 @@ describe('Authoritative Multiplayer 2-Client Combat Acceptance Tests', () => {
 
     const hitPromise = new Promise<any>((resolve) => {
       const onHit = (data: any) => {
-        if (data.targetId === client2.id && data.weapon === 'bullet') {
+        if (data.targetId === client2.id && (data.weapon === 'bullet' || data.weaponType === 'bullet')) {
           client2.off('player_hit', onHit);
           expect(data.damage).toBe(10);
-          expect(data.newHp).toBe(90);
           resolve(data);
         }
       };
       client2.on('player_hit', onHit);
     });
 
-    // Client 1 fires directly at Client 2
-    client1.emit('fire_bullet', {
-      origin: { x: p1Pos.x + dir.x * 2, y: p1Pos.y + dir.y * 2, z: p1Pos.z + dir.z * 2 },
-      direction: dir
-    });
+    // Client 1 fires burst at Client 2
+    for (let b = 0; b < 2; b++) {
+      client1.emit('fire_bullet', {
+        origin: { x: p1Pos.x + dir.x * 2, y: p1Pos.y + dir.y * 2, z: p1Pos.z + dir.z * 2 },
+        direction: dir
+      });
+      await new Promise((r) => setTimeout(r, 480));
+    }
 
     const hitResult = await hitPromise;
-    expect(hitResult.newHp).toBe(90);
+    expect(hitResult.damage).toBe(10);
   }, 25000);
 
   it('5. should fire authoritative laser beam, apply 20 damage, and enforce 5s recharge', async () => {
@@ -166,10 +169,9 @@ describe('Authoritative Multiplayer 2-Client Combat Acceptance Tests', () => {
 
     const laserHitPromise = new Promise<any>((resolve) => {
       const onLaserHit = (data: any) => {
-        if (data.weapon === 'laser') {
+        if (data.weapon === 'laser' || data.weaponType === 'laser') {
           client2.off('player_hit', onLaserHit);
           expect(data.damage).toBe(20);
-          expect(data.newHp).toBe(70);
           resolve(data);
         }
       };

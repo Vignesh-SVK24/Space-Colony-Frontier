@@ -68,6 +68,11 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Host Launches Match
+    socket.on('start_match', () => {
+        roomManager.startMatch(socket.id);
+    });
+
     // Instant Rematch Request
     socket.on('request_rematch', () => {
         const room = roomManager.getRoomForPlayer(socket.id);
