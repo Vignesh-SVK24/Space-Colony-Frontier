@@ -5,7 +5,6 @@ import {
   PlayerState,
   ProjectileState,
   GameSnapshot,
-  HitEvent,
   DamageEvent,
   LaserEvent,
   MatchStats
@@ -148,6 +147,7 @@ export const connectToServer = () => {
     const snapshot: GameSnapshot = {
       players,
       projectiles,
+      serverTick: raw.serverTick,
       timestamp: raw.timestamp || Date.now(),
       roomStatus: raw.roomStatus || useMultiplayerStore.getState().roomStatus
     };
@@ -168,27 +168,20 @@ export const connectToServer = () => {
     useMultiplayerStore.getState().setLaserCooldownRemaining(parseFloat(data.remaining));
   });
 
-  // Authoritative Damage Event
-  socket.on('player_hit', (event: HitEvent) => {
+  // Authoritative Damage Event with tick sequence tracking
+  const onDamageApplied = (event: DamageEvent) => {
+    useMultiplayerStore.getState().handleDamageApplied(event);
     const myId = useMultiplayerStore.getState().playerId;
     if (event.targetId === myId) {
-      useMultiplayerStore.getState().handleHit();
       nexusAudio.playWarning();
-    } else if (event.shooterId === myId) {
-      // Confirmed hit on opponent!
-      useMultiplayerStore.getState().triggerHitConfirm();
+    } else if (event.attackerId === myId) {
       nexusAudio.playHit();
     }
-  });
+  };
 
-  socket.on('damage_applied', (event: DamageEvent) => {
-    const myId = useMultiplayerStore.getState().playerId;
-    if (event.targetId === myId) {
-      useMultiplayerStore.getState().handleHit();
-    } else if (event.attackerId === myId) {
-      useMultiplayerStore.getState().triggerHitConfirm();
-    }
-  });
+  socket.on('player_hit', onDamageApplied);
+  socket.on('damage_applied', onDamageApplied);
+  socket.on('DAMAGE_APPLIED', onDamageApplied);
 
   socket.on('player_eliminated', () => {
     nexusAudio.playExplosion();
@@ -242,23 +235,27 @@ export const sendInput = (input: PlayerInput) => {
   }
 };
 
-export const sendShoot = (origin?: [number, number, number], direction?: [number, number, number]) => {
+export const sendShoot = (origin?: [number, number, number], direction?: [number, number, number], attackId?: string) => {
   if (useMultiplayerStore.getState().roomStatus === 'BATTLE') {
-    const payload = origin && direction ? {
-      origin: { x: origin[0], y: origin[1], z: origin[2] },
-      direction: { x: direction[0], y: direction[1], z: direction[2] }
-    } : undefined;
+    const finalAttackId = attackId || `BULLET_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const payload = {
+      origin: origin ? { x: origin[0], y: origin[1], z: origin[2] } : undefined,
+      direction: direction ? { x: direction[0], y: direction[1], z: direction[2] } : undefined,
+      attackId: finalAttackId
+    };
     socket?.emit('shoot', payload);
     socket?.emit('fire_bullet', payload);
   }
 };
 
-export const sendLaser = (origin?: [number, number, number], direction?: [number, number, number]) => {
+export const sendLaser = (origin?: [number, number, number], direction?: [number, number, number], attackId?: string) => {
   if (useMultiplayerStore.getState().roomStatus === 'BATTLE') {
-    const payload = origin && direction ? {
-      origin: { x: origin[0], y: origin[1], z: origin[2] },
-      direction: { x: direction[0], y: direction[1], z: direction[2] }
-    } : undefined;
+    const finalAttackId = attackId || `LASER_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const payload = {
+      origin: origin ? { x: origin[0], y: origin[1], z: origin[2] } : undefined,
+      direction: direction ? { x: direction[0], y: direction[1], z: direction[2] } : undefined,
+      attackId: finalAttackId
+    };
     socket?.emit('fire_laser', payload);
   }
 };

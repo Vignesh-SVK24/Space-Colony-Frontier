@@ -33,14 +33,22 @@ export interface PlayerState {
 
 export interface Projectile {
     id: string;
+    attackId: string;
     shooterId: string;
+    ownerId?: string;
+    weaponType: 'BULLET' | 'bullet';
     position: Vector3;
     prevPosition: Vector3; // for swept continuous collision
     velocity: Vector3;
+    speed: number;
+    damage: number;
     spawnTime: number;
+    lifeTime?: number;
+    maxDistance: number;
 }
 
 export interface LaserEvent {
+    attackId: string;
     shooterId: string;
     start: [number, number, number];
     end: [number, number, number];
@@ -51,17 +59,23 @@ export interface LaserEvent {
 }
 
 export interface DamageEvent {
-    targetId: string;
+    attackId: string;
     attackerId: string;
+    defenderId: string;
+    targetId: string; // backwards compatibility alias
+    weaponType: 'BULLET' | 'LASER' | 'COLLISION' | 'bullet' | 'laser' | 'collision';
+    weapon: 'bullet' | 'laser' | 'collision'; // backwards compatibility alias
     damage: number;
-    newHp: number;
-    weapon: 'bullet' | 'laser' | 'collision';
+    remainingHp: number;
+    newHp: number; // backwards compatibility alias
     timestamp: number;
+    serverTick: number;
 }
 
 export interface GameSnapshot {
     players: Record<string, PlayerState>;
     projectiles: Projectile[];
+    serverTick: number;
     timestamp: number;
 }
 
@@ -78,6 +92,8 @@ export interface Room {
     state: RoomState;
     players: Map<string, PlayerState>;
     projectiles: Projectile[];
+    processedAttacks: Set<string>; // Attack deduplication registry
+    tickCount: number;
     createdAt: number;
     battleStartTime?: number;
     winnerId?: string;
@@ -113,7 +129,9 @@ export const COMBAT = {
     BULLET_SPEED: 145,
     BULLET_COOLDOWN: 450, // ms
     BULLET_LIFETIME: 2200, // ms
-    BULLET_HITBOX_RADIUS: 4.5, // forgiving combat volume
+    BULLET_MAX_DISTANCE: 320,
+    BULLET_HITBOX_RADIUS: 4.8, // 10-20% forgiving combat hitbox
+    HITBOX_RADIUS: 4.8, // alias
 
     LASER_DAMAGE: 20,
     LASER_RANGE: 220,
@@ -122,8 +140,10 @@ export const COMBAT = {
 
     AIM_ASSIST_ENABLED: true,
     AIM_ASSIST_ANGLE: 0.08, // ~4.6 degrees
+    AIM_ASSIST_STRENGTH: 0.55,
     AIM_ASSIST_MAX_DIST: 200,
 
     SPAWN_PROTECTION_TIME: 2000, // ms
-    COUNTDOWN_SECONDS: 3
+    COUNTDOWN_SECONDS: 3,
+    COLLISION_DAMAGE: 15
 };

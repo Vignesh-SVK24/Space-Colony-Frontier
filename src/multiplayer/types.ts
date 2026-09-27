@@ -46,12 +46,29 @@ export interface LaserEvent {
 }
 
 export interface DamageEvent {
+  attackId?: string;
   targetId: string;
   attackerId: string;
+  defenderId?: string;
   damage: number;
   newHp: number;
+  remainingHp?: number;
   weapon: 'bullet' | 'laser' | 'collision';
+  weaponType?: 'bullet' | 'laser' | 'collision' | 'BULLET' | 'LASER' | 'COLLISION';
+  serverTick?: number;
   timestamp: number;
+}
+
+export interface CombatTelemetryEntry {
+  id: string;
+  attackId: string;
+  timestamp: number;
+  serverTick: number;
+  weapon: string;
+  attackerId: string;
+  targetId: string;
+  damage: number;
+  remainingHp: number;
 }
 
 export interface LeadIndicatorInfo {
@@ -70,6 +87,7 @@ export interface GameSnapshot {
   players: PlayerState[];
   projectiles: ProjectileState[];
   timestamp: number;
+  serverTick?: number;
   roomStatus: RoomStatus;
 }
 

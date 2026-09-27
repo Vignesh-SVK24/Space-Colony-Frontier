@@ -35,7 +35,8 @@ export class CombatSystem {
         room: Room,
         playerId: string,
         clientOrigin?: { x: number; y: number; z: number },
-        clientDir?: { x: number; y: number; z: number }
+        clientDir?: { x: number; y: number; z: number },
+        attackId?: string
     ) {
         if (room.state !== RoomState.BATTLE) return;
 
@@ -112,9 +113,16 @@ export class CombatSystem {
             }
         }
 
+        const bulletAttackId = attackId || `BULLET_${now}_${uuidv4().substring(0, 8)}`;
+
         const projectile: Projectile = {
             id: uuidv4(),
+            attackId: bulletAttackId,
             shooterId: playerId,
+            weaponType: 'bullet',
+            damage: COMBAT.BULLET_DAMAGE,
+            speed: COMBAT.BULLET_SPEED,
+            maxDistance: COMBAT.BULLET_MAX_DISTANCE,
             position: { ...origin },
             prevPosition: { ...origin },
             velocity: {
@@ -132,7 +140,8 @@ export class CombatSystem {
         room: Room,
         playerId: string,
         clientOrigin?: { x: number; y: number; z: number },
-        clientDir?: { x: number; y: number; z: number }
+        clientDir?: { x: number; y: number; z: number },
+        attackId?: string
     ) {
         if (room.state !== RoomState.BATTLE) return;
 
@@ -221,8 +230,11 @@ export class CombatSystem {
             }
         }
 
+        const laserAttackId = attackId || `LASER_${now}_${uuidv4().substring(0, 8)}`;
+
         // Broadcast laser event to both clients
         const laserEvent: LaserEvent = {
+            attackId: laserAttackId,
             shooterId: playerId,
             start: [origin.x, origin.y, origin.z],
             end: actualEnd,
@@ -236,7 +248,7 @@ export class CombatSystem {
 
         // Apply authoritative damage if opponent struck
         if (hitTargetId) {
-            this.applyDamage(room, hitTargetId, COMBAT.LASER_DAMAGE, 'laser', playerId);
+            this.applyDamage(room, hitTargetId, COMBAT.LASER_DAMAGE, 'laser', playerId, laserAttackId);
         }
     }
 
@@ -295,7 +307,7 @@ export class CombatSystem {
 
                 if (coll.hit) {
                     hitPlayer = true;
-                    this.applyDamage(room, targetId, COMBAT.BULLET_DAMAGE, 'bullet', proj.shooterId);
+                    this.applyDamage(room, targetId, COMBAT.BULLET_DAMAGE, 'bullet', proj.shooterId, proj.attackId);
                     break;
                 }
             }
@@ -313,8 +325,22 @@ export class CombatSystem {
         targetId: string,
         damage: number,
         weapon: 'bullet' | 'laser' | 'collision',
-        attackerId: string
+        attackerId: string,
+        attackId?: string
     ) {
+        if (!room) return;
+
+        // Deduplication check: ensure each unique attackId only applies damage once
+        if (attackId) {
+            if (!room.processedAttacks) {
+                room.processedAttacks = new Set<string>();
+            }
+            if (room.processedAttacks.has(attackId)) {
+                return;
+            }
+            room.processedAttacks.add(attackId);
+        }
+
         const target = room.players.get(targetId);
         if (!target || target.hp <= 0) return;
 
@@ -327,16 +353,24 @@ export class CombatSystem {
         target.hp = Math.max(0, target.hp - damage);
 
         const damageEvent: DamageEvent = {
-            targetId,
+            attackId: attackId || `DMG_${now}_${uuidv4().substring(0, 8)}`,
             attackerId,
-            damage,
-            newHp: target.hp,
+            defenderId: targetId,
+            targetId,
+            weaponType: weapon,
             weapon,
+            damage,
+            remainingHp: target.hp,
+            newHp: target.hp,
+            serverTick: room.tickCount || 0,
             timestamp: now
         };
 
+        console.log(`[Combat] DMG APPLIED: tick=${damageEvent.serverTick} attack=${damageEvent.attackId} weapon=${weapon} dmg=${damage} newHp=${target.hp} (${targetId})`);
+
         this.io.to(room.id).emit('player_hit', damageEvent);
         this.io.to(room.id).emit('damage_applied', damageEvent);
+        this.io.to(room.id).emit('DAMAGE_APPLIED', damageEvent);
 
         if (target.hp <= 0) {
             room.state = RoomState.FINISHED;

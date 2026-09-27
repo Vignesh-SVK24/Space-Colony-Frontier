@@ -549,7 +549,7 @@ export const SoloAIBot: React.FC = () => {
 
       // 2. Collision against Player
       if (proj.ownerId === 'solo_ai_drone') {
-        if (projPos.distanceTo(playerPos) < 3.2) {
+        if (projPos.distanceTo(playerPos) < COMBAT_CONFIG.HITBOX_RADIUS) {
           hit = true;
           stateChanged = true;
           applyDamageToSoloPlayer(COMBAT_CONFIG.BULLET_DAMAGE);
@@ -560,7 +560,7 @@ export const SoloAIBot: React.FC = () => {
       // 3. Collision against AI Drone
       if (proj.ownerId === 'solo_player') {
         totalShotsFired.current++;
-        if (projPos.distanceTo(dronePos.current) < 3.5) {
+        if (projPos.distanceTo(dronePos.current) < COMBAT_CONFIG.HITBOX_RADIUS) {
           hit = true;
           stateChanged = true;
           totalShotsHit.current++;

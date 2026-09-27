@@ -46,25 +46,25 @@ io.on('connection', (socket) => {
     });
 
     // Authoritative Bullet Firing
-    socket.on('shoot', (data?: { origin?: { x: number; y: number; z: number }; direction?: { x: number; y: number; z: number } }) => {
+    socket.on('shoot', (data?: { origin?: { x: number; y: number; z: number }; direction?: { x: number; y: number; z: number }; attackId?: string }) => {
         const room = roomManager.getRoomForPlayer(socket.id);
         if (room) {
-            combatSystem.shoot(room, socket.id, data?.origin, data?.direction);
+            combatSystem.shoot(room, socket.id, data?.origin, data?.direction, data?.attackId);
         }
     });
 
-    socket.on('fire_bullet', (data?: { origin?: { x: number; y: number; z: number }; direction?: { x: number; y: number; z: number } }) => {
+    socket.on('fire_bullet', (data?: { origin?: { x: number; y: number; z: number }; direction?: { x: number; y: number; z: number }; attackId?: string }) => {
         const room = roomManager.getRoomForPlayer(socket.id);
         if (room) {
-            combatSystem.shoot(room, socket.id, data?.origin, data?.direction);
+            combatSystem.shoot(room, socket.id, data?.origin, data?.direction, data?.attackId);
         }
     });
 
     // Authoritative Laser Beam (5-Second Recharge)
-    socket.on('fire_laser', (data?: { origin?: { x: number; y: number; z: number }; direction?: { x: number; y: number; z: number } }) => {
+    socket.on('fire_laser', (data?: { origin?: { x: number; y: number; z: number }; direction?: { x: number; y: number; z: number }; attackId?: string }) => {
         const room = roomManager.getRoomForPlayer(socket.id);
         if (room) {
-            combatSystem.fireLaser(room, socket.id, data?.origin, data?.direction);
+            combatSystem.fireLaser(room, socket.id, data?.origin, data?.direction, data?.attackId);
         }
     });
 

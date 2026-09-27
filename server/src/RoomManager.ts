@@ -34,6 +34,8 @@ export class RoomManager {
             state: RoomState.WAITING,
             players: new Map(),
             projectiles: [],
+            processedAttacks: new Set<string>(),
+            tickCount: 0,
             createdAt: Date.now()
         };
 
@@ -144,6 +146,8 @@ export class RoomManager {
 
         room.projectiles = [];
         room.winnerId = undefined;
+        room.processedAttacks.clear();
+        room.tickCount = 0;
 
         // Reset players to their respective spawn zones
         let isFirst = true;

@@ -67,6 +67,8 @@ export const RemotePlayerShip: React.FC = () => {
     ? Math.hypot(opponentState.velocity[0], opponentState.velocity[1], opponentState.velocity[2])
     : 0;
 
+  const showCombatHitboxes = useMultiplayerStore(state => state.showCombatHitboxes);
+
   return (
     <group ref={group}>
       <SpaceshipModel 
@@ -79,6 +81,12 @@ export const RemotePlayerShip: React.FC = () => {
         <sprite position={[0, 4, 0]} scale={[8, 2, 1]}>
           <spriteMaterial map={nameTexture} sizeAttenuation={true} depthTest={false} />
         </sprite>
+      )}
+      {showCombatHitboxes && (
+        <mesh>
+          <sphereGeometry args={[4.8, 16, 16]} />
+          <meshBasicMaterial wireframe color="#ff0055" transparent opacity={0.6} />
+        </mesh>
       )}
     </group>
   );

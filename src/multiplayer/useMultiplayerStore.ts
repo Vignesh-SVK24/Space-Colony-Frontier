@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import { AppView, BattleColor, RoomStatus, GameSnapshot, PlayerState, ProjectileState, MatchStats, LaserEvent, LeadIndicatorInfo } from './types';
+import { AppView, BattleColor, RoomStatus, GameSnapshot, PlayerState, ProjectileState, MatchStats, LaserEvent, LeadIndicatorInfo, DamageEvent, CombatTelemetryEntry } from './types';
 import { CombatDifficulty } from '../config/combatConfig';
 
-export type { LaserEvent, LeadIndicatorInfo };
+export type { LaserEvent, LeadIndicatorInfo, DamageEvent, CombatTelemetryEntry };
 
 export interface TargetLockInfo {
   id: string;
@@ -43,6 +43,18 @@ interface MultiplayerState {
   leadIndicator: LeadIndicatorInfo | null;
   hitConfirmActive: boolean;
   joystickAxis: { x: number; y: number };
+
+  // Combat Debug & Telemetry
+  showCombatHitboxes: boolean;
+  showCombatTrajectories: boolean;
+  showCombatAimVector: boolean;
+  combatTelemetryLog: CombatTelemetryEntry[];
+  lastAppliedServerTick: number;
+
+  toggleCombatHitboxes: () => void;
+  toggleCombatTrajectories: () => void;
+  toggleCombatAimVector: () => void;
+  handleDamageApplied: (event: DamageEvent) => void;
 
   snapshotBuffer: GameSnapshot[];
 
@@ -133,6 +145,62 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   joystickAxis: { x: 0, y: 0 },
   snapshotBuffer: [],
 
+  // Combat Debug & Telemetry initial state
+  showCombatHitboxes: false,
+  showCombatTrajectories: false,
+  showCombatAimVector: false,
+  combatTelemetryLog: [],
+  lastAppliedServerTick: 0,
+
+  toggleCombatHitboxes: () => set(state => ({ showCombatHitboxes: !state.showCombatHitboxes })),
+  toggleCombatTrajectories: () => set(state => ({ showCombatTrajectories: !state.showCombatTrajectories })),
+  toggleCombatAimVector: () => set(state => ({ showCombatAimVector: !state.showCombatAimVector })),
+
+  handleDamageApplied: (event) => {
+    const tick = event.serverTick ?? 0;
+    const myId = get().playerId;
+    const isTargetMe = event.targetId === myId;
+    const isAttackerMe = event.attackerId === myId;
+
+    const telemetryEntry: CombatTelemetryEntry = {
+      id: Math.random().toString(36).substring(2, 9),
+      attackId: event.attackId || 'unknown',
+      timestamp: event.timestamp || Date.now(),
+      serverTick: tick,
+      weapon: event.weapon || event.weaponType || 'weapon',
+      attackerId: event.attackerId,
+      targetId: event.targetId,
+      damage: event.damage,
+      remainingHp: event.newHp
+    };
+
+    set(state => {
+      const updatedSelf = state.selfState && isTargetMe
+        ? { ...state.selfState, hp: event.newHp, alive: event.newHp > 0 }
+        : state.selfState;
+
+      const updatedOpponent = state.opponentState && !isTargetMe
+        ? { ...state.opponentState, hp: event.newHp, alive: event.newHp > 0 }
+        : state.opponentState;
+
+      const newLog = [telemetryEntry, ...state.combatTelemetryLog].slice(0, 15);
+
+      return {
+        selfState: updatedSelf,
+        opponentState: updatedOpponent,
+        combatTelemetryLog: newLog,
+        lastAppliedServerTick: Math.max(state.lastAppliedServerTick, tick)
+      };
+    });
+
+    if (isTargetMe) {
+      get().handleHit();
+    }
+    if (isAttackerMe) {
+      get().triggerHitConfirm();
+    }
+  },
+
   setJoystickAxis: (axis) => set({ joystickAxis: axis }),
   setAppView: (view) => set({ appView: view }),
   setGameModeSelection: (mode) => set({ gameModeSelection: mode }),
@@ -142,9 +210,24 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   setRoomCode: (code) => set({ roomCode: code }),
   
   updateFromSnapshot: (snapshot) => {
-    const { playerId } = get();
-    const selfState = snapshot.players.find(p => p.id === playerId) || null;
-    const opponentState = snapshot.players.find(p => p.id !== playerId) || null;
+    const { playerId, lastAppliedServerTick, selfState: prevSelf, opponentState: prevOpp } = get();
+    const currentTick = snapshot.serverTick ?? 0;
+    
+    const rawSelf = snapshot.players.find(p => p.id === playerId) || null;
+    const rawOpponent = snapshot.players.find(p => p.id !== playerId) || null;
+
+    // HP regression protection: If snapshot tick is older than last applied damage tick, preserve authoritative HP
+    const selfState = rawSelf ? {
+      ...rawSelf,
+      hp: currentTick < lastAppliedServerTick && prevSelf ? prevSelf.hp : rawSelf.hp,
+      alive: (currentTick < lastAppliedServerTick && prevSelf ? prevSelf.hp : rawSelf.hp) > 0
+    } : null;
+
+    const opponentState = rawOpponent ? {
+      ...rawOpponent,
+      hp: currentTick < lastAppliedServerTick && prevOpp ? prevOpp.hp : rawOpponent.hp,
+      alive: (currentTick < lastAppliedServerTick && prevOpp ? prevOpp.hp : rawOpponent.hp) > 0
+    } : null;
 
     set(state => {
       const newBuffer = [...state.snapshotBuffer, snapshot].slice(-2);
@@ -153,7 +236,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
         selfState,
         opponentState,
         projectiles: snapshot.projectiles,
-        roomStatus: snapshot.roomStatus
+        roomStatus: snapshot.roomStatus,
+        lastAppliedServerTick: Math.max(state.lastAppliedServerTick, currentTick)
       };
     });
   },
@@ -182,7 +266,9 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     activeLaserBeam: null,
     targetLock: null,
     hitConfirmActive: false,
-    projectiles: []
+    projectiles: [],
+    lastAppliedServerTick: 0,
+    combatTelemetryLog: []
   }),
 
   reset: () => set({
@@ -207,7 +293,9 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     leadIndicator: null,
     hitConfirmActive: false,
     joystickAxis: { x: 0, y: 0 },
-    snapshotBuffer: []
+    snapshotBuffer: [],
+    lastAppliedServerTick: 0,
+    combatTelemetryLog: []
   }),
 
   setError: (error) => set({ error }),

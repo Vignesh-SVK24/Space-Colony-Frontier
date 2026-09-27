@@ -37,6 +37,7 @@ export class GameLoop {
         const rooms = this.roomManager.getRooms();
         for (const room of rooms) {
             if (room.state === RoomState.BATTLE) {
+                room.tickCount = (room.tickCount || 0) + 1;
                 this.updatePhysics(room, TICK_DT);
                 this.collisionSystem.updateCollisions(room);
                 this.combatSystem.updateProjectiles(room, TICK_DT);
@@ -45,6 +46,7 @@ export class GameLoop {
                 const snapshot: GameSnapshot = {
                     players: Object.fromEntries(room.players.entries()),
                     projectiles: room.projectiles,
+                    serverTick: room.tickCount,
                     timestamp: Date.now()
                 };
                 

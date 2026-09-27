@@ -238,7 +238,7 @@ export const LocalPlayerShip: React.FC = () => {
     }
 
     // ==========================================
-    // 4. Weapon Cooldown Timers
+    // 4. Weapon Cooldown Timers & Crosshair Ray Convergence
     // ==========================================
     const bulletCdLeft = Math.max(0, COMBAT_CONFIG.BULLET_COOLDOWN - (now - lastBulletTime.current) / 1000);
     setBulletCooldownRemaining(bulletCdLeft);
@@ -246,8 +246,23 @@ export const LocalPlayerShip: React.FC = () => {
     const laserCdLeft = Math.max(0, COMBAT_CONFIG.LASER_COOLDOWN - (now - lastLaserTime.current) / 1000);
     setLaserCooldownRemaining(laserCdLeft);
 
-    // Muzzle positions for weapon origin
+    // Muzzle position in world space
     const muzzlePos = group.current.position.clone().add(forwardDir.clone().multiplyScalar(2.0));
+
+    // Camera aim ray & 3D crosshair convergence
+    // Eliminates 3.5m vertical parallax between elevated camera and muzzle
+    const camDir = new THREE.Vector3();
+    camera.getWorldDirection(camDir);
+
+    let aimDist = 120;
+    if (opponentState) {
+      const oppPos = new THREE.Vector3(...opponentState.position);
+      const toOpp = new THREE.Vector3().subVectors(oppPos, camera.position);
+      aimDist = Math.max(15, Math.min(260, toOpp.length()));
+    }
+
+    const aimTargetPoint = camera.position.clone().addScaledVector(camDir, aimDist);
+    const aimFireDir = new THREE.Vector3().subVectors(aimTargetPoint, muzzlePos).normalize();
 
     // ==========================================
     // 5. Primary Weapon: PLASMA BULLET (0.45s)
@@ -255,11 +270,12 @@ export const LocalPlayerShip: React.FC = () => {
     const shootBullet = isMouseDownLeft || keys['KeyJ'];
     if (shootBullet && now - lastBulletTime.current > COMBAT_CONFIG.BULLET_COOLDOWN * 1000) {
       lastBulletTime.current = now;
+      const attackId = `BULLET_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       
       if (isSolo) {
-        const bulletVel = forwardDir.clone().multiplyScalar(COMBAT_CONFIG.BULLET_SPEED);
+        const bulletVel = aimFireDir.clone().multiplyScalar(COMBAT_CONFIG.BULLET_SPEED);
         addSoloProjectile({
-          id: `solo_bullet_${Math.random()}`,
+          id: attackId,
           ownerId: 'solo_player',
           position: [muzzlePos.x, muzzlePos.y, muzzlePos.z],
           direction: [bulletVel.x, bulletVel.y, bulletVel.z],
@@ -270,7 +286,8 @@ export const LocalPlayerShip: React.FC = () => {
       } else {
         sendShoot(
           [muzzlePos.x, muzzlePos.y, muzzlePos.z],
-          [forwardDir.x, forwardDir.y, forwardDir.z]
+          [aimFireDir.x, aimFireDir.y, aimFireDir.z],
+          attackId
         );
         nexusAudio.playLaser();
       }
@@ -282,12 +299,13 @@ export const LocalPlayerShip: React.FC = () => {
     const shootLaser = isMouseDownRight || keys['KeyK'] || keys['KeyL'];
     if (shootLaser && now - lastLaserTime.current > COMBAT_CONFIG.LASER_COOLDOWN * 1000) {
       lastLaserTime.current = now;
+      const attackId = `LASER_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
       if (isSolo) {
         nexusAudio.playLaser();
 
         const emitterPos = muzzlePos.clone();
-        const maxBeamEnd = emitterPos.clone().add(forwardDir.clone().multiplyScalar(COMBAT_CONFIG.LASER_RANGE));
+        const maxBeamEnd = emitterPos.clone().add(aimFireDir.clone().multiplyScalar(COMBAT_CONFIG.LASER_RANGE));
 
         // Raycast against all obstacles
         const raycast = checkObstacleRaycast(
@@ -314,7 +332,7 @@ export const LocalPlayerShip: React.FC = () => {
 
           if (oppDist <= COMBAT_CONFIG.LASER_RANGE) {
             const oppDir = toOpp.clone().normalize();
-            const angle = forwardDir.angleTo(oppDir);
+            const angle = aimFireDir.angleTo(oppDir);
 
             // Beam cone test (~6.9 degrees)
             if (angle < COMBAT_CONFIG.LASER_AIM_CONE) {
@@ -344,7 +362,8 @@ export const LocalPlayerShip: React.FC = () => {
         // Authoritative multiplayer laser: sent to server, server validates line-of-sight & cooldown
         sendLaser(
           [muzzlePos.x, muzzlePos.y, muzzlePos.z],
-          [forwardDir.x, forwardDir.y, forwardDir.z]
+          [aimFireDir.x, aimFireDir.y, aimFireDir.z],
+          attackId
         );
       }
     }
@@ -377,6 +396,8 @@ export const LocalPlayerShip: React.FC = () => {
     }
   });
 
+  const showCombatHitboxes = useMultiplayerStore(state => state.showCombatHitboxes);
+
   return (
     <group ref={group} position={[0, 0, 0]}>
       <SpaceshipModel 
@@ -385,6 +406,12 @@ export const LocalPlayerShip: React.FC = () => {
         isBoosting={keys['ShiftLeft'] || keys['ShiftRight'] || keys['SHIFT']}
         damaged={selfState?.hp !== undefined && selfState.hp < COMBAT_CONFIG.LOW_HP_THRESHOLD}
       />
+      {showCombatHitboxes && (
+        <mesh>
+          <sphereGeometry args={[4.8, 16, 16]} />
+          <meshBasicMaterial wireframe color={playerColor === 'blue' ? '#00f0ff' : '#ffe600'} transparent opacity={0.6} />
+        </mesh>
+      )}
     </group>
   );
 };

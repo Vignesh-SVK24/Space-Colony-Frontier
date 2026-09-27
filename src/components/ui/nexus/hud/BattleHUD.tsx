@@ -3,6 +3,7 @@ import { useMultiplayerStore } from '../../../../multiplayer/useMultiplayerStore
 import { disconnect } from '../../../../multiplayer/socketClient';
 import { LogOut, Bot, Wifi, Map as MapIcon, Crosshair, Zap, Maximize, Minimize } from 'lucide-react';
 import { FullScreenTacticalMap } from './FullScreenTacticalMap';
+import { CombatDebugOverlay } from './CombatDebugOverlay';
 import { nexusAudio } from '../../../../utils/nexusAudio';
 import { COMBAT_CONFIG } from '../../../../config/combatConfig';
 import { enterFullscreen, toggleFullscreen, useFullscreen } from '../../../../utils/fullscreenHelper';
@@ -302,6 +303,9 @@ export const BattleHUD: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Combat Debug Inspector (F3) */}
+      <CombatDebugOverlay />
 
       {/* Full-Screen Tactical Map Modal */}
       <FullScreenTacticalMap />

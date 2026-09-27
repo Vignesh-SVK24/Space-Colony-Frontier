@@ -11,9 +11,9 @@ export const COMBAT_CONFIG = {
   BULLET_DAMAGE: 10,
   BULLET_SPEED: 145,
   BULLET_COOLDOWN: 0.45, // seconds
-  BULLET_LIFETIME: 2.2, // seconds
-  BULLET_HIT_RADIUS: 4.5, // forgiving collision detection radius (combat hitbox)
-  BULLET_HITBOX_RADIUS: 4.5, // alias
+  BULLET_HIT_RADIUS: 4.8, // forgiving collision detection radius (combat hitbox)
+  BULLET_HITBOX_RADIUS: 4.8, // alias
+  HITBOX_RADIUS: 4.8, // dedicated combat hitbox radius
 
   // Aim Assist & Lead Indicator
   AIM_ASSIST_ENABLED: true,
