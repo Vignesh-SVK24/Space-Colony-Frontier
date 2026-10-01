@@ -51,6 +51,8 @@ interface MultiplayerState {
   connectionQuality: 'good' | 'fair' | 'poor' | 'disconnected' | 'connecting';
   countdown: number | null;
   error: string | null;
+  isServerOnline: boolean | null;
+  checkServerReachability: () => Promise<boolean>;
 
   // Tactical Map
   isMapOpen: boolean;
@@ -161,7 +163,13 @@ const getDefaultServerUrl = () => {
     const stored = localStorage.getItem('sfc_server_url');
     if (stored) return stored;
   } catch {}
-  return `http://${(typeof window !== 'undefined' && window.location.hostname) || 'localhost'}:3001`;
+  const host = (typeof window !== 'undefined' && window.location.hostname) || 'localhost';
+  const isLocal = host === 'localhost' || host === '127.0.0.1';
+  if (isLocal) {
+    return 'http://localhost:3001';
+  }
+  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  return isHttps ? `https://${host}:3001` : `http://${host}:3001`;
 };
 
 export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
@@ -189,6 +197,34 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   connectionQuality: 'disconnected',
   countdown: null,
   error: null,
+  isServerOnline: null,
+
+  checkServerReachability: async () => {
+    const server = get().serverUrl;
+    if (!server) {
+      set({ isServerOnline: false });
+      return false;
+    }
+    let httpUrl = server.trim().replace(/^ws:\/\//, 'http://').replace(/^wss:\/\//, 'https://');
+    if (!httpUrl.startsWith('http://') && !httpUrl.startsWith('https://')) {
+      const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+      httpUrl = `${isHttps ? 'https' : 'http'}://${httpUrl}`;
+    }
+    httpUrl = `${httpUrl.replace(/\/+$/, '')}/health`;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const res = await fetch(httpUrl, { method: 'GET', signal: controller.signal });
+      clearTimeout(timeoutId);
+      const isOk = res.ok;
+      set({ isServerOnline: isOk });
+      return isOk;
+    } catch {
+      set({ isServerOnline: false });
+      return false;
+    }
+  },
+
   isMapOpen: false,
 
   ammo: COMBAT_CONFIG.BULLET_MAGAZINE_SIZE,
@@ -379,7 +415,10 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   setPlayerId: (id) => set({ playerId: id }),
   setOpponentInfo: (name, color) => set({ opponentName: name, opponentColor: color }),
   setRoomPlayers: (players) => set({ roomPlayers: players }),
-  setServerUrl: (url) => set({ serverUrl: url }),
+  setServerUrl: (url) => {
+    set({ serverUrl: url, isServerOnline: null });
+    get().checkServerReachability();
+  },
   setIsHost: (isHost) => set({ isHost }),
   setCountdown: (countdown) => set({ countdown }),
   setConnectionQuality: (quality) => set({ connectionQuality: quality }),

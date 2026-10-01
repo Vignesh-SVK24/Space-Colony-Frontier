@@ -14,6 +14,15 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
+      '/matchmake': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/colyseus': {
+        target: 'http://localhost:3001',
+        ws: true,
+        changeOrigin: true,
+      },
       '/socket.io': {
         target: 'http://localhost:3001',
         ws: true,

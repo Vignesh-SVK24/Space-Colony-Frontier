@@ -45,7 +45,10 @@ export const LandingPage: React.FC = () => {
     playerColor,
     setPlayerColor,
     error,
+    setError,
     serverUrl,
+    isServerOnline,
+    checkServerReachability,
     startSoloGame
   } = useMultiplayerStore();
 
@@ -57,6 +60,10 @@ export const LandingPage: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoLoaded, setVideoLoaded] = React.useState(false);
   const [videoError, setVideoError] = React.useState(false);
+
+  React.useEffect(() => {
+    checkServerReachability();
+  }, [checkServerReachability, serverUrl]);
 
   React.useEffect(() => {
     if (videoRef.current) {
@@ -154,11 +161,61 @@ export const LandingPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Error Alert */}
+          {/* Diagnostic Error Banner */}
           {error && (
-            <div className="mb-6 bg-red-950/60 border border-red-500/50 p-3.5 rounded-lg text-red-300 flex items-center gap-3 text-xs sm:text-sm animate-pulse">
-              <AlertCircle size={18} className="shrink-0 text-red-400" />
-              <p>{error}</p>
+            <div className="mb-6 bg-red-950/80 border border-red-500/60 p-4 rounded-xl text-red-200 shadow-[0_0_25px_rgba(239,68,68,0.25)]">
+              <div className="flex items-start gap-3">
+                <AlertCircle size={20} className="shrink-0 text-red-400 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs sm:text-sm font-bold text-red-300 uppercase tracking-wider">
+                      Multiplayer Server Connection Notice
+                    </h3>
+                    <button
+                      onClick={() => setError(null)}
+                      className="text-gray-400 hover:text-white text-xs px-1.5 py-0.5 rounded hover:bg-white/10 cursor-pointer"
+                      title="Dismiss"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p className="text-xs text-red-200/90 mt-2 leading-relaxed font-sans">
+                    {error}
+                  </p>
+
+                  {/* Action Quick-Buttons */}
+                  <div className="mt-3.5 pt-3 border-t border-red-500/30 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleStartSolo}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md cursor-pointer active:scale-95"
+                    >
+                      <Bot size={14} />
+                      <span>Play Solo Battle (Offline)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingServer(true);
+                        setGameModeSelection('ROOM_CONFIG');
+                      }}
+                      className="px-3.5 py-2 bg-sky-950 hover:bg-sky-900 border border-sky-500/50 text-sky-300 rounded-lg text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer font-bold active:scale-95"
+                    >
+                      <Server size={14} />
+                      <span>Configure Server URL</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCreate}
+                      className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg text-xs uppercase tracking-wider transition-all cursor-pointer font-semibold"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -467,41 +524,76 @@ export const LandingPage: React.FC = () => {
               {/* Server Connection Bar */}
               <div className="pt-2 border-t border-gray-800/80">
                 <div className="flex items-center justify-between text-[10px] text-gray-400 bg-gray-950/60 p-2.5 rounded-lg border border-gray-800">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <Server size={12} className="text-sky-400 shrink-0" />
-                    <span className="truncate">Server: <span className="text-gray-300">{serverUrl}</span></span>
+                  <div className="flex items-center gap-2 truncate">
+                    <Server size={13} className="text-sky-400 shrink-0" />
+                    <span className="truncate">Server: <span className="text-gray-300 font-mono">{serverUrl}</span></span>
+                    {isServerOnline === true && (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/40 px-1.5 py-0.5 rounded shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        ONLINE
+                      </span>
+                    )}
+                    {isServerOnline === false && (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-bold text-rose-400 bg-rose-950/80 border border-rose-500/40 px-1.5 py-0.5 rounded shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                        OFFLINE
+                      </span>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditingServer(!editingServer)}
-                    className="text-sky-400 hover:text-sky-300 uppercase tracking-wider font-bold ml-2 shrink-0 cursor-pointer flex items-center gap-1"
-                  >
-                    <Edit2 size={10} />
-                    <span>{editingServer ? 'Close' : 'Configure'}</span>
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <button
+                      type="button"
+                      onClick={() => checkServerReachability()}
+                      className="text-gray-400 hover:text-white uppercase tracking-wider text-[9px] cursor-pointer"
+                      title="Test Connection"
+                    >
+                      Check
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingServer(!editingServer)}
+                      className="text-sky-400 hover:text-sky-300 uppercase tracking-wider font-bold cursor-pointer flex items-center gap-1"
+                    >
+                      <Edit2 size={10} />
+                      <span>{editingServer ? 'Close' : 'Configure'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {editingServer && (
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="text"
-                      value={customServerUrl}
-                      onChange={(e) => setCustomServerUrl(e.target.value)}
-                      placeholder="http://localhost:3001"
-                      className="flex-1 bg-gray-950 border border-gray-700 text-xs px-2.5 py-1.5 rounded text-white font-mono focus:border-sky-400 focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (customServerUrl.trim()) {
-                          updateServerUrl(customServerUrl.trim());
-                          setEditingServer(false);
-                        }
-                      }}
-                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded uppercase tracking-wider cursor-pointer"
-                    >
-                      Save
-                    </button>
+                  <div className="mt-2.5 p-3 bg-gray-950/90 border border-gray-700/80 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-wider font-bold text-gray-300">
+                        Colyseus Server URL
+                      </span>
+                      <span className="text-[9px] text-gray-400">
+                        Local: http://localhost:3001
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customServerUrl}
+                        onChange={(e) => setCustomServerUrl(e.target.value)}
+                        placeholder="http://localhost:3001"
+                        className="flex-1 bg-gray-900 border border-gray-700 text-xs px-3 py-2 rounded text-white font-mono focus:border-sky-400 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (customServerUrl.trim()) {
+                            updateServerUrl(customServerUrl.trim());
+                            setEditingServer(false);
+                          }
+                        }}
+                        className="px-4 py-2 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white text-xs font-bold rounded uppercase tracking-wider cursor-pointer transition-colors shadow-sm"
+                      >
+                        Save
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-400 leading-normal">
+                      💡 Tip: For local play, run <code className="text-sky-300 bg-black/40 px-1 py-0.5 rounded">npm run server</code>. For online multiplayer with friends, host the server (e.g. Render, Railway, Fly.io) and paste the server URL above.
+                    </p>
                   </div>
                 )}
               </div>

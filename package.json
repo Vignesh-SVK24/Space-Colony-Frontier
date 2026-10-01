@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server": "npm --prefix server run dev",
+    "server:build": "npm --prefix server run build",
+    "server:start": "node server/dist/index.js",
     "build": "tsc -b && vite build",
     "type-check": "tsc --noEmit",
     "test": "vitest run --fileParallelism=false",

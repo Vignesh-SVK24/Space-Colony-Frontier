@@ -15,21 +15,62 @@ export { BattleStateSchema };
 let client: Client | null = null;
 let currentRoom: Room | null = null;
 
+export const formatConnectionError = (err: any, endpoint: string): string => {
+  const rawMsg = err?.message || String(err || '');
+  const isFetchError = rawMsg.toLowerCase().includes('failed to fetch') || 
+                       rawMsg.toLowerCase().includes('networkerror') ||
+                       rawMsg.toLowerCase().includes('load failed') ||
+                       rawMsg.toLowerCase().includes('network error') ||
+                       err?.name === 'TypeError' ||
+                       err?.code === 'ECONNREFUSED';
+
+  if (isFetchError) {
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    const isLocal = endpoint.includes('localhost') || endpoint.includes('127.0.0.1');
+
+    if (isHttps && isLocal) {
+      return `Cannot connect to local server (${endpoint}) from an HTTPS website due to browser Mixed Content security. Run the game locally on http://localhost:5173, or host the Colyseus backend with HTTPS/WSS (e.g. on Render/Fly.io) and configure the server URL.`;
+    }
+
+    if (isLocal) {
+      return `Cannot reach game server at ${endpoint}. Make sure the Colyseus backend server is running on port 3001 (run 'npm run server' or 'cd server && npm run dev').`;
+    }
+
+    return `Cannot reach multiplayer server at ${endpoint}. If playing online, please ensure the backend is deployed and active, or configure a custom server URL in Server Settings.`;
+  }
+
+  return rawMsg || 'Failed to connect to multiplayer server. Please verify your connection.';
+};
+
 const getColyseusEndpoint = (): string => {
   const customUrl = useMultiplayerStore.getState().serverUrl;
-  if (customUrl) {
-    // If http/https replace with ws/wss
-    return customUrl.replace(/^http/, 'ws');
+  if (customUrl && customUrl.trim()) {
+    let clean = customUrl.trim().replace(/\/+$/, '');
+    if (clean.startsWith('http://')) {
+      return clean.replace(/^http:/, 'ws:');
+    }
+    if (clean.startsWith('https://')) {
+      return clean.replace(/^https:/, 'wss:');
+    }
+    if (!clean.startsWith('ws://') && !clean.startsWith('wss://')) {
+      const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+      return `${isHttps ? 'wss' : 'ws'}://${clean}`;
+    }
+    return clean;
   }
   const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
   const host = (typeof window !== 'undefined' && window.location.hostname) || 'localhost';
-  const port = (typeof window !== 'undefined' && window.location.port === '5173') ? '3001' : ((typeof window !== 'undefined' && window.location.port) || '3001');
-  return `${isHttps ? 'wss' : 'ws'}://${host}:${port}`;
+  const isLocal = host === 'localhost' || host === '127.0.0.1';
+  if (isLocal) {
+    return 'ws://localhost:3001';
+  }
+  return `${isHttps ? 'wss' : 'ws'}://${host}:3001`;
 };
 
 export const getClient = (): Client => {
+  const endpoint = getColyseusEndpoint();
   if (!client) {
-    client = new Client(getColyseusEndpoint());
+    client = new Client(endpoint);
   }
   return client;
 };
@@ -39,15 +80,21 @@ export const updateServerUrl = (url: string) => {
   try {
     localStorage.setItem('sfc_server_url', url);
   } catch {}
-  client = new Client(url.replace(/^http/, 'ws'));
+  let clean = url.trim().replace(/\/+$/, '');
+  if (clean.startsWith('http://')) clean = clean.replace(/^http:/, 'ws:');
+  else if (clean.startsWith('https://')) clean = clean.replace(/^https:/, 'wss:');
+  client = new Client(clean);
 };
 
 export const createRoom = async (playerName: string, playerColor: BattleColor, mode: GameMode = '1v1') => {
+  const endpoint = getColyseusEndpoint();
   try {
     useMultiplayerStore.getState().setError(null);
     useMultiplayerStore.getState().setConnectionQuality('connecting');
 
-    const colyseusClient = getClient();
+    const colyseusClient = new Client(endpoint);
+    client = colyseusClient;
+
     currentRoom = await colyseusClient.create('battle', {
       playerName,
       playerColor,
@@ -62,19 +109,24 @@ export const createRoom = async (playerName: string, playerColor: BattleColor, m
     useMultiplayerStore.getState().setRoomStatus('LOBBY');
     useMultiplayerStore.getState().setAppView('LOBBY');
     useMultiplayerStore.getState().setConnectionQuality('good');
+    useMultiplayerStore.getState().setError(null);
   } catch (err: any) {
     console.error('Failed to create Colyseus room:', err);
-    useMultiplayerStore.getState().setError(err.message || 'Failed to create room. Ensure backend server is running.');
+    const friendlyError = formatConnectionError(err, endpoint);
+    useMultiplayerStore.getState().setError(friendlyError);
     useMultiplayerStore.getState().setConnectionQuality('disconnected');
   }
 };
 
 export const joinRoom = async (roomCode: string, playerName: string, playerColor: BattleColor) => {
+  const endpoint = getColyseusEndpoint();
   try {
     useMultiplayerStore.getState().setError(null);
     useMultiplayerStore.getState().setConnectionQuality('connecting');
 
-    const colyseusClient = getClient();
+    const colyseusClient = new Client(endpoint);
+    client = colyseusClient;
+
     // Join by roomCode filter
     currentRoom = await colyseusClient.joinOrCreate('battle', {
       roomCode: roomCode.toUpperCase(),
@@ -89,9 +141,11 @@ export const joinRoom = async (roomCode: string, playerName: string, playerColor
     useMultiplayerStore.getState().setRoomStatus('LOBBY');
     useMultiplayerStore.getState().setAppView('LOBBY');
     useMultiplayerStore.getState().setConnectionQuality('good');
+    useMultiplayerStore.getState().setError(null);
   } catch (err: any) {
     console.error('Failed to join Colyseus room:', err);
-    useMultiplayerStore.getState().setError(err.message || `Failed to join room ${roomCode}`);
+    const friendlyError = formatConnectionError(err, endpoint);
+    useMultiplayerStore.getState().setError(friendlyError);
     useMultiplayerStore.getState().setConnectionQuality('disconnected');
   }
 };

@@ -188,4 +188,32 @@ describe('Multiplayer System Tests', () => {
     });
     expect(useMultiplayerStore.getState().projectiles.length).toBe(1);
   });
+
+  it('should format connection errors informatively instead of cryptic failed to fetch', async () => {
+    const { formatConnectionError } = await import('../src/multiplayer/colyseusClient');
+    
+    // Local server error
+    const localErr = new TypeError('Failed to fetch');
+    const localMsg = formatConnectionError(localErr, 'ws://localhost:3001');
+    expect(localMsg).toContain('Cannot reach game server at ws://localhost:3001');
+    expect(localMsg).toContain("npm run server");
+
+    // Remote server error
+    const remoteErr = new Error('NetworkError when attempting to fetch resource.');
+    const remoteMsg = formatConnectionError(remoteErr, 'wss://game.example.com');
+    expect(remoteMsg).toContain('Cannot reach multiplayer server at wss://game.example.com');
+
+    // Generic error
+    const genErr = new Error('Custom room error 404');
+    const genMsg = formatConnectionError(genErr, 'ws://localhost:3001');
+    expect(genMsg).toBe('Custom room error 404');
+  });
+
+  it('should manage custom server URLs and reachability', async () => {
+    const store = useMultiplayerStore.getState();
+    expect(store.serverUrl).toBeDefined();
+
+    store.setServerUrl('http://myserver.example.com:3001');
+    expect(useMultiplayerStore.getState().serverUrl).toBe('http://myserver.example.com:3001');
+  });
 });
