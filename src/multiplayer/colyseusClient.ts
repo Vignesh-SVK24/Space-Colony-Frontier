@@ -127,12 +127,22 @@ export const joinRoom = async (roomCode: string, playerName: string, playerColor
     const colyseusClient = new Client(endpoint);
     client = colyseusClient;
 
-    // Join by roomCode filter
-    currentRoom = await colyseusClient.joinOrCreate('battle', {
-      roomCode: roomCode.toUpperCase(),
-      playerName,
-      playerColor
-    }, BattleStateSchema);
+    // Room codes are the actual Colyseus room IDs.
+    // Never use joinOrCreate here: that can create a different room when a
+    // code is wrong/not discoverable. An invalid code must fail explicitly.
+    const normalizedCode = roomCode.trim().toUpperCase();
+    if (!normalizedCode) {
+      throw new Error('ROOM_CODE_REQUIRED');
+    }
+
+    currentRoom = await colyseusClient.joinById<BattleStateSchema>(
+      normalizedCode,
+      {
+        playerName,
+        playerColor
+      },
+      BattleStateSchema
+    );
 
     bindRoomEvents(currentRoom);
 
@@ -297,6 +307,14 @@ const bindRoomEvents = (room: Room) => {
       timestamp: Date.now()
     });
     nexusAudio.playLaser();
+  });
+
+  room.onMessage('match_error', (data: any) => {
+    useMultiplayerStore.getState().setError(data?.message || 'Unable to start match.');
+  });
+
+  room.onMessage('team_error', (data: any) => {
+    useMultiplayerStore.getState().setError(data?.message || 'Unable to change team.');
   });
 
   // Match ended

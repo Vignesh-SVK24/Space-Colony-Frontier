@@ -110,9 +110,18 @@ export class ProjectileSystem {
         const tPos = target.position;
         const targetDist = this.distancePointToSegment(tPos, prevPos, nextPos);
         if (targetDist <= GAME_CONFIG.BULLET_HITBOX_RADIUS) {
-          const distFromPrev = Math.hypot(tPos.x - prevPos.x, tPos.y - prevPos.y, tPos.z - prevPos.z);
-          if (distFromPrev < closestEnemyDist) {
-            closestEnemyDist = distFromPrev;
+          // Use the actual first intersection parameter, not distance from the
+          // segment start to the sphere center. This prevents a farther target
+          // from incorrectly winning when a nearer target is crossed first.
+          const hitT = this.segmentSphereHitT(
+            prevPos,
+            nextPos,
+            tPos,
+            GAME_CONFIG.BULLET_HITBOX_RADIUS
+          );
+
+          if (hitT !== null && hitT < closestEnemyDist) {
+            closestEnemyDist = hitT;
             closestEnemy = target;
           }
         }
@@ -156,6 +165,35 @@ export class ProjectileSystem {
     }
 
     return { hits, blocked };
+  }
+
+  private segmentSphereHitT(
+    a: Vector3D,
+    b: Vector3D,
+    center: Vector3D,
+    radius: number
+  ): number | null {
+    const d = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z };
+    const m = { x: a.x - center.x, y: a.y - center.y, z: a.z - center.z };
+
+    const aa = d.x * d.x + d.y * d.y + d.z * d.z;
+    const bb = 2 * (m.x * d.x + m.y * d.y + m.z * d.z);
+    const cc = m.x * m.x + m.y * m.y + m.z * m.z - radius * radius;
+
+    if (aa <= 0.000001) {
+      return cc <= 0 ? 0 : null;
+    }
+
+    const discriminant = bb * bb - 4 * aa * cc;
+    if (discriminant < 0) return null;
+
+    const sqrtDisc = Math.sqrt(discriminant);
+    const t1 = (-bb - sqrtDisc) / (2 * aa);
+    const t2 = (-bb + sqrtDisc) / (2 * aa);
+
+    if (t1 >= 0 && t1 <= 1) return t1;
+    if (t2 >= 0 && t2 <= 1) return t2;
+    return null;
   }
 
   private distancePointToSegment(p: { x: number; y: number; z: number }, a: Vector3D, b: Vector3D): number {
