@@ -49,6 +49,8 @@ describe('Authoritative Colyseus 2-Client Combat Acceptance Tests', () => {
 
     await new Promise(r => setTimeout(r, 200));
 
+    expect(room1.roomId).toBe(room1.state.roomCode);
+    expect(room2.roomId).toBe(room1.state.roomCode);
     expect(room1.state.players.size).toBe(2);
     expect(room2.state.players.size).toBe(2);
   }, 10000);
