@@ -309,6 +309,14 @@ const bindRoomEvents = (room: Room) => {
     nexusAudio.playLaser();
   });
 
+  room.onMessage('match_error', (data: any) => {
+    useMultiplayerStore.getState().setError(data?.message || 'Unable to start match.');
+  });
+
+  room.onMessage('team_error', (data: any) => {
+    useMultiplayerStore.getState().setError(data?.message || 'Unable to change team.');
+  });
+
   // Match ended
   room.onMessage('match_ended', (data: any) => {
     const store = useMultiplayerStore.getState();
