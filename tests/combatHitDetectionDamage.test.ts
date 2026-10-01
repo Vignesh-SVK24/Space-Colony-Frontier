@@ -12,23 +12,27 @@ describe('Authoritative Combat Hit Detection & Real HP Damage Pipeline', () => {
     useMultiplayerStore.getState().reset();
   });
 
-  it('1. Direct hit at 10m applies exact authoritative damage (Bullet = 10 HP, Laser = 20 HP)', () => {
+  it('1. Direct hit at 10m applies exact authoritative damage (Bullet = 2 HP, Laser = 12 HP, Solar = 30 HP)', () => {
     const store = useMultiplayerStore.getState();
     store.startSoloGame();
 
     const initialSelf = useMultiplayerStore.getState().selfState;
     const initialOpp = useMultiplayerStore.getState().opponentState;
 
-    expect(initialSelf?.hp).toBe(100);
-    expect(initialOpp?.hp).toBe(100);
+    expect(initialSelf?.hp).toBe(250);
+    expect(initialOpp?.hp).toBe(250);
 
-    // Apply Bullet Damage (10 HP)
+    // Apply Bullet Damage (2 HP)
     useMultiplayerStore.getState().applyDamageToSoloOpponent(COMBAT_CONFIG.BULLET_DAMAGE);
-    expect(useMultiplayerStore.getState().opponentState?.hp).toBe(90);
+    expect(useMultiplayerStore.getState().opponentState?.hp).toBe(248);
 
-    // Apply Laser Damage (20 HP)
+    // Apply Laser Damage (12 HP)
     useMultiplayerStore.getState().applyDamageToSoloOpponent(COMBAT_CONFIG.LASER_DAMAGE);
-    expect(useMultiplayerStore.getState().opponentState?.hp).toBe(70);
+    expect(useMultiplayerStore.getState().opponentState?.hp).toBe(236);
+
+    // Apply Solar Beam Damage (30 HP)
+    useMultiplayerStore.getState().applyDamageToSoloOpponent(COMBAT_CONFIG.SOLAR_DAMAGE);
+    expect(useMultiplayerStore.getState().opponentState?.hp).toBe(206);
   });
 
   it('2. Authoritative server applyDamage enforces bullet=10, laser=20, and deduplicates attackId', () => {
@@ -207,6 +211,7 @@ describe('Authoritative Combat Hit Detection & Real HP Damage Pipeline', () => {
       defenderId: 'client_p1',
       targetId: 'client_p1',
       weapon: 'laser',
+      weaponType: 'LASER',
       damage: 20,
       newHp: 80,
       serverTick: 25,
@@ -280,6 +285,7 @@ describe('Authoritative Combat Hit Detection & Real HP Damage Pipeline', () => {
       attackerId: 'p1',
       targetId: 'p2',
       weapon: 'bullet',
+      weaponType: 'BULLET',
       damage: 10,
       newHp: 90,
       serverTick: 50,

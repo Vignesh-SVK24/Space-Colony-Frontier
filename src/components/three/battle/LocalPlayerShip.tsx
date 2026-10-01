@@ -6,7 +6,7 @@ import { SHIP_CONFIG } from '../../../config/shipConfig';
 import { COMBAT_CONFIG } from '../../../config/combatConfig';
 import { checkObstacleRaycast } from '../../../config/arenaObstacles';
 import { SpaceshipPaintSchemeKey } from '../../../config/visualTheme';
-import { sendInput, sendShoot, sendLaser } from '../../../multiplayer/socketClient';
+import { sendInput, sendBullet, sendLaser, sendSolar } from '../../../multiplayer/colyseusClient';
 import { useMultiplayerStore } from '../../../multiplayer/useMultiplayerStore';
 import { nexusAudio } from '../../../utils/nexusAudio';
 
@@ -23,8 +23,13 @@ export const LocalPlayerShip: React.FC = () => {
   const addSoloProjectile = useMultiplayerStore(state => state.addSoloProjectile);
   const applyDamageToSoloOpponent = useMultiplayerStore(state => state.applyDamageToSoloOpponent);
   const setActiveLaserBeam = useMultiplayerStore(state => state.setActiveLaserBeam);
+  const setActiveSolarBeam = useMultiplayerStore(state => state.setActiveSolarBeam);
   const setLaserCooldownRemaining = useMultiplayerStore(state => state.setLaserCooldownRemaining);
+  const setSolarCooldownRemaining = useMultiplayerStore(state => state.setSolarCooldownRemaining);
   const setBulletCooldownRemaining = useMultiplayerStore(state => state.setBulletCooldownRemaining);
+  const setAmmo = useMultiplayerStore(state => state.setAmmo);
+  const setIsReloading = useMultiplayerStore(state => state.setIsReloading);
+  const setReloadTimeRemaining = useMultiplayerStore(state => state.setReloadTimeRemaining);
   const setTargetLock = useMultiplayerStore(state => state.setTargetLock);
   const setLeadIndicator = useMultiplayerStore(state => state.setLeadIndicator);
   
@@ -37,7 +42,13 @@ export const LocalPlayerShip: React.FC = () => {
   const lastSendTime = useRef(0);
   const lastBulletTime = useRef(0);
   const lastLaserTime = useRef(0);
+  const lastSolarTime = useRef(0);
   const initialPosSet = useRef(false);
+
+  // Solo mode local weapon state
+  const soloAmmo = useRef(COMBAT_CONFIG.BULLET_MAGAZINE_SIZE);
+  const soloIsReloading = useRef(false);
+  const soloReloadEndTime = useRef(0);
 
   const getPaintScheme = (): SpaceshipPaintSchemeKey => {
     switch(playerColor) {
@@ -102,70 +113,58 @@ export const LocalPlayerShip: React.FC = () => {
     const dt = Math.min(delta, 0.1);
 
     // ==========================================
-    // 1. Flight Controls & Dynamics
+    // 1. Flight Controls
     // ==========================================
+    let forwardInput = 0;
+    if (keys['KeyW'] || keys['ArrowUp'] || keys['W']) forwardInput += 1;
+    if (keys['KeyS'] || keys['ArrowDown'] || keys['S']) forwardInput -= 1;
+
+    let yawInput = 0;
+    if (keys['KeyA'] || keys['ArrowLeft'] || keys['A']) yawInput += 1;
+    if (keys['KeyD'] || keys['ArrowRight'] || keys['D']) yawInput -= 1;
+
+    let verticalInput = 0;
+    if (keys['Space'] || keys[' ']) verticalInput += 1;
+    if (keys['KeyC'] || keys['C']) verticalInput -= 1;
+
     const isBoosting = !!(keys['ShiftLeft'] || keys['ShiftRight'] || keys['SHIFT']);
     const isBraking = !!(keys['KeyX'] || keys['X']);
-    
-    // Read 360-degree analog joystick input
-    const joystickAxis = useMultiplayerStore.getState().joystickAxis || { x: 0, y: 0 };
-    const joyMag = Math.sqrt(joystickAxis.x * joystickAxis.x + joystickAxis.y * joystickAxis.y);
-
-    const keyForward = (keys['KeyW'] || keys['W']) ? 1 : (keys['KeyS'] || keys['S']) ? -0.8 : 0;
-    const keyYaw = (keys['KeyA'] || keys['A']) ? 1 : (keys['KeyD'] || keys['D']) ? -1 : 0;
-
-    // Analog translation: y > 0 is forward, y < 0 is reverse, x < 0 is steer left, x > 0 is steer right
-    const joyForward = joystickAxis.y > 0 ? joystickAxis.y : joystickAxis.y * 0.8;
-    const joyYaw = -joystickAxis.x;
-
-    const forwardInput = joyMag > 0.05 ? joyForward : keyForward;
-    const yawInput = joyMag > 0.05 ? joyYaw : keyYaw;
-    const rollInput = (keys['KeyQ'] || keys['Q']) ? 1 : (keys['KeyE'] || keys['E']) ? -1 : 0;
-    const pitchInput = (keys['KeyR'] || keys['R']) ? 1 : (keys['KeyF'] || keys['F']) ? -1 : 0;
-
-    const ascendInput = (keys['Space'] || keys['KeyE'] || keys['PageUp']) ? 1 : 0;
-    const descendInput = (keys['KeyC'] || keys['KeyZ'] || keys['KeyQ'] || keys['ControlLeft'] || keys['ControlRight']) ? 1 : 0;
-    const verticalInput = ascendInput - descendInput;
-
-    const targetMaxSpeed = isBoosting ? COMBAT_CONFIG.SHIP_BOOST_SPEED : COMBAT_CONFIG.SHIP_MAX_SPEED;
-    let targetSpeed = 0;
-    if (forwardInput > 0) targetSpeed = targetMaxSpeed * Math.min(1, forwardInput);
-    else if (forwardInput < 0) targetSpeed = COMBAT_CONFIG.SHIP_MIN_SPEED * Math.min(1, Math.abs(forwardInput));
-
-    if (isBraking) {
-      velocity.current.z = THREE.MathUtils.lerp(velocity.current.z, 0, dt * 5.0);
-      velocity.current.y = THREE.MathUtils.lerp(velocity.current.y, 0, dt * 5.0);
-    } else {
-      const accel = forwardInput !== 0 ? (isBoosting ? 3.8 : 2.2) : 1.5;
-      velocity.current.z = THREE.MathUtils.lerp(velocity.current.z, targetSpeed, dt * accel);
-
-      const targetVert = verticalInput * SHIP_CONFIG.verticalMaxSpeed;
-      velocity.current.y = THREE.MathUtils.lerp(velocity.current.y, targetVert, dt * 3.5);
-    }
 
     // Rotation
     rotationEuler.current.y += yawInput * SHIP_CONFIG.yawSpeed * dt;
-    rotationEuler.current.x = THREE.MathUtils.lerp(rotationEuler.current.x, pitchInput * 0.6, dt * 5.0);
-    const targetBank = yawInput * SHIP_CONFIG.bankFactor + rollInput * 0.8;
-    rotationEuler.current.z = THREE.MathUtils.lerp(rotationEuler.current.z, targetBank, dt * 6.0);
-
     group.current.quaternion.setFromEuler(rotationEuler.current);
-    
-    // Translation
-    const forwardDir = new THREE.Vector3(0, 0, 1).applyEuler(rotationEuler.current);
-    const upDir = new THREE.Vector3(0, 1, 0).applyEuler(rotationEuler.current);
 
-    group.current.position.addScaledVector(forwardDir, velocity.current.z * dt);
-    group.current.position.addScaledVector(upDir, velocity.current.y * dt);
-    
-    // Boundary Enforcement: 300m sphere
-    const dist = group.current.position.length();
-    if (dist > COMBAT_CONFIG.ARENA_RADIUS) {
-      group.current.position.clampLength(0, COMBAT_CONFIG.ARENA_RADIUS - 1);
-      velocity.current.z *= 0.5;
+    // Forward Direction
+    const forwardDir = new THREE.Vector3(0, 0, 1).applyEuler(rotationEuler.current);
+    const upDir = new THREE.Vector3(0, 1, 0);
+
+    // Target Speed
+    let targetSpeed = 0;
+    if (forwardInput > 0) {
+      targetSpeed = isBoosting ? COMBAT_CONFIG.SHIP_BOOST_SPEED : COMBAT_CONFIG.SHIP_MAX_SPEED;
+    } else if (forwardInput < 0) {
+      targetSpeed = COMBAT_CONFIG.SHIP_MIN_SPEED;
     }
 
-    // Camera Chase
+    if (isBraking) {
+      targetSpeed = 0;
+    }
+
+    velocity.current.z = THREE.MathUtils.lerp(velocity.current.z, targetSpeed, dt * 3.5);
+    velocity.current.y = THREE.MathUtils.lerp(velocity.current.y, verticalInput * 25, dt * 4.0);
+
+    // Apply translation
+    const moveStep = forwardDir.clone().multiplyScalar(velocity.current.z * dt);
+    moveStep.add(upDir.clone().multiplyScalar(velocity.current.y * dt));
+    group.current.position.add(moveStep);
+
+    // Arena boundary clamp
+    const distFromCenter = group.current.position.length();
+    if (distFromCenter > COMBAT_CONFIG.ARENA_RADIUS) {
+      group.current.position.setLength(COMBAT_CONFIG.ARENA_RADIUS);
+    }
+
+    // Camera chase
     const cameraOffset = new THREE.Vector3(
       0,
       SHIP_CONFIG.camera.chaseHeight,
@@ -190,16 +189,14 @@ export const LocalPlayerShip: React.FC = () => {
       const posError = group.current.position.distanceTo(serverPos);
 
       if (posError > 8.0) {
-        // Snap directly if extreme drift / teleports
         group.current.position.copy(serverPos);
       } else if (posError > 0.4) {
-        // Smoothly correct drift
         group.current.position.lerp(serverPos, dt * 4.0);
       }
     }
 
     // ==========================================
-    // 3. Target Lock & Holographic Lead Indicator (Multi-Target Aware)
+    // 3. Target Lock & Holographic Lead Indicator
     // ==========================================
     const candidates = (otherPlayers.length > 0 ? otherPlayers : (opponentState ? [opponentState] : []))
       .filter(p => p && p.alive && p.hp > 0);
@@ -212,7 +209,7 @@ export const LocalPlayerShip: React.FC = () => {
       const pos = new THREE.Vector3(...cand.position);
       const toCand = new THREE.Vector3().subVectors(pos, group.current.position);
       const dist = toCand.length();
-      if (dist < 260) {
+      if (dist < 280) {
         const angle = forwardDir.angleTo(toCand.clone().normalize());
         if (angle < minAngle) {
           minAngle = angle;
@@ -222,7 +219,7 @@ export const LocalPlayerShip: React.FC = () => {
       }
     }
 
-    let aimDist = 120;
+    let aimDist = 140;
     if (bestTarget) {
       const oppPos = new THREE.Vector3(...bestTarget.position);
       const oppVel = new THREE.Vector3(...bestTarget.velocity);
@@ -235,7 +232,7 @@ export const LocalPlayerShip: React.FC = () => {
         hp: bestTarget.hp
       });
 
-      if (range < 220) {
+      if (range < 260) {
         const timeToHit = range / COMBAT_CONFIG.BULLET_SPEED;
         const leadWorld = oppPos.clone().add(oppVel.clone().multiplyScalar(timeToHit));
         setLeadIndicator({
@@ -247,7 +244,7 @@ export const LocalPlayerShip: React.FC = () => {
         setLeadIndicator(null);
       }
 
-      aimDist = Math.max(15, Math.min(260, bestDist));
+      aimDist = Math.max(15, Math.min(280, bestDist));
     } else {
       setTargetLock(null);
       setLeadIndicator(null);
@@ -256,14 +253,39 @@ export const LocalPlayerShip: React.FC = () => {
     // ==========================================
     // 4. Weapon Cooldown Timers & Crosshair Ray Convergence
     // ==========================================
-    const bulletCdLeft = Math.max(0, COMBAT_CONFIG.BULLET_COOLDOWN - (now - lastBulletTime.current) / 1000);
+    if (isSolo) {
+      // Handle solo reloading
+      if (soloIsReloading.current) {
+        const remaining = Math.max(0, (soloReloadEndTime.current - now) / 1000);
+        setReloadTimeRemaining(remaining);
+        if (remaining <= 0) {
+          soloIsReloading.current = false;
+          soloAmmo.current = COMBAT_CONFIG.BULLET_MAGAZINE_SIZE;
+          setIsReloading(false);
+          setAmmo(COMBAT_CONFIG.BULLET_MAGAZINE_SIZE);
+        }
+      }
+    } else if (selfState) {
+      setAmmo(selfState.ammo);
+      setIsReloading(selfState.isReloading);
+      setReloadTimeRemaining(selfState.reloadTimeRemaining);
+    }
+
+    const bulletCdLeft = Math.max(0, COMBAT_CONFIG.BULLET_FIRE_INTERVAL - (now - lastBulletTime.current) / 1000);
     setBulletCooldownRemaining(bulletCdLeft);
 
-    const laserCdLeft = Math.max(0, COMBAT_CONFIG.LASER_COOLDOWN - (now - lastLaserTime.current) / 1000);
+    const laserCdLeft = isSolo
+      ? Math.max(0, COMBAT_CONFIG.LASER_COOLDOWN - (now - lastLaserTime.current) / 1000)
+      : (selfState?.laserCooldownRemaining ?? 0);
     setLaserCooldownRemaining(laserCdLeft);
 
+    const solarCdLeft = isSolo
+      ? Math.max(0, COMBAT_CONFIG.SOLAR_COOLDOWN - (now - lastSolarTime.current) / 1000)
+      : (selfState?.solarCooldownRemaining ?? 0);
+    setSolarCooldownRemaining(solarCdLeft);
+
     // Muzzle position in world space
-    const muzzlePos = group.current.position.clone().add(forwardDir.clone().multiplyScalar(2.0));
+    const muzzlePos = group.current.position.clone().add(forwardDir.clone().multiplyScalar(2.2));
 
     // Camera aim ray & 3D crosshair convergence
     const camDir = new THREE.Vector3();
@@ -273,26 +295,43 @@ export const LocalPlayerShip: React.FC = () => {
     const aimFireDir = new THREE.Vector3().subVectors(aimTargetPoint, muzzlePos).normalize();
 
     // ==========================================
-    // 5. Primary Weapon: PLASMA BULLET (0.45s)
+    // 5. Weapon 1: Rapid Plasma Bullet (2 HP, 0.1s rate, 30 magazine, 2s reload)
     // ==========================================
     const shootBullet = isMouseDownLeft || keys['KeyJ'];
-    if (shootBullet && now - lastBulletTime.current > COMBAT_CONFIG.BULLET_COOLDOWN * 1000) {
+    const canFireBullet = isSolo
+      ? (!soloIsReloading.current && soloAmmo.current > 0)
+      : (selfState && !selfState.isReloading && selfState.ammo > 0);
+
+    if (shootBullet && canFireBullet && now - lastBulletTime.current > COMBAT_CONFIG.BULLET_FIRE_INTERVAL * 1000) {
       lastBulletTime.current = now;
       const attackId = `BULLET_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       
       if (isSolo) {
+        soloAmmo.current -= 1;
+        setAmmo(soloAmmo.current);
+        if (soloAmmo.current <= 0) {
+          soloIsReloading.current = true;
+          soloReloadEndTime.current = now + COMBAT_CONFIG.BULLET_RELOAD_TIME * 1000;
+          setIsReloading(true);
+        }
+
         const bulletVel = aimFireDir.clone().multiplyScalar(COMBAT_CONFIG.BULLET_SPEED);
         addSoloProjectile({
           id: attackId,
+          attackId,
           ownerId: 'solo_player',
+          weaponType: 'BULLET',
           position: [muzzlePos.x, muzzlePos.y, muzzlePos.z],
           direction: [bulletVel.x, bulletVel.y, bulletVel.z],
           color: playerColor,
+          team: 'NONE',
+          speed: COMBAT_CONFIG.BULLET_SPEED,
+          damage: COMBAT_CONFIG.BULLET_DAMAGE,
           createdAt: Date.now()
         });
         nexusAudio.playLaser();
       } else {
-        sendShoot(
+        sendBullet(
           [muzzlePos.x, muzzlePos.y, muzzlePos.z],
           [aimFireDir.x, aimFireDir.y, aimFireDir.z],
           attackId
@@ -302,10 +341,10 @@ export const LocalPlayerShip: React.FC = () => {
     }
 
     // ==========================================
-    // 6. Secondary Weapon: LASER BEAM (5.0s RECHARGE)
+    // 6. Weapon 2: Directed Laser Beam (12 HP, 3.0s RECHARGE)
     // ==========================================
-    const shootLaser = isMouseDownRight || keys['KeyK'] || keys['KeyL'];
-    if (shootLaser && now - lastLaserTime.current > COMBAT_CONFIG.LASER_COOLDOWN * 1000) {
+    const shootLaser = isMouseDownRight || keys['KeyK'];
+    if (shootLaser && laserCdLeft <= 0.05) {
       lastLaserTime.current = now;
       const attackId = `LASER_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
@@ -315,7 +354,6 @@ export const LocalPlayerShip: React.FC = () => {
         const emitterPos = muzzlePos.clone();
         const maxBeamEnd = emitterPos.clone().add(aimFireDir.clone().multiplyScalar(COMBAT_CONFIG.LASER_RANGE));
 
-        // Raycast against all obstacles
         const raycast = checkObstacleRaycast(
           emitterPos.x, emitterPos.y, emitterPos.z,
           maxBeamEnd.x, maxBeamEnd.y, maxBeamEnd.z
@@ -331,9 +369,8 @@ export const LocalPlayerShip: React.FC = () => {
           actualEnd = [maxBeamEnd.x, maxBeamEnd.y, maxBeamEnd.z];
         }
 
-        // Check if enemy is in beam path before any obstacle
         let hitEnemy = false;
-        if (opponentState) {
+        if (opponentState && opponentState.alive && opponentState.hp > 0) {
           const oppPos = new THREE.Vector3(...opponentState.position);
           const toOpp = new THREE.Vector3().subVectors(oppPos, emitterPos);
           const oppDist = toOpp.length();
@@ -342,7 +379,6 @@ export const LocalPlayerShip: React.FC = () => {
             const oppDir = toOpp.clone().normalize();
             const angle = aimFireDir.angleTo(oppDir);
 
-            // Beam cone test (~6.9 degrees)
             if (angle < COMBAT_CONFIG.LASER_AIM_CONE) {
               if (!blockedByObstacle || (raycast.distance > oppDist)) {
                 actualEnd = [oppPos.x, oppPos.y, oppPos.z];
@@ -354,20 +390,21 @@ export const LocalPlayerShip: React.FC = () => {
         }
 
         setActiveLaserBeam({
+          attackId,
           shooterId: 'solo_player',
           start: [emitterPos.x, emitterPos.y, emitterPos.z],
           end: actualEnd,
           blocked: blockedByObstacle,
           color: playerColor,
+          weaponType: 'LASER',
           timestamp: Date.now()
         });
 
         if (hitEnemy) {
-          applyDamageToSoloOpponent(COMBAT_CONFIG.LASER_DAMAGE);
+          applyDamageToSoloOpponent(COMBAT_CONFIG.LASER_DAMAGE); // Exactly 12 HP
           nexusAudio.playHit();
         }
       } else {
-        // Authoritative multiplayer laser: sent to server, server validates line-of-sight & cooldown
         sendLaser(
           [muzzlePos.x, muzzlePos.y, muzzlePos.z],
           [aimFireDir.x, aimFireDir.y, aimFireDir.z],
@@ -377,28 +414,97 @@ export const LocalPlayerShip: React.FC = () => {
     }
 
     // ==========================================
-    // 7. State Sync / Telemetry
+    // 7. Weapon 3: Special High-Yield Solar Beam (30 HP, 10.0s RECHARGE)
+    // ==========================================
+    const shootSolar = keys['KeyL'];
+    if (shootSolar && solarCdLeft <= 0.05) {
+      lastSolarTime.current = now;
+      const attackId = `SOLAR_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+      if (isSolo) {
+        nexusAudio.playLaser();
+
+        const emitterPos = muzzlePos.clone();
+        const maxBeamEnd = emitterPos.clone().add(aimFireDir.clone().multiplyScalar(COMBAT_CONFIG.SOLAR_RANGE));
+
+        const raycast = checkObstacleRaycast(
+          emitterPos.x, emitterPos.y, emitterPos.z,
+          maxBeamEnd.x, maxBeamEnd.y, maxBeamEnd.z
+        );
+
+        let actualEnd: [number, number, number];
+        let blockedByObstacle = false;
+
+        if (raycast.blocked && raycast.hitPoint) {
+          actualEnd = raycast.hitPoint;
+          blockedByObstacle = true;
+        } else {
+          actualEnd = [maxBeamEnd.x, maxBeamEnd.y, maxBeamEnd.z];
+        }
+
+        let hitEnemy = false;
+        if (opponentState && opponentState.alive && opponentState.hp > 0) {
+          const oppPos = new THREE.Vector3(...opponentState.position);
+          const toOpp = new THREE.Vector3().subVectors(oppPos, emitterPos);
+          const oppDist = toOpp.length();
+
+          if (oppDist <= COMBAT_CONFIG.SOLAR_RANGE) {
+            const oppDir = toOpp.clone().normalize();
+            const angle = aimFireDir.angleTo(oppDir);
+
+            if (angle < COMBAT_CONFIG.SOLAR_AIM_CONE) {
+              if (!blockedByObstacle || (raycast.distance > oppDist)) {
+                actualEnd = [oppPos.x, oppPos.y, oppPos.z];
+                hitEnemy = true;
+                blockedByObstacle = false;
+              }
+            }
+          }
+        }
+
+        setActiveSolarBeam({
+          attackId,
+          shooterId: 'solo_player',
+          start: [emitterPos.x, emitterPos.y, emitterPos.z],
+          end: actualEnd,
+          blocked: blockedByObstacle,
+          color: playerColor,
+          weaponType: 'SOLAR_BEAM',
+          timestamp: Date.now()
+        });
+
+        if (hitEnemy) {
+          applyDamageToSoloOpponent(COMBAT_CONFIG.SOLAR_DAMAGE); // Exactly 30 HP
+          nexusAudio.playHit();
+        }
+      } else {
+        sendSolar(
+          [muzzlePos.x, muzzlePos.y, muzzlePos.z],
+          [aimFireDir.x, aimFireDir.y, aimFireDir.z],
+          attackId
+        );
+      }
+    }
+
+    // ==========================================
+    // 8. Flight State Sync / Telemetry
     // ==========================================
     if (isSolo) {
       updateSoloSelf(
         [group.current.position.x, group.current.position.y, group.current.position.z],
         [rotationEuler.current.x, rotationEuler.current.y, rotationEuler.current.z],
         [forwardDir.x * velocity.current.z, forwardDir.y * velocity.current.z, forwardDir.z * velocity.current.z],
-        selfState?.hp ?? 100,
+        selfState?.hp ?? COMBAT_CONFIG.MAX_HP,
         isBoosting,
         Math.min(Math.abs(velocity.current.z) / COMBAT_CONFIG.SHIP_MAX_SPEED, 1)
       );
     } else {
       if (now - lastSendTime.current > 33) {
-        sendInput({
-          thrust: forwardInput,
-          yaw: yawInput,
-          pitch: pitchInput,
-          roll: rollInput,
-          vertical: verticalInput,
-          boost: isBoosting,
-          brake: isBraking
-        });
+        sendInput(
+          [group.current.position.x, group.current.position.y, group.current.position.z],
+          [rotationEuler.current.x, rotationEuler.current.y, rotationEuler.current.z],
+          [forwardDir.x * velocity.current.z, forwardDir.y * velocity.current.z, forwardDir.z * velocity.current.z]
+        );
         lastSendTime.current = now;
       }
     }
@@ -416,7 +522,7 @@ export const LocalPlayerShip: React.FC = () => {
       />
       {showCombatHitboxes && (
         <mesh>
-          <sphereGeometry args={[4.8, 16, 16]} />
+          <sphereGeometry args={[COMBAT_CONFIG.BULLET_HITBOX_RADIUS, 16, 16]} />
           <meshBasicMaterial wireframe color={playerColor === 'blue' ? '#00f0ff' : '#ffe600'} transparent opacity={0.6} />
         </mesh>
       )}

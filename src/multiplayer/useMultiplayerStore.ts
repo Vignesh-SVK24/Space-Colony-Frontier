@@ -1,6 +1,21 @@
 import { create } from 'zustand';
-import { AppView, BattleColor, RoomStatus, GameSnapshot, PlayerState, ProjectileState, MatchStats, LaserEvent, LeadIndicatorInfo, DamageEvent, CombatTelemetryEntry, RoomPlayerInfo } from './types';
-import { CombatDifficulty } from '../config/combatConfig';
+import {
+  AppView,
+  BattleColor,
+  GameMode,
+  RoomStatus,
+  Team,
+  PlayerState,
+  ProjectileState,
+  MatchStats,
+  LaserEvent,
+  LeadIndicatorInfo,
+  DamageEvent,
+  CombatTelemetryEntry,
+  RoomPlayerInfo,
+  GameSnapshot
+} from './types';
+import { CombatDifficulty, COMBAT_CONFIG } from '../config/combatConfig';
 
 export type { LaserEvent, LeadIndicatorInfo, DamageEvent, CombatTelemetryEntry, RoomPlayerInfo };
 
@@ -14,9 +29,11 @@ export interface TargetLockInfo {
 interface MultiplayerState {
   appView: AppView;
   gameModeSelection: 'SELECT' | 'SOLO_CONFIG' | 'ROOM_CONFIG';
+  gameMode: GameMode;
   aiDifficulty: CombatDifficulty;
   playerName: string;
   playerColor: BattleColor;
+  playerTeam: Team;
   roomCode: string;
   roomStatus: RoomStatus;
   playerId: string;
@@ -26,22 +43,27 @@ interface MultiplayerState {
   opponentColor: BattleColor | null;
   selfState: PlayerState | null;
   opponentState: PlayerState | null;
-  otherPlayers: PlayerState[]; // All remote players in 4-player match
-  roomPlayers: RoomPlayerInfo[]; // All pilots in room lobby
+  otherPlayers: PlayerState[];
+  roomPlayers: RoomPlayerInfo[];
   serverUrl: string;
   projectiles: ProjectileState[];
   matchResult: MatchStats | null;
-  connectionQuality: 'good' | 'fair' | 'poor' | 'disconnected';
+  connectionQuality: 'good' | 'fair' | 'poor' | 'disconnected' | 'connecting';
   countdown: number | null;
   error: string | null;
 
   // Tactical Map
   isMapOpen: boolean;
 
-  // Weapon Cooldowns & Beam FX
+  // Weapon Cooldowns, Ammo & Visual FX
+  ammo: number;
+  isReloading: boolean;
+  reloadTimeRemaining: number;
   laserCooldownRemaining: number;
+  solarCooldownRemaining: number;
   bulletCooldownRemaining: number;
   activeLaserBeam: LaserEvent | null;
+  activeSolarBeam: LaserEvent | null;
   targetLock: TargetLockInfo | null;
   leadIndicator: LeadIndicatorInfo | null;
   hitConfirmActive: boolean;
@@ -59,17 +81,16 @@ interface MultiplayerState {
   toggleCombatAimVector: () => void;
   handleDamageApplied: (event: DamageEvent) => void;
 
-  snapshotBuffer: GameSnapshot[];
-
   // Action methods
   setJoystickAxis: (axis: { x: number; y: number }) => void;
   setAppView: (view: AppView) => void;
   setGameModeSelection: (mode: 'SELECT' | 'SOLO_CONFIG' | 'ROOM_CONFIG') => void;
+  setGameMode: (mode: GameMode) => void;
   setAIDifficulty: (diff: CombatDifficulty) => void;
   setPlayerName: (name: string) => void;
   setPlayerColor: (color: BattleColor) => void;
+  setPlayerTeam: (team: Team) => void;
   setRoomCode: (code: string) => void;
-  updateFromSnapshot: (snapshot: GameSnapshot) => void;
   handleHit: () => void;
   triggerHitConfirm: () => void;
   handleMatchEnd: (stats: MatchStats) => void;
@@ -83,18 +104,30 @@ interface MultiplayerState {
   setServerUrl: (url: string) => void;
   setIsHost: (isHost: boolean) => void;
   setCountdown: (countdown: number | null) => void;
-  setConnectionQuality: (quality: 'good' | 'fair' | 'poor' | 'disconnected') => void;
+  setConnectionQuality: (quality: 'good' | 'fair' | 'poor' | 'disconnected' | 'connecting') => void;
 
-  // Map & Combat Actions
-  toggleMap: () => void;
-  setMapOpen: (open: boolean) => void;
+  // Weapon Actions
+  setAmmo: (ammo: number) => void;
+  setIsReloading: (reloading: boolean) => void;
+  setReloadTimeRemaining: (sec: number) => void;
   setLaserCooldownRemaining: (sec: number) => void;
+  setSolarCooldownRemaining: (sec: number) => void;
   setBulletCooldownRemaining: (sec: number) => void;
   setActiveLaserBeam: (beam: LaserEvent | null) => void;
+  setActiveSolarBeam: (beam: LaserEvent | null) => void;
   setTargetLock: (lock: TargetLockInfo | null) => void;
   setLeadIndicator: (lead: LeadIndicatorInfo | null) => void;
+  toggleMap: () => void;
+  setMapOpen: (open: boolean) => void;
 
-  // Solo Practice Mode Actions
+  setSelfState: (self: PlayerState | null) => void;
+  setOpponentState: (opp: PlayerState | null) => void;
+  setOtherPlayers: (players: PlayerState[]) => void;
+  addProjectile: (proj: ProjectileState) => void;
+  setProjectiles: (projs: ProjectileState[]) => void;
+  updateFromSnapshot: (snapshot: GameSnapshot) => void;
+
+  // Solo Practice Mode Actions (Strict 250 HP and identical rules)
   startSoloGame: () => void;
   updateSoloSelf: (
     pos: [number, number, number],
@@ -113,7 +146,6 @@ interface MultiplayerState {
     throttle: number
   ) => void;
   addSoloProjectile: (proj: ProjectileState) => void;
-  setProjectiles: (projs: ProjectileState[]) => void;
   applyDamageToSoloPlayer: (damage: number) => void;
   applyDamageToSoloOpponent: (damage: number) => void;
 }
@@ -135,9 +167,11 @@ const getDefaultServerUrl = () => {
 export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   appView: 'LANDING',
   gameModeSelection: 'SELECT',
+  gameMode: '1v1',
   aiDifficulty: 'NORMAL',
   playerName: '',
   playerColor: 'yellow',
+  playerTeam: 'NONE',
   roomCode: '',
   roomStatus: 'WAITING',
   playerId: '',
@@ -156,16 +190,20 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   countdown: null,
   error: null,
   isMapOpen: false,
+
+  ammo: COMBAT_CONFIG.BULLET_MAGAZINE_SIZE,
+  isReloading: false,
+  reloadTimeRemaining: 0,
   laserCooldownRemaining: 0,
+  solarCooldownRemaining: 0,
   bulletCooldownRemaining: 0,
   activeLaserBeam: null,
+  activeSolarBeam: null,
   targetLock: null,
   leadIndicator: null,
   hitConfirmActive: false,
   joystickAxis: { x: 0, y: 0 },
-  snapshotBuffer: [],
 
-  // Combat Debug & Telemetry initial state
   showCombatHitboxes: false,
   showCombatTrajectories: false,
   showCombatAimVector: false,
@@ -229,58 +267,54 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     }
   },
 
-  setJoystickAxis: (axis) => set({ joystickAxis: axis }),
-  setAppView: (view) => set({ appView: view }),
-  setGameModeSelection: (mode) => set({ gameModeSelection: mode }),
-  setAIDifficulty: (diff) => set({ aiDifficulty: diff }),
-  setPlayerName: (name) => set({ playerName: name }),
-  setPlayerColor: (color) => set({ playerColor: color }),
-  setRoomCode: (code) => set({ roomCode: code }),
-  
   updateFromSnapshot: (snapshot) => {
-    const { playerId, lastAppliedServerTick, selfState: prevSelf } = get();
-    const currentTick = snapshot.serverTick ?? 0;
-    
-    const rawSelf = snapshot.players.find(p => p.id === playerId) || null;
-    const selfState = rawSelf ? {
-      ...rawSelf,
-      hp: currentTick < lastAppliedServerTick && prevSelf ? prevSelf.hp : rawSelf.hp,
-      alive: (currentTick < lastAppliedServerTick && prevSelf ? prevSelf.hp : rawSelf.hp) > 0
-    } : null;
+    const { playerId, lastAppliedServerTick } = get();
+    const tick = snapshot.serverTick ?? 0;
 
-    // Up to 3 remote opponents in 4-player match
-    const otherPlayers = snapshot.players
-      .filter(p => p.id !== playerId)
-      .map(p => {
-        const prevP = get().otherPlayers.find(op => op.id === p.id);
-        const hp = currentTick < lastAppliedServerTick && prevP ? prevP.hp : p.hp;
-        return {
-          ...p,
-          hp,
-          alive: hp > 0
-        };
-      });
-
-    const opponentState = otherPlayers.length > 0 ? otherPlayers[0] : null;
+    const selfSnap = snapshot.players.find((p: any) => p.id === playerId);
+    const oppSnap = snapshot.players.find((p: any) => p.id !== playerId);
 
     set(state => {
-      const newBuffer = [...state.snapshotBuffer, snapshot].slice(-2);
+      let updatedSelf = state.selfState;
+      if (selfSnap) {
+        const hp = (tick > 0 && tick < lastAppliedServerTick && state.selfState) ? state.selfState.hp : selfSnap.hp;
+        updatedSelf = {
+          ...state.selfState,
+          ...selfSnap,
+          hp
+        };
+      }
+
+      let updatedOpp = state.opponentState;
+      if (oppSnap) {
+        const hp = (tick > 0 && tick < lastAppliedServerTick && state.opponentState) ? state.opponentState.hp : oppSnap.hp;
+        updatedOpp = {
+          ...state.opponentState,
+          ...oppSnap,
+          hp
+        };
+      }
+
       return {
-        snapshotBuffer: newBuffer,
-        selfState,
-        otherPlayers,
-        opponentState,
-        projectiles: snapshot.projectiles,
-        roomStatus: snapshot.roomStatus,
-        lastAppliedServerTick: Math.max(state.lastAppliedServerTick, currentTick)
+        selfState: updatedSelf,
+        opponentState: updatedOpp,
+        projectiles: snapshot.projectiles || state.projectiles,
+        roomStatus: snapshot.roomStatus || state.roomStatus
       };
     });
   },
 
-  handleHit: () => {
-    // Screen flash / damage feedback
-  },
-
+  setJoystickAxis: (axis) => set({ joystickAxis: axis }),
+  setAppView: (view) => set({ appView: view }),
+  setGameModeSelection: (mode) => set({ gameModeSelection: mode }),
+  setGameMode: (mode) => set({ gameMode: mode }),
+  setAIDifficulty: (diff) => set({ aiDifficulty: diff }),
+  setPlayerName: (name) => set({ playerName: name }),
+  setPlayerColor: (color) => set({ playerColor: color }),
+  setPlayerTeam: (team) => set({ playerTeam: team }),
+  setRoomCode: (code) => set({ roomCode: code }),
+  
+  handleHit: () => {},
   triggerHitConfirm: () => {
     if (hitConfirmTimer) clearTimeout(hitConfirmTimer);
     set({ hitConfirmActive: true });
@@ -297,21 +331,22 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     roomStatus: 'COUNTDOWN',
     countdown: 3,
     laserCooldownRemaining: 0,
+    solarCooldownRemaining: 0,
     bulletCooldownRemaining: 0,
-    activeLaserBeam: null,
-    targetLock: null,
-    hitConfirmActive: false,
-    projectiles: [],
-    lastAppliedServerTick: 0,
-    combatTelemetryLog: []
+    ammo: COMBAT_CONFIG.BULLET_MAGAZINE_SIZE,
+    isReloading: false,
+    reloadTimeRemaining: 0,
+    projectiles: []
   }),
 
   reset: () => set({
     appView: 'LANDING',
     gameModeSelection: 'SELECT',
-    isSolo: false,
     roomCode: '',
     roomStatus: 'WAITING',
+    playerId: '',
+    isHost: false,
+    isSolo: false,
     opponentName: '',
     opponentColor: null,
     selfState: null,
@@ -320,19 +355,23 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     roomPlayers: [],
     projectiles: [],
     matchResult: null,
+    connectionQuality: 'disconnected',
     countdown: null,
     error: null,
     isMapOpen: false,
+    ammo: COMBAT_CONFIG.BULLET_MAGAZINE_SIZE,
+    isReloading: false,
+    reloadTimeRemaining: 0,
     laserCooldownRemaining: 0,
+    solarCooldownRemaining: 0,
     bulletCooldownRemaining: 0,
     activeLaserBeam: null,
+    activeSolarBeam: null,
     targetLock: null,
     leadIndicator: null,
     hitConfirmActive: false,
-    joystickAxis: { x: 0, y: 0 },
-    snapshotBuffer: [],
-    lastAppliedServerTick: 0,
-    combatTelemetryLog: []
+    combatTelemetryLog: [],
+    lastAppliedServerTick: 0
   }),
 
   setError: (error) => set({ error }),
@@ -340,58 +379,81 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   setPlayerId: (id) => set({ playerId: id }),
   setOpponentInfo: (name, color) => set({ opponentName: name, opponentColor: color }),
   setRoomPlayers: (players) => set({ roomPlayers: players }),
-  setServerUrl: (url) => {
-    try {
-      localStorage.setItem('sfc_server_url', url);
-    } catch {}
-    set({ serverUrl: url });
-  },
+  setServerUrl: (url) => set({ serverUrl: url }),
   setIsHost: (isHost) => set({ isHost }),
   setCountdown: (countdown) => set({ countdown }),
   setConnectionQuality: (quality) => set({ connectionQuality: quality }),
 
-  // Map & Combat
+  setAmmo: (ammo) => set({ ammo }),
+  setIsReloading: (isReloading) => set({ isReloading }),
+  setReloadTimeRemaining: (reloadTimeRemaining) => set({ reloadTimeRemaining }),
+  setLaserCooldownRemaining: (laserCooldownRemaining) => set({ laserCooldownRemaining }),
+  setSolarCooldownRemaining: (solarCooldownRemaining) => set({ solarCooldownRemaining }),
+  setBulletCooldownRemaining: (bulletCooldownRemaining) => set({ bulletCooldownRemaining }),
+  setActiveLaserBeam: (activeLaserBeam) => set({ activeLaserBeam }),
+  setActiveSolarBeam: (activeSolarBeam) => set({ activeSolarBeam }),
+  setTargetLock: (targetLock) => set({ targetLock }),
+  setLeadIndicator: (leadIndicator) => set({ leadIndicator }),
   toggleMap: () => set(state => ({ isMapOpen: !state.isMapOpen })),
   setMapOpen: (open) => set({ isMapOpen: open }),
-  setLaserCooldownRemaining: (sec) => set({ laserCooldownRemaining: Math.max(0, sec) }),
-  setBulletCooldownRemaining: (sec) => set({ bulletCooldownRemaining: Math.max(0, sec) }),
-  setActiveLaserBeam: (beam) => set({ activeLaserBeam: beam }),
-  setTargetLock: (lock) => set({ targetLock: lock }),
-  setLeadIndicator: (lead) => set({ leadIndicator: lead }),
 
-  // Solo Practice Mode
+  setSelfState: (selfState) => set({ selfState }),
+  setOpponentState: (opponentState) => set({ opponentState }),
+  setOtherPlayers: (otherPlayers) => set({ otherPlayers }),
+  addProjectile: (proj) => set(state => ({ projectiles: [...state.projectiles, proj].slice(-50) })),
+  setProjectiles: (projectiles) => set({ projectiles }),
+
+  // Solo Mode Aligned with 250 HP and Exact Match Rules
   startSoloGame: () => {
     const { playerName, playerColor, aiDifficulty } = get();
-    const name = playerName.trim() || 'Cadet Vanguard';
-    const opponentCol: BattleColor = playerColor === 'red' ? 'blue' : 'red';
-    const diffLabel = aiDifficulty === 'EASY' ? 'DRONE (EASY)' : aiDifficulty === 'HARD' ? 'CORVETTE (HARD)' : 'DRONE (NORMAL)';
+    const name = playerName.trim() || 'Cadet-01';
+    const opponentCol: BattleColor = playerColor === 'yellow' ? 'blue' : 'yellow';
+    const diffLabel = aiDifficulty;
 
     const initialSelf: PlayerState = {
       id: 'solo_player',
       name,
       color: playerColor,
-      position: [0, 15, -120],
+      team: 'NONE',
+      slot: 1,
+      position: [0, 0, -80],
       rotation: [0, 0, 0],
       velocity: [0, 0, 0],
-      hp: 100,
-      maxHp: 100,
+      hp: COMBAT_CONFIG.MAX_HP, // 250
+      maxHp: COMBAT_CONFIG.MAX_HP, // 250
       alive: true,
+      ready: true,
+      isHost: true,
       throttle: 0,
-      isBoosting: false
+      isBoosting: false,
+      ammo: COMBAT_CONFIG.BULLET_MAGAZINE_SIZE,
+      isReloading: false,
+      reloadTimeRemaining: 0,
+      laserCooldownRemaining: 0,
+      solarCooldownRemaining: 0
     };
 
     const initialOpponent: PlayerState = {
       id: 'solo_ai_drone',
       name: `TARGET DRONE (${diffLabel})`,
       color: opponentCol,
-      position: [0, 15, 120],
+      team: 'NONE',
+      slot: 2,
+      position: [0, 15, 80],
       rotation: [0, Math.PI, 0],
       velocity: [0, 0, 15],
-      hp: 100,
-      maxHp: 100,
+      hp: COMBAT_CONFIG.MAX_HP, // 250
+      maxHp: COMBAT_CONFIG.MAX_HP, // 250
       alive: true,
+      ready: true,
+      isHost: false,
       throttle: 0.5,
-      isBoosting: false
+      isBoosting: false,
+      ammo: COMBAT_CONFIG.BULLET_MAGAZINE_SIZE,
+      isReloading: false,
+      reloadTimeRemaining: 0,
+      laserCooldownRemaining: 0,
+      solarCooldownRemaining: 0
     };
 
     set({
@@ -399,6 +461,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
       playerId: 'solo_player',
       playerName: name,
       playerColor,
+      playerTeam: 'NONE',
+      gameMode: '1v1',
       selfState: initialSelf,
       opponentState: initialOpponent,
       otherPlayers: [initialOpponent],
@@ -417,9 +481,14 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
       countdown: null,
       error: null,
       isMapOpen: false,
+      ammo: COMBAT_CONFIG.BULLET_MAGAZINE_SIZE,
+      isReloading: false,
+      reloadTimeRemaining: 0,
       laserCooldownRemaining: 0,
+      solarCooldownRemaining: 0,
       bulletCooldownRemaining: 0,
       activeLaserBeam: null,
+      activeSolarBeam: null,
       targetLock: null,
       leadIndicator: null,
       hitConfirmActive: false
@@ -447,7 +516,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   updateSoloOpponent: (pos, rot, vel, hp, isBoosting, throttle) => {
     set(state => {
       if (!state.opponentState) return {};
-      const updatedOpponent = {
+      const updatedOpponent: PlayerState = {
         ...state.opponentState,
         position: pos,
         rotation: rot,
@@ -470,8 +539,6 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     }));
   },
 
-  setProjectiles: (projs) => set({ projectiles: projs }),
-
   applyDamageToSoloPlayer: (damage) => {
     set(state => {
       if (!state.selfState) return {};
@@ -490,7 +557,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     set(state => {
       if (!state.opponentState) return {};
       const newHp = Math.max(0, state.opponentState.hp - damage);
-      const updatedOpp = {
+      const updatedOpp: PlayerState = {
         ...state.opponentState,
         hp: newHp,
         alive: newHp > 0

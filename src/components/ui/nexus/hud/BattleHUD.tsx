@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useMultiplayerStore } from '../../../../multiplayer/useMultiplayerStore';
-import { disconnect } from '../../../../multiplayer/socketClient';
-import { LogOut, Bot, Wifi, Map as MapIcon, Crosshair, Zap, Maximize, Minimize } from 'lucide-react';
+import { disconnect, sendReload } from '../../../../multiplayer/colyseusClient';
+import { LogOut, Bot, Wifi, Map as MapIcon, Crosshair, Zap, Maximize, Minimize, Sun, Shield } from 'lucide-react';
 import { FullScreenTacticalMap } from './FullScreenTacticalMap';
 import { CombatDebugOverlay } from './CombatDebugOverlay';
 import { nexusAudio } from '../../../../utils/nexusAudio';
@@ -16,11 +16,15 @@ export const BattleHUD: React.FC = () => {
     otherPlayers,
     connectionQuality,
     isSolo,
+    gameMode,
     reset,
     isMapOpen,
     setMapOpen,
+    ammo,
+    isReloading,
+    reloadTimeRemaining,
     laserCooldownRemaining,
-    bulletCooldownRemaining,
+    solarCooldownRemaining,
     targetLock,
     hitConfirmActive,
     countdown,
@@ -28,15 +32,13 @@ export const BattleHUD: React.FC = () => {
   } = useMultiplayerStore();
 
   const opponentList = otherPlayers.length > 0 ? otherPlayers : (opponentState ? [opponentState] : []);
-
   const { isFullscreen } = useFullscreen();
 
-  // Attempt to enter fullscreen on battle start to hide address bar
   useEffect(() => {
     enterFullscreen();
   }, []);
 
-  // 'M' Key shortcut for opening/closing map
+  // 'M' Key shortcut for map, 'R' key for reload
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'KeyM' && !e.repeat) {
@@ -44,14 +46,20 @@ export const BattleHUD: React.FC = () => {
         setMapOpen(!isMapOpen);
         nexusAudio.playClick();
       }
+      if (e.code === 'KeyR' && !e.repeat) {
+        e.preventDefault();
+        if (!isSolo) {
+          sendReload();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMapOpen, setMapOpen]);
+  }, [isMapOpen, setMapOpen, isSolo]);
 
   const getHpColor = (hp: number) => {
-    if (hp > 60) return 'bg-emerald-500';
-    if (hp > 30) return 'bg-yellow-500';
+    if (hp > 150) return 'bg-emerald-500';
+    if (hp > 75) return 'bg-yellow-500';
     return 'bg-red-500';
   };
 
@@ -69,15 +77,17 @@ export const BattleHUD: React.FC = () => {
     reset();
   };
 
-  // Laser recharge progress (0% when 5.0s, 100% when 0s)
   const laserReady = laserCooldownRemaining <= 0.05;
   const laserProgress = Math.max(0, Math.min(100, ((COMBAT_CONFIG.LASER_COOLDOWN - laserCooldownRemaining) / COMBAT_CONFIG.LASER_COOLDOWN) * 100));
+
+  const solarReady = solarCooldownRemaining <= 0.05;
+  const solarProgress = Math.max(0, Math.min(100, ((COMBAT_CONFIG.SOLAR_COOLDOWN - solarCooldownRemaining) / COMBAT_CONFIG.SOLAR_COOLDOWN) * 100));
 
   return (
     <>
       <div className="absolute inset-0 pointer-events-none font-mono text-white select-none overflow-hidden">
         
-        {/* Top Left: Exit Match & Fullscreen Toggle & Controls Guide */}
+        {/* Top Left: Exit Match & Controls Guide */}
         <div className="absolute top-3 sm:top-4 left-3 sm:left-4 z-30 flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <button
@@ -92,7 +102,7 @@ export const BattleHUD: React.FC = () => {
             <button
               onClick={toggleFullscreen}
               className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/70 hover:bg-sky-950/80 border border-gray-700/60 hover:border-sky-500/50 text-[11px] text-gray-300 hover:text-sky-300 transition-colors cursor-pointer backdrop-blur-md shadow-lg"
-              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen (Hide browser address bar)'}
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
             >
               {isFullscreen ? <Minimize size={13} /> : <Maximize size={13} />}
               <span className="hidden sm:inline uppercase tracking-wider font-semibold">
@@ -101,13 +111,15 @@ export const BattleHUD: React.FC = () => {
             </button>
           </div>
 
-          {/* Quick Desktop Flight Key Reference */}
+          {/* Flight & Combat Keys */}
           <div className="hidden lg:flex flex-col gap-1 p-2 bg-black/60 border border-gray-800/80 rounded-lg text-[10px] text-gray-400 backdrop-blur-md">
             <div><span className="text-cyan-400 font-bold">W/S/A/D:</span> Thrust & Yaw</div>
             <div><span className="text-cyan-400 font-bold">SPACE/C:</span> Ascend/Descend</div>
-            <div><span className="text-cyan-400 font-bold">L-CLICK / J:</span> Plasma Blaster</div>
-            <div><span className="text-amber-400 font-bold">R-CLICK / K:</span> Laser Beam (5s)</div>
-            <div><span className="text-sky-300 font-bold">M:</span> Full Tactical Map</div>
+            <div><span className="text-cyan-400 font-bold">L-CLICK / J:</span> Bullet (2 HP · 30 Mag)</div>
+            <div><span className="text-amber-400 font-bold">R-CLICK / K:</span> Laser Beam (12 HP · 3s)</div>
+            <div><span className="text-orange-400 font-bold">L:</span> Solar Beam (30 HP · 10s)</div>
+            <div><span className="text-sky-300 font-bold">R:</span> Reload Ammo (2.0s)</div>
+            <div><span className="text-sky-300 font-bold">M:</span> Tactical Map</div>
           </div>
         </div>
 
@@ -117,18 +129,20 @@ export const BattleHUD: React.FC = () => {
             {isSolo ? (
               <>
                 <Bot size={13} className="text-emerald-400" />
-                <span className="font-bold tracking-widest text-emerald-300">SOLO PRACTICE (AI COMBAT)</span>
+                <span className="font-bold tracking-widest text-emerald-300">SOLO PRACTICE (250 HP)</span>
               </>
             ) : (
               <>
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="font-bold tracking-widest">ROOM: {roomCode}</span>
+                <span className="font-bold tracking-widest">
+                  ROOM: {roomCode} · {gameMode === '2v2' ? '2v2 TEAM BATTLE' : gameMode === 'FFA' ? '4-PLAYER FFA' : '1v1 DUEL'}
+                </span>
               </>
             )}
           </div>
         </div>
 
-        {/* Center: Tactical Targeting Reticle */}
+        {/* Center: Targeting Reticle & Hit Marker */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 pointer-events-none opacity-85">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[2px] h-3 sm:h-3.5 bg-cyan-400/80" />
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[2px] h-3 sm:h-3.5 bg-cyan-400/80" />
@@ -136,12 +150,10 @@ export const BattleHUD: React.FC = () => {
           <div className="absolute top-1/2 right-0 -translate-y-1/2 w-3 sm:w-3.5 h-[2px] bg-cyan-400/80" />
           <div className="absolute inset-2 rounded-full border border-cyan-400/40" />
           
-          {/* Target Lock Ring */}
           {targetLock && (
             <div className="absolute -inset-2 rounded-full border-2 border-red-500/80 animate-ping" />
           )}
 
-          {/* Hit Confirmation Marker */}
           {hitConfirmActive && (
             <div className="absolute inset-0 flex items-center justify-center animate-out fade-out duration-250">
               <div className="absolute w-3.5 h-0.5 bg-red-400 rotate-45 translate-x-2.5 -translate-y-2.5 shadow-[0_0_8px_rgba(239,68,68,1)]" />
@@ -153,7 +165,7 @@ export const BattleHUD: React.FC = () => {
           )}
         </div>
 
-        {/* Match Countdown Banner */}
+        {/* Match Countdown */}
         {((countdown !== null && countdown > 0) || roomStatus === 'COUNTDOWN') && (
           <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none flex flex-col items-center animate-pulse">
             <div className="text-5xl sm:text-7xl font-black text-amber-400 drop-shadow-[0_0_25px_rgba(245,158,11,0.8)]">
@@ -165,20 +177,20 @@ export const BattleHUD: React.FC = () => {
           </div>
         )}
 
-        {/* Target Lock Card (If opponent in sights) */}
+        {/* Target Lock Card */}
         {targetLock && (
           <div className="absolute top-[58%] left-1/2 -translate-x-1/2 bg-red-950/70 border border-red-500/80 px-3 py-1.5 rounded-lg flex items-center gap-3 backdrop-blur-md shadow-[0_0_15px_rgba(239,68,68,0.4)] z-20">
             <Crosshair size={14} className="text-red-400 animate-spin-slow" />
             <div className="text-[11px] font-bold text-red-200">
-              TARGET LOCKED: <span className="text-white">{targetLock.name}</span>
+              TARGET: <span className="text-white">{targetLock.name}</span>
             </div>
             <div className="text-[10px] bg-red-900/80 px-1.5 py-0.5 rounded text-red-300 font-bold">
-              {targetLock.distance}M
+              {targetLock.distance}M · {Math.max(0, targetLock.hp)} HP
             </div>
           </div>
         )}
 
-        {/* Top Right: Opponents Status Stack (Up to 3 opponents) */}
+        {/* Top Right: Opponents Status Stack */}
         {opponentList.length > 0 && (
           <div className="absolute top-3 sm:top-4 right-3 sm:right-4 flex flex-col items-end gap-2 z-20">
             {opponentList.map((opp) => {
@@ -191,6 +203,7 @@ export const BattleHUD: React.FC = () => {
                 )
               ) : 0;
               const isEliminated = !opp.alive || opp.hp <= 0;
+              const isFriendly = gameMode === '2v2' && selfState && selfState.team !== 'NONE' && selfState.team === opp.team;
 
               return (
                 <div 
@@ -198,19 +211,21 @@ export const BattleHUD: React.FC = () => {
                   className={`flex flex-col items-end gap-0.5 p-1.5 rounded-lg backdrop-blur-md transition-all ${
                     isLocked 
                       ? 'bg-red-950/80 border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]' 
+                      : isFriendly
+                      ? 'bg-emerald-950/60 border border-emerald-500/60'
                       : 'bg-black/60 border border-gray-800'
                   }`}
                 >
-                  <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-red-400 drop-shadow">
-                    {isSolo && <Bot size={12} className="text-red-400" />}
+                  <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-white drop-shadow">
+                    {isFriendly ? <Shield size={12} className="text-emerald-400" /> : (isSolo ? <Bot size={12} className="text-red-400" /> : null)}
                     <span 
                       className="w-2 h-2 rounded-full shrink-0" 
                       style={{
                         backgroundColor: opp.color === 'yellow' ? '#eab308' : opp.color === 'blue' ? '#3b82f6' : opp.color === 'green' ? '#22c55e' : '#ef4444'
                       }} 
                     />
-                    <span className="truncate max-w-[110px] sm:max-w-[160px] text-white">
-                      {opp.name}
+                    <span className="truncate max-w-[110px] sm:max-w-[160px]">
+                      {opp.name} {opp.team !== 'NONE' ? `[Team ${opp.team}]` : ''}
                     </span>
                     {isEliminated && (
                       <span className="text-[9px] text-red-500 font-black uppercase">
@@ -221,13 +236,13 @@ export const BattleHUD: React.FC = () => {
 
                   <div className="flex items-center gap-2 text-[9px] text-gray-300 font-semibold">
                     <span>{dist}M</span>
-                    <span>HP: {Math.max(0, Math.floor(opp.hp))}</span>
+                    <span>HP: {Math.max(0, Math.floor(opp.hp))} / 250</span>
                   </div>
 
                   <div className="w-[120px] sm:w-[160px] h-[6px] sm:h-[8px] bg-black/80 border border-red-500/40 rounded-xs overflow-hidden relative shadow">
                     <div 
-                      className={`h-full transition-all duration-300 ${isEliminated ? 'bg-gray-700' : 'bg-gradient-to-r from-red-600 to-rose-500'}`}
-                      style={{ width: `${Math.max(0, Math.min(100, opp.hp))}%` }}
+                      className={`h-full transition-all duration-300 ${isEliminated ? 'bg-gray-700' : isFriendly ? 'bg-emerald-500' : 'bg-gradient-to-r from-red-600 to-rose-500'}`}
+                      style={{ width: `${Math.max(0, Math.min(100, (opp.hp / 250) * 100))}%` }}
                     />
                   </div>
                 </div>
@@ -236,23 +251,23 @@ export const BattleHUD: React.FC = () => {
           </div>
         )}
 
-        {/* Bottom Center: Player Hull HP Gauge */}
+        {/* Bottom Center: Authoritative 250 HP Gauge */}
         {selfState && (
           <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 z-20">
             <div className="text-xs sm:text-sm font-bold tracking-wider text-sky-200 drop-shadow">
-              {selfState.name}
+              {selfState.name} {selfState.team !== 'NONE' ? `[TEAM ${selfState.team}]` : ''}
             </div>
-            <div className="w-[220px] sm:w-[340px] h-[20px] sm:h-[24px] bg-black/85 border border-sky-500/50 rounded-sm relative overflow-hidden backdrop-blur-md shadow-[0_0_20px_rgba(2,132,199,0.35)]">
+            <div className="w-[240px] sm:w-[360px] h-[22px] sm:h-[26px] bg-black/85 border border-sky-500/50 rounded-sm relative overflow-hidden backdrop-blur-md shadow-[0_0_20px_rgba(2,132,199,0.35)]">
               <div 
                 className={`h-full transition-all duration-300 ${getHpColor(selfState.hp)}`}
-                style={{ width: `${Math.max(0, Math.min(100, selfState.hp))}%` }}
+                style={{ width: `${Math.max(0, Math.min(100, (selfState.hp / 250) * 100))}%` }}
               />
               <div className="absolute inset-0 flex items-center justify-center text-[10px] sm:text-xs font-black drop-shadow text-white tracking-wider">
-                HULL: {Math.max(0, Math.floor(selfState.hp))} / 100
+                HULL: {Math.max(0, Math.floor(selfState.hp))} / 250
               </div>
             </div>
 
-            {/* Tactical Map Button (Desktop Only) */}
+            {/* Tactical Map Button */}
             <button
               onClick={() => {
                 setMapOpen(true);
@@ -266,26 +281,32 @@ export const BattleHUD: React.FC = () => {
           </div>
         )}
 
-        {/* Bottom Right: Dual Weapon Systems Deck (Desktop Only - Mobile has dedicated touch buttons) */}
+        {/* Bottom Right: 3 Weapons Systems Deck (Bullet, Laser, Solar Beam) */}
         <div className="hidden lg:flex absolute bottom-4 sm:bottom-6 right-3 sm:right-6 items-end gap-3 z-20 pointer-events-auto">
           
-          {/* Primary Weapon: Plasma Bullets */}
+          {/* Weapon 1: Rapid Plasma Bullet (2 HP · 30 Magazine · 2s Reload) */}
           <div className="flex flex-col items-center gap-1">
-            <div className={`w-12 h-12 rounded-xl border flex flex-col items-center justify-center backdrop-blur-md transition-all ${
-              bulletCooldownRemaining <= 0.05
+            <div className={`w-14 h-14 rounded-xl border flex flex-col items-center justify-center backdrop-blur-md transition-all ${
+              !isReloading && ammo > 0
                 ? 'bg-black/75 border-cyan-400 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
-                : 'bg-black/60 border-gray-700 text-gray-500'
+                : 'bg-black/80 border-red-500/70 text-red-400'
             }`}>
-              <Zap size={16} className={bulletCooldownRemaining <= 0.05 ? 'text-cyan-400 animate-pulse' : 'text-gray-500'} />
-              <span className="text-[8.5px] font-bold mt-0.5">0.45s</span>
+              <Zap size={16} className={!isReloading && ammo > 0 ? 'text-cyan-400 animate-pulse' : 'text-red-400'} />
+              {isReloading ? (
+                <div className="flex flex-col items-center">
+                  <span className="text-[8px] font-black text-red-300 animate-pulse">RELOAD</span>
+                  <span className="text-[7.5px] text-gray-300">{reloadTimeRemaining.toFixed(1)}s</span>
+                </div>
+              ) : (
+                <span className="text-[10px] font-black text-white">{ammo} / 30</span>
+              )}
             </div>
-            <div className="text-[9px] text-gray-300 font-bold tracking-wider">BLASTERS</div>
+            <div className="text-[9px] text-gray-300 font-bold tracking-wider">BULLET (2HP)</div>
           </div>
 
-          {/* Secondary Weapon: 5.0s Laser Beam Recharge Gauge */}
+          {/* Weapon 2: Laser Beam (12 HP · 3.0s Recharge) */}
           <div className="flex flex-col items-center gap-1">
             <div className="relative w-14 h-14 rounded-xl border border-amber-500/60 bg-black/80 flex flex-col items-center justify-center backdrop-blur-md shadow-[0_0_15px_rgba(245,158,11,0.3)]">
-              {/* Circular Recharge Indicator */}
               <svg className="absolute inset-0 w-full h-full -rotate-90 p-1" viewBox="0 0 36 36">
                 <path
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
@@ -314,7 +335,41 @@ export const BattleHUD: React.FC = () => {
                 </div>
               )}
             </div>
-            <div className="text-[9px] text-amber-300 font-bold tracking-wider">LASER BEAM</div>
+            <div className="text-[9px] text-amber-300 font-bold tracking-wider">LASER (12HP)</div>
+          </div>
+
+          {/* Weapon 3: Special Solar Beam (30 HP · 10.0s Recharge) */}
+          <div className="flex flex-col items-center gap-1">
+            <div className="relative w-14 h-14 rounded-xl border border-orange-500/70 bg-black/80 flex flex-col items-center justify-center backdrop-blur-md shadow-[0_0_15px_rgba(249,115,22,0.35)]">
+              <svg className="absolute inset-0 w-full h-full -rotate-90 p-1" viewBox="0 0 36 36">
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="rgba(249, 115, 22, 0.2)"
+                  strokeWidth="3"
+                />
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke={solarReady ? '#f97316' : '#fbbf24'}
+                  strokeWidth="3.2"
+                  strokeDasharray={`${solarProgress}, 100`}
+                />
+              </svg>
+
+              {solarReady ? (
+                <div className="flex flex-col items-center z-10">
+                  <Sun size={18} className="text-orange-400 animate-spin-slow" />
+                  <span className="text-[8.5px] font-black text-orange-300 tracking-wider">READY</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center z-10 text-[10px] font-black text-orange-300">
+                  <span>{solarCooldownRemaining.toFixed(1)}s</span>
+                  <span className="text-[7px] text-gray-400 font-normal">CHARGING</span>
+                </div>
+              )}
+            </div>
+            <div className="text-[9px] text-orange-400 font-bold tracking-wider">SOLAR (30HP)</div>
           </div>
 
         </div>
@@ -338,10 +393,7 @@ export const BattleHUD: React.FC = () => {
 
       </div>
 
-      {/* Combat Debug Inspector (F3) */}
       <CombatDebugOverlay />
-
-      {/* Full-Screen Tactical Map Modal */}
       <FullScreenTacticalMap />
     </>
   );

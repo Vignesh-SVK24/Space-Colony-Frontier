@@ -121,6 +121,7 @@ describe('Multiplayer System Tests', () => {
       winner: 'pilot_1',
       winnerName: 'Ace',
       loserName: 'Ghost',
+      mode: '1v1',
       damageDealt: 100,
       shotsHit: 10,
       shotsFired: 12,
@@ -153,11 +154,11 @@ describe('Multiplayer System Tests', () => {
     expect(state.roomStatus).toBe('BATTLE');
     expect(state.selfState?.name).toBe('Falcon');
     expect(state.selfState?.color).toBe('blue');
-    expect(state.selfState?.hp).toBe(100);
+    expect(state.selfState?.hp).toBe(250);
 
     expect(state.opponentState?.id).toBe('solo_ai_drone');
     expect(state.opponentState?.name).toContain('TARGET DRONE');
-    expect(state.opponentState?.hp).toBe(100);
+    expect(state.opponentState?.hp).toBe(250);
   });
 
   it('should accurately apply damage and update telemetry in solo mode', () => {
@@ -165,16 +166,21 @@ describe('Multiplayer System Tests', () => {
 
     // Damage player
     useMultiplayerStore.getState().applyDamageToSoloPlayer(20);
-    expect(useMultiplayerStore.getState().selfState?.hp).toBe(80);
+    expect(useMultiplayerStore.getState().selfState?.hp).toBe(230);
 
     // Damage AI drone
     useMultiplayerStore.getState().applyDamageToSoloOpponent(30);
-    expect(useMultiplayerStore.getState().opponentState?.hp).toBe(70);
+    expect(useMultiplayerStore.getState().opponentState?.hp).toBe(220);
 
     // Add solo projectile
     useMultiplayerStore.getState().addSoloProjectile({
       id: 'test_laser',
+      attackId: 'test_atk',
       ownerId: 'solo_player',
+      weaponType: 'BULLET',
+      team: 'NONE',
+      speed: 120,
+      damage: 2,
       position: [0, 5, 10],
       direction: [0, 0, 100],
       color: 'blue',

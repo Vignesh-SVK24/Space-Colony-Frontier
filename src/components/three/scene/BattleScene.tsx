@@ -11,6 +11,7 @@ import { LocalPlayerShip } from '../battle/LocalPlayerShip';
 import { RemotePlayerShip } from '../battle/RemotePlayerShip';
 import { LaserProjectiles } from '../battle/LaserProjectiles';
 import { LaserBeam3D } from '../battle/LaserBeam3D';
+import { SolarBeam3D } from '../battle/SolarBeam3D';
 import { LeadReticle3D } from '../battle/LeadReticle3D';
 import { BattleArena } from '../battle/BattleArena';
 import { SoloAIBot } from '../battle/SoloAIBot';
@@ -63,10 +64,10 @@ export const BattleScene: React.FC = () => {
       ))}
       <LaserProjectiles />
       <LaserBeam3D />
+      <SolarBeam3D />
       <LeadReticle3D />
       {isSolo && <SoloAIBot />}
 
-      
       {/* Post Processing */}
       <CinematicPostProcessing />
     </Canvas>

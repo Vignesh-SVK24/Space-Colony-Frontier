@@ -9,11 +9,13 @@ describe('Advanced Combat System & Arena Obstacles', () => {
   });
 
   it('should have authoritative combat configuration parameters', () => {
-    expect(COMBAT_CONFIG.MAX_HP).toBe(100);
-    expect(COMBAT_CONFIG.BULLET_DAMAGE).toBe(10);
-    expect(COMBAT_CONFIG.BULLET_COOLDOWN).toBe(0.45);
-    expect(COMBAT_CONFIG.LASER_DAMAGE).toBe(20);
-    expect(COMBAT_CONFIG.LASER_COOLDOWN).toBe(5.0);
+    expect(COMBAT_CONFIG.MAX_HP).toBe(250);
+    expect(COMBAT_CONFIG.BULLET_DAMAGE).toBe(2);
+    expect(COMBAT_CONFIG.BULLET_FIRE_INTERVAL).toBe(0.10);
+    expect(COMBAT_CONFIG.LASER_DAMAGE).toBe(12);
+    expect(COMBAT_CONFIG.LASER_COOLDOWN).toBe(3.0);
+    expect(COMBAT_CONFIG.SOLAR_DAMAGE).toBe(30);
+    expect(COMBAT_CONFIG.SOLAR_COOLDOWN).toBe(10.0);
     expect(COMBAT_CONFIG.ARENA_RADIUS).toBe(300);
   });
 
@@ -134,7 +136,7 @@ describe('Advanced Combat System & Arena Obstacles', () => {
     expect(state.aiDifficulty).toBe('HARD');
     expect(state.opponentName).toContain('HARD');
     expect(state.appView).toBe('BATTLE');
-    expect(state.selfState?.hp).toBe(100);
-    expect(state.opponentState?.hp).toBe(100);
+    expect(state.selfState?.hp).toBe(250);
+    expect(state.opponentState?.hp).toBe(250);
   });
 });

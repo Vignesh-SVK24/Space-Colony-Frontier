@@ -1,6 +1,6 @@
 import React from 'react';
 import { useMultiplayerStore } from '../../multiplayer/useMultiplayerStore';
-import { disconnect, requestRematch } from '../../multiplayer/socketClient';
+import { disconnect, requestRematch } from '../../multiplayer/colyseusClient';
 import { Crosshair, ShieldAlert, Target, Clock, Trophy, Skull, RotateCcw, Home } from 'lucide-react';
 
 export const MatchResultScreen: React.FC = () => {

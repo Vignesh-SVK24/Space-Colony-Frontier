@@ -1,5 +1,6 @@
-export type BattleColor = 'yellow' | 'blue' | 'red' | 'green';
-export type RoomStatus = 'WAITING' | 'COUNTDOWN' | 'BATTLE' | 'FINISHED';
+import { BattleColor, GameMode, RoomStatus, Team, WeaponType } from '../shared/gameConfig';
+
+export type { BattleColor, GameMode, RoomStatus, Team, WeaponType };
 export type AppView = 'LANDING' | 'LOBBY' | 'BATTLE' | 'RESULT';
 
 export interface PlayerInput {
@@ -14,49 +15,75 @@ export interface PlayerInput {
 
 export interface PlayerState {
   id: string;
+  sessionId?: string;
   name: string;
   color: BattleColor;
+  team: Team;
+  slot: number;
   position: [number, number, number];
   rotation: [number, number, number]; // euler YXZ
   velocity: [number, number, number];
   hp: number;
   maxHp: number;
   alive: boolean;
+  ready?: boolean;
+  isHost?: boolean;
   throttle: number;
   isBoosting: boolean;
+  ammo: number;
+  isReloading: boolean;
+  reloadTimeRemaining: number;
+  laserCooldownRemaining: number;
+  solarCooldownRemaining: number;
 }
 
 export interface ProjectileState {
   id: string;
+  attackId: string;
   ownerId: string;
+  weaponType: WeaponType;
   position: [number, number, number];
   direction: [number, number, number];
   color: BattleColor;
+  team: Team;
+  speed: number;
+  damage: number;
   createdAt: number;
 }
 
 export interface LaserEvent {
+  attackId: string;
   shooterId: string;
   start: [number, number, number];
   end: [number, number, number];
   blocked: boolean;
   hitTargetId?: string;
   color: BattleColor;
+  damage?: number;
+  weaponType?: 'LASER' | 'SOLAR_BEAM';
   timestamp: number;
 }
 
 export interface DamageEvent {
-  attackId?: string;
+  attackId: string;
   targetId: string;
   attackerId: string;
   defenderId?: string;
   damage: number;
   newHp: number;
   remainingHp?: number;
-  weapon: 'bullet' | 'laser' | 'collision';
-  weaponType?: 'bullet' | 'laser' | 'collision' | 'BULLET' | 'LASER' | 'COLLISION';
+  weapon: 'bullet' | 'laser' | 'solar' | 'collision';
+  weaponType?: WeaponType;
   serverTick?: number;
   timestamp: number;
+}
+
+export interface GameSnapshot {
+  players: any[];
+  projectiles: any[];
+  timestamp: number;
+  serverTick?: number;
+  roomStatus?: RoomStatus;
 }
 
 export interface CombatTelemetryEntry {
@@ -81,6 +108,7 @@ export interface RoomPlayerInfo {
   id: string;
   name: string;
   color: BattleColor;
+  team?: Team;
   ready?: boolean;
   isHost?: boolean;
   slot?: number;
@@ -88,33 +116,20 @@ export interface RoomPlayerInfo {
 
 export interface RoomInfo {
   code: string;
+  mode: GameMode;
   players: RoomPlayerInfo[];
   status: RoomStatus;
-}
-
-export interface GameSnapshot {
-  players: PlayerState[];
-  projectiles: ProjectileState[];
-  timestamp: number;
-  serverTick?: number;
-  roomStatus: RoomStatus;
 }
 
 export interface MatchStats {
   winner: string;
   winnerName: string;
+  winnerTeam?: Team;
   loserName: string;
+  mode: GameMode;
   damageDealt: number;
   shotsHit: number;
   shotsFired: number;
   accuracy: number;
   matchDuration: number;
-}
-
-export interface HitEvent {
-  targetId: string;
-  shooterId: string;
-  damage: number;
-  newHp: number;
-  weapon?: 'bullet' | 'laser' | 'collision';
 }

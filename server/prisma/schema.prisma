@@ -1,0 +1,58 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Player {
+  id             String         @id @default(uuid())
+  displayName    String
+  preferredColor String         @default("yellow")
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  stats          PlayerStats?
+  matchScores    MatchScore[]
+}
+
+model PlayerStats {
+  id             String   @id @default(uuid())
+  playerId       String   @unique
+  player         Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  wins           Int      @default(0)
+  losses         Int      @default(0)
+  kills          Int      @default(0)
+  shotsFired     Int      @default(0)
+  shotsHit       Int      @default(0)
+  damageDealt    Int      @default(0)
+  damageReceived Int      @default(0)
+}
+
+model MatchHistory {
+  id            String       @id @default(uuid())
+  roomCode      String
+  gameMode      String       // "1v1", "FFA", "2v2"
+  winnerId      String?
+  winnerTeam    String?
+  durationSec   Int          @default(0)
+  createdAt     DateTime     @default(now())
+  scores        MatchScore[]
+}
+
+model MatchScore {
+  id             String       @id @default(uuid())
+  matchId        String
+  match          MatchHistory @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  playerId       String
+  player         Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  playerName     String
+  team           String       // "A", "B", "NONE"
+  damageDealt    Int          @default(0)
+  damageReceived Int          @default(0)
+  kills          Int          @default(0)
+  shotsFired     Int          @default(0)
+  shotsHit       Int          @default(0)
+  isWinner       Boolean      @default(false)
+}
