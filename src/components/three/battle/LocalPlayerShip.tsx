@@ -315,14 +315,13 @@ export const LocalPlayerShip: React.FC = () => {
           setIsReloading(true);
         }
 
-        const bulletVel = aimFireDir.clone().multiplyScalar(COMBAT_CONFIG.BULLET_SPEED);
         addSoloProjectile({
           id: attackId,
           attackId,
           ownerId: 'solo_player',
           weaponType: 'BULLET',
           position: [muzzlePos.x, muzzlePos.y, muzzlePos.z],
-          direction: [bulletVel.x, bulletVel.y, bulletVel.z],
+          direction: [aimFireDir.x, aimFireDir.y, aimFireDir.z],
           color: playerColor,
           team: 'NONE',
           speed: COMBAT_CONFIG.BULLET_SPEED,
@@ -370,16 +369,18 @@ export const LocalPlayerShip: React.FC = () => {
         }
 
         let hitEnemy = false;
-        if (opponentState && opponentState.alive && opponentState.hp > 0) {
-          const oppPos = new THREE.Vector3(...opponentState.position);
+        const liveOpp = useMultiplayerStore.getState().opponentState;
+        if (liveOpp && liveOpp.alive && liveOpp.hp > 0) {
+          const oppPos = new THREE.Vector3(...liveOpp.position);
           const toOpp = new THREE.Vector3().subVectors(oppPos, emitterPos);
           const oppDist = toOpp.length();
 
           if (oppDist <= COMBAT_CONFIG.LASER_RANGE) {
             const oppDir = toOpp.clone().normalize();
             const angle = aimFireDir.angleTo(oppDir);
+            const perpDist = oppDist * Math.sin(angle);
 
-            if (angle < COMBAT_CONFIG.LASER_AIM_CONE) {
+            if (angle < COMBAT_CONFIG.LASER_AIM_CONE || perpDist <= COMBAT_CONFIG.BULLET_HITBOX_RADIUS) {
               if (!blockedByObstacle || (raycast.distance > oppDist)) {
                 actualEnd = [oppPos.x, oppPos.y, oppPos.z];
                 hitEnemy = true;
@@ -443,16 +444,18 @@ export const LocalPlayerShip: React.FC = () => {
         }
 
         let hitEnemy = false;
-        if (opponentState && opponentState.alive && opponentState.hp > 0) {
-          const oppPos = new THREE.Vector3(...opponentState.position);
+        const liveOpp = useMultiplayerStore.getState().opponentState;
+        if (liveOpp && liveOpp.alive && liveOpp.hp > 0) {
+          const oppPos = new THREE.Vector3(...liveOpp.position);
           const toOpp = new THREE.Vector3().subVectors(oppPos, emitterPos);
           const oppDist = toOpp.length();
 
           if (oppDist <= COMBAT_CONFIG.SOLAR_RANGE) {
             const oppDir = toOpp.clone().normalize();
             const angle = aimFireDir.angleTo(oppDir);
+            const perpDist = oppDist * Math.sin(angle);
 
-            if (angle < COMBAT_CONFIG.SOLAR_AIM_CONE) {
+            if (angle < COMBAT_CONFIG.SOLAR_AIM_CONE || perpDist <= COMBAT_CONFIG.BULLET_HITBOX_RADIUS) {
               if (!blockedByObstacle || (raycast.distance > oppDist)) {
                 actualEnd = [oppPos.x, oppPos.y, oppPos.z];
                 hitEnemy = true;
@@ -494,7 +497,7 @@ export const LocalPlayerShip: React.FC = () => {
         [group.current.position.x, group.current.position.y, group.current.position.z],
         [rotationEuler.current.x, rotationEuler.current.y, rotationEuler.current.z],
         [forwardDir.x * velocity.current.z, forwardDir.y * velocity.current.z, forwardDir.z * velocity.current.z],
-        selfState?.hp ?? COMBAT_CONFIG.MAX_HP,
+        useMultiplayerStore.getState().selfState?.hp ?? COMBAT_CONFIG.MAX_HP,
         isBoosting,
         Math.min(Math.abs(velocity.current.z) / COMBAT_CONFIG.SHIP_MAX_SPEED, 1)
       );

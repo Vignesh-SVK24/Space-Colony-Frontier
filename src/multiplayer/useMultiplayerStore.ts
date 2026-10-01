@@ -495,9 +495,10 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     });
   },
 
-  updateSoloSelf: (pos, rot, vel, hp, isBoosting, throttle) => {
+  updateSoloSelf: (pos, rot, vel, explicitHp, isBoosting, throttle) => {
     set(state => {
       if (!state.selfState) return {};
+      const hp = (typeof explicitHp === 'number' && explicitHp < state.selfState.hp) ? explicitHp : state.selfState.hp;
       return {
         selfState: {
           ...state.selfState,
@@ -506,16 +507,17 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
           velocity: vel,
           hp,
           alive: hp > 0,
-          isBoosting,
-          throttle
+          isBoosting: isBoosting ?? false,
+          throttle: throttle ?? 0
         }
       };
     });
   },
 
-  updateSoloOpponent: (pos, rot, vel, hp, isBoosting, throttle) => {
+  updateSoloOpponent: (pos, rot, vel, explicitHp, isBoosting, throttle) => {
     set(state => {
       if (!state.opponentState) return {};
+      const hp = (typeof explicitHp === 'number' && explicitHp < state.opponentState.hp) ? explicitHp : state.opponentState.hp;
       const updatedOpponent: PlayerState = {
         ...state.opponentState,
         position: pos,
@@ -523,8 +525,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
         velocity: vel,
         hp,
         alive: hp > 0,
-        isBoosting,
-        throttle
+        isBoosting: isBoosting ?? false,
+        throttle: throttle ?? 0
       };
       return {
         opponentState: updatedOpponent,
@@ -535,7 +537,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
 
   addSoloProjectile: (proj) => {
     set(state => ({
-      projectiles: [...state.projectiles, proj].slice(-40)
+      projectiles: [...state.projectiles, proj].slice(-50)
     }));
   },
 
@@ -551,6 +553,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
         }
       };
     });
+    get().handleHit();
   },
 
   applyDamageToSoloOpponent: (damage) => {
@@ -567,5 +570,6 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
         otherPlayers: [updatedOpp]
       };
     });
+    get().triggerHitConfirm();
   }
 }));

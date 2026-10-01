@@ -247,5 +247,60 @@ describe('Space Colony: Frontier - Full Authoritative Combat & 4-Player/2v2 Suit
       store.applyDamageToSoloOpponent(GAME_CONFIG.SOLAR_DAMAGE);
       expect(useMultiplayerStore.getState().opponentState?.hp).toBe(208);
     });
+
+    it('should never revert or overwrite damaged HP during standard movement updates in solo mode', () => {
+      const store = useMultiplayerStore.getState();
+      store.startSoloGame();
+
+      // Deal 12 HP Laser damage to opponent
+      store.applyDamageToSoloOpponent(12);
+      expect(useMultiplayerStore.getState().opponentState?.hp).toBe(238);
+
+      // Simulate 60FPS AI movement ticks with stale 250 HP passed
+      for (let i = 0; i < 10; i++) {
+        store.updateSoloOpponent(
+          [0, 10 + i, 80],
+          [0, Math.PI, 0],
+          [0, 0, 15],
+          250, // Stale closure value that previously reverted HP!
+          false,
+          0.5
+        );
+      }
+
+      // HP MUST remain 238 and must NOT revert to 250!
+      expect(useMultiplayerStore.getState().opponentState?.hp).toBe(238);
+      expect(useMultiplayerStore.getState().opponentState?.alive).toBe(true);
+
+      // Deal 2 HP Bullet damage
+      store.applyDamageToSoloOpponent(2);
+      expect(useMultiplayerStore.getState().opponentState?.hp).toBe(236);
+
+      // Deal 30 HP Solar damage
+      store.applyDamageToSoloOpponent(30);
+      expect(useMultiplayerStore.getState().opponentState?.hp).toBe(206);
+
+      // Simulate player movement update with stale HP
+      store.applyDamageToSoloPlayer(2);
+      expect(useMultiplayerStore.getState().selfState?.hp).toBe(248);
+
+      store.updateSoloSelf([0, 0, -80], [0, 0, 0], [0, 0, 0], 250, false, 0);
+      expect(useMultiplayerStore.getState().selfState?.hp).toBe(248);
+    });
+
+    it('should eliminate solo opponent when HP reaches 0 and trigger hit confirmation', () => {
+      const store = useMultiplayerStore.getState();
+      store.startSoloGame();
+
+      expect(useMultiplayerStore.getState().opponentState?.hp).toBe(250);
+
+      // Deal 250 total damage
+      store.applyDamageToSoloOpponent(250);
+
+      const opp = useMultiplayerStore.getState().opponentState;
+      expect(opp?.hp).toBe(0);
+      expect(opp?.alive).toBe(false);
+      expect(useMultiplayerStore.getState().hitConfirmActive).toBe(true);
+    });
   });
 });

@@ -29,12 +29,18 @@ const PATROL_WAYPOINTS: [number, number, number][] = [
   [-60, 20, -50]
 ];
 
+function distancePointToSegment(point: THREE.Vector3, start: THREE.Vector3, end: THREE.Vector3): number {
+  const seg = end.clone().sub(start);
+  const segLenSq = seg.lengthSq();
+  if (segLenSq === 0) return point.distanceTo(start);
+  const t = Math.max(0, Math.min(1, point.clone().sub(start).dot(seg) / segLenSq));
+  const proj = start.clone().addScaledVector(seg, t);
+  return point.distanceTo(proj);
+}
+
 export const SoloAIBot: React.FC = () => {
   const isSolo = useMultiplayerStore(state => state.isSolo);
   const aiDifficulty = useMultiplayerStore(state => state.aiDifficulty);
-  const selfState = useMultiplayerStore(state => state.selfState);
-  const opponentState = useMultiplayerStore(state => state.opponentState);
-  const projectiles = useMultiplayerStore(state => state.projectiles);
 
   const updateSoloOpponent = useMultiplayerStore(state => state.updateSoloOpponent);
   const addSoloProjectile = useMultiplayerStore(state => state.addSoloProjectile);
@@ -75,12 +81,14 @@ export const SoloAIBot: React.FC = () => {
   const totalShotsHit = useRef(0);
 
   useFrame((state, delta) => {
-    if (!isSolo || !selfState || !opponentState || matchEnded.current) return;
+    const liveOpponent = useMultiplayerStore.getState().opponentState;
+    const liveSelf = useMultiplayerStore.getState().selfState;
+    if (!isSolo || !liveSelf || !liveOpponent || matchEnded.current) return;
 
     const dt = Math.min(delta, 0.1);
     const now = state.clock.elapsedTime;
     const settings = AI_DIFFICULTY_SETTINGS[aiDifficulty] || AI_DIFFICULTY_SETTINGS.NORMAL;
-    const playerPos = new THREE.Vector3(...selfState.position);
+    const playerPos = new THREE.Vector3(...liveSelf.position);
     const toPlayer = new THREE.Vector3().subVectors(playerPos, dronePos.current);
     const distToPlayer = toPlayer.length();
 
@@ -92,7 +100,7 @@ export const SoloAIBot: React.FC = () => {
     const hasLineOfSight = !los.blocked;
 
     // Check if destroyed
-    if (opponentState.hp <= 0 && currentState.current !== 'DESTROYED') {
+    if (liveOpponent.hp <= 0 && currentState.current !== 'DESTROYED') {
       currentState.current = 'DESTROYED';
       lastStateChange.current = now;
       nexusAudio.playHit();
@@ -117,10 +125,10 @@ export const SoloAIBot: React.FC = () => {
           const duration = Math.floor((Date.now() - matchStartTime.current) / 1000);
           handleMatchEnd({
             winner: 'solo_player',
-            winnerName: selfState.name || 'Ace Pilot',
-            loserName: opponentState.name || 'AI Drone',
+            winnerName: liveSelf.name || 'Ace Pilot',
+            loserName: liveOpponent.name || 'AI Drone',
             mode: '1v1',
-            damageDealt: COMBAT_CONFIG.MAX_HP - opponentState.hp,
+            damageDealt: COMBAT_CONFIG.MAX_HP - liveOpponent.hp,
             shotsHit: Math.max(1, totalShotsHit.current),
             shotsFired: Math.max(1, totalShotsFired.current),
             accuracy: Math.round((totalShotsHit.current / Math.max(1, totalShotsFired.current)) * 100),
@@ -170,7 +178,7 @@ export const SoloAIBot: React.FC = () => {
       }
 
       case 'APPROACH': {
-        if (opponentState.hp < settings.retreatHpThreshold) {
+        if (liveOpponent.hp < settings.retreatHpThreshold) {
           currentState.current = 'TAKE_COVER';
           lastStateChange.current = now;
         } else if (distToPlayer < 90 && hasLineOfSight) {
@@ -195,7 +203,7 @@ export const SoloAIBot: React.FC = () => {
         if (!hasLineOfSight) {
           currentState.current = 'PURSUIT';
           lastStateChange.current = now;
-        } else if (opponentState.hp < settings.retreatHpThreshold) {
+        } else if (liveOpponent.hp < settings.retreatHpThreshold) {
           currentState.current = 'TAKE_COVER';
           lastStateChange.current = now;
         } else if (timeInState > 3.5) {
@@ -237,7 +245,7 @@ export const SoloAIBot: React.FC = () => {
       }
 
       case 'RECOVER': {
-        if (timeInState > 4.0 || opponentState.hp > settings.retreatHpThreshold + 20) {
+        if (timeInState > 4.0 || liveOpponent.hp > settings.retreatHpThreshold + 20) {
           targetCoverPoint.current = null;
           currentState.current = 'SEARCH';
           lastStateChange.current = now;
@@ -377,7 +385,7 @@ export const SoloAIBot: React.FC = () => {
         [dronePos.current.x, dronePos.current.y, dronePos.current.z],
         [droneEuler.current.x, droneEuler.current.y, droneEuler.current.z],
         [droneVel.current.x, droneVel.current.y, droneVel.current.z],
-        opponentState.hp,
+        liveOpponent.hp,
         desiredSpeed > 35,
         desiredSpeed / 48
       );
@@ -429,7 +437,7 @@ export const SoloAIBot: React.FC = () => {
           start: [emitterPos.x, emitterPos.y, emitterPos.z],
           end: beamEnd,
           blocked,
-          color: opponentState.color || 'red',
+          color: liveOpponent.color || 'red',
           weaponType: 'SOLAR_BEAM',
           timestamp: Date.now()
         });
@@ -467,7 +475,7 @@ export const SoloAIBot: React.FC = () => {
           start: [emitterPos.x, emitterPos.y, emitterPos.z],
           end: beamEnd,
           blocked,
-          color: opponentState.color || 'red',
+          color: liveOpponent.color || 'red',
           weaponType: 'LASER',
           timestamp: Date.now()
         });
@@ -496,7 +504,7 @@ export const SoloAIBot: React.FC = () => {
           weaponType: 'BULLET',
           position: [dronePos.current.x, dronePos.current.y, dronePos.current.z],
           direction: [bulletVel.x, bulletVel.y, bulletVel.z],
-          color: opponentState.color || 'red',
+          color: liveOpponent.color || 'red',
           team: 'NONE',
           speed: COMBAT_CONFIG.BULLET_SPEED,
           damage: COMBAT_CONFIG.BULLET_DAMAGE,
@@ -510,54 +518,45 @@ export const SoloAIBot: React.FC = () => {
     // 4. PROJECTILE COLLISION & OBSTACLE BLOCKING
     // =========================================================================
     const updatedProjectiles: ProjectileState[] = [];
-    let stateChanged = false;
+    const currentProjs = useMultiplayerStore.getState().projectiles;
 
-    for (const proj of projectiles) {
-      const projPos = new THREE.Vector3(...proj.position);
+    for (const proj of currentProjs) {
+      const prevPos = new THREE.Vector3(...proj.position);
       const projDir = new THREE.Vector3(...proj.direction).normalize();
+      const nextPos = prevPos.clone().addScaledVector(projDir, COMBAT_CONFIG.BULLET_SPEED * dt);
 
-      projPos.addScaledVector(projDir, COMBAT_CONFIG.BULLET_SPEED * dt);
-
-      if (Date.now() - proj.createdAt > 2200) {
-        stateChanged = true;
-        continue;
-      }
-
-      if (projPos.length() > COMBAT_CONFIG.ARENA_RADIUS) {
-        stateChanged = true;
+      if (Date.now() - proj.createdAt > 2200 || nextPos.length() > COMBAT_CONFIG.ARENA_RADIUS) {
         continue;
       }
 
       let hit = false;
 
-      // Obstacle collision
+      // 1. Obstacle swept collision
       for (const obs of ARENA_OBSTACLES) {
         const obsPos = new THREE.Vector3(...obs.position);
-        if (projPos.distanceTo(obsPos) < obs.radius) {
+        if (distancePointToSegment(obsPos, prevPos, nextPos) < obs.radius) {
           hit = true;
-          stateChanged = true;
           break;
         }
       }
 
       if (hit) continue;
 
-      // Collision against Player
+      // 2. Collision against Player
       if (proj.ownerId === 'solo_ai_drone') {
-        if (projPos.distanceTo(playerPos) < COMBAT_CONFIG.HITBOX_RADIUS) {
+        const distToPlayer = distancePointToSegment(playerPos, prevPos, nextPos);
+        if (distToPlayer <= COMBAT_CONFIG.BULLET_HITBOX_RADIUS) {
           hit = true;
-          stateChanged = true;
           applyDamageToSoloPlayer(COMBAT_CONFIG.BULLET_DAMAGE); // Exactly 2 HP
           nexusAudio.playWarning();
         }
       }
 
-      // Collision against AI Drone
+      // 3. Collision against AI Drone
       if (proj.ownerId === 'solo_player') {
-        totalShotsFired.current++;
-        if (projPos.distanceTo(dronePos.current) < COMBAT_CONFIG.HITBOX_RADIUS) {
+        const distToDrone = distancePointToSegment(dronePos.current, prevPos, nextPos);
+        if (distToDrone <= COMBAT_CONFIG.BULLET_HITBOX_RADIUS) {
           hit = true;
-          stateChanged = true;
           totalShotsHit.current++;
           applyDamageToSoloOpponent(COMBAT_CONFIG.BULLET_DAMAGE); // Exactly 2 HP
           nexusAudio.playHit();
@@ -578,27 +577,27 @@ export const SoloAIBot: React.FC = () => {
       if (!hit) {
         updatedProjectiles.push({
           ...proj,
-          position: [projPos.x, projPos.y, projPos.z]
+          position: [nextPos.x, nextPos.y, nextPos.z]
         });
       }
     }
 
-    if (stateChanged) {
+    if (currentProjs.length > 0 || updatedProjectiles.length > 0) {
       setProjectiles(updatedProjectiles);
     }
 
     // =========================================================================
     // 5. PLAYER DEFEAT RESOLUTION
     // =========================================================================
-    if (selfState.hp <= 0 && !matchEnded.current) {
+    if (liveSelf.hp <= 0 && !matchEnded.current) {
       matchEnded.current = true;
       const duration = Math.floor((Date.now() - matchStartTime.current) / 1000);
       handleMatchEnd({
         winner: 'solo_ai_drone',
-        winnerName: opponentState.name || 'AI Drone',
-        loserName: selfState.name || 'Ace Pilot',
+        winnerName: liveOpponent.name || 'AI Drone',
+        loserName: liveSelf.name || 'Ace Pilot',
         mode: '1v1',
-        damageDealt: Math.max(0, COMBAT_CONFIG.MAX_HP - opponentState.hp),
+        damageDealt: Math.max(0, COMBAT_CONFIG.MAX_HP - liveOpponent.hp),
         shotsHit: totalShotsHit.current,
         shotsFired: Math.max(1, totalShotsFired.current),
         accuracy: Math.round((totalShotsHit.current / Math.max(1, totalShotsFired.current)) * 100),
