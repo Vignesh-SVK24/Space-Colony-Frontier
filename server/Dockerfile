@@ -6,12 +6,11 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Install all dependencies (including devDependencies for build)
-RUN npm ci
+# Install dependencies for build
+RUN npm install
 
-# Copy server source code and shared folder
+# Copy server source code (includes src/shared)
 COPY src ./src
-COPY ../src/shared ./src/shared
 
 # Compile TypeScript
 RUN npm run build
@@ -25,7 +24,7 @@ ENV NODE_ENV=production
 ENV PORT=3001
 
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist
 

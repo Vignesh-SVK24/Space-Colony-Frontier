@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Room, Projectile, PlayerState, Vector3, RoomState, COMBAT, LaserEvent, DamageEvent } from './types.js';
 import { ARENA_OBSTACLES, checkObstacleRaycast, checkSegmentSphereCollision } from './arenaObstacles.js';
 
@@ -111,10 +112,10 @@ export class CombatSystem {
             }
         }
 
-        const bulletAttackId = attackId || `BULLET_${now}_${uuidv4().substring(0, 8)}`;
+        const bulletAttackId = attackId || `BULLET_${now}_${randomUUID().substring(0, 8)}`;
 
         const projectile: Projectile = {
-            id: uuidv4(),
+            id: randomUUID(),
             attackId: bulletAttackId,
             shooterId: playerId,
             weaponType: 'bullet',
@@ -228,7 +229,7 @@ export class CombatSystem {
             }
         }
 
-        const laserAttackId = attackId || `LASER_${now}_${uuidv4().substring(0, 8)}`;
+        const laserAttackId = attackId || `LASER_${now}_${randomUUID().substring(0, 8)}`;
 
         // Broadcast laser event to both clients
         const laserEvent: LaserEvent = {
@@ -351,7 +352,7 @@ export class CombatSystem {
         target.hp = Math.max(0, target.hp - damage);
 
         const damageEvent: DamageEvent = {
-            attackId: attackId || `DMG_${now}_${uuidv4().substring(0, 8)}`,
+            attackId: attackId || `DMG_${now}_${randomUUID().substring(0, 8)}`,
             attackerId,
             defenderId: targetId,
             targetId,
