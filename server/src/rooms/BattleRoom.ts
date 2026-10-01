@@ -257,13 +257,37 @@ export class BattleRoom extends Room {
     // 2. Primary Weapon: Bullet / Plasma Blaster (2 HP, 0.1s rate, 30 magazine)
     this.onMessage('fire_bullet', (client, data: { origin: Vector3D; direction: Vector3D; attackId?: string }) => {
       const state = this.state as BattleStateSchema;
-      if (state.roomStatus !== 'BATTLE') return;
+      const shooter = state.players.get(client.sessionId);
+      if (state.roomStatus !== 'BATTLE' || !shooter || !shooter.alive) return;
+
+      // Enforce the 0.1s fire interval on the authoritative server.
+      const now = Date.now();
+      const last = (shooter as PlayerSchema & { lastBulletAt?: number }).lastBulletAt || 0;
+      if (now - last < GAME_CONFIG.BULLET_FIRE_INTERVAL_MS) return;
+      (shooter as PlayerSchema & { lastBulletAt?: number }).lastBulletAt = now;
+
+      const origin = data?.origin || {
+        x: shooter.position.x,
+        y: shooter.position.y,
+        z: shooter.position.z
+      };
+      const direction = data?.direction || { x: shooter.rotation.x, y: shooter.rotation.y, z: shooter.rotation.z };
+
+      const originDistance = Math.hypot(
+        origin.x - shooter.position.x,
+        origin.y - shooter.position.y,
+        origin.z - shooter.position.z
+      );
+
+      // Client muzzle positions are accepted only near the server ship.
+      if (!Number.isFinite(originDistance) || originDistance > 8) return;
+
       const proj = this.simulationLoop.projectileSystem.spawnBullet(
         state,
         client.sessionId,
-        data.origin,
-        data.direction,
-        data.attackId
+        origin,
+        direction,
+        data?.attackId
       );
 
       if (proj) {
