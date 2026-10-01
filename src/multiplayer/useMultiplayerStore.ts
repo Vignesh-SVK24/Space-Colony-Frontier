@@ -162,6 +162,8 @@ const getDefaultServerUrl = () => {
     if (queryServer) return queryServer;
     const stored = localStorage.getItem('sfc_server_url');
     if (stored) return stored;
+    const envServer = import.meta.env.VITE_SERVER_URL;
+    if (envServer) return envServer;
   } catch {}
   const host = (typeof window !== 'undefined' && window.location.hostname) || 'localhost';
   const isLocal = host === 'localhost' || host === '127.0.0.1';
