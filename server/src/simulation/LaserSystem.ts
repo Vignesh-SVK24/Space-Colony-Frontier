@@ -88,7 +88,12 @@ export class LaserSystem {
         const dot = direction.x * norm.x + direction.y * norm.y + direction.z * norm.z;
         const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
 
-        if (angle < GAME_CONFIG.LASER_AIM_CONE && dist < closestDist) {
+        // Use perpendicular distance to the beam centerline. This makes the
+        // beam feel precise but still gives the player a fair hitbox.
+        const perpendicularDistance = dist * Math.sin(angle);
+        const hitRadius = GAME_CONFIG.BULLET_HITBOX_RADIUS;
+
+        if ((angle < GAME_CONFIG.LASER_AIM_CONE || perpendicularDistance <= hitRadius) && dist < closestDist) {
           closestDist = dist;
           closestEnemy = target;
         }
