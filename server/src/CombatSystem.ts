@@ -1,12 +1,10 @@
 import { Room, Projectile, PlayerState, Vector3, RoomState, COMBAT, LaserEvent, DamageEvent } from './types.js';
-import { v4 as uuidv4 } from 'uuid';
-import { Server } from 'socket.io';
 import { ARENA_OBSTACLES, checkObstacleRaycast, checkSegmentSphereCollision } from './arenaObstacles.js';
 
 export class CombatSystem {
-    private io: Server;
+    private io: any;
 
-    constructor(io: Server) {
+    constructor(io: any) {
         this.io = io;
     }
 

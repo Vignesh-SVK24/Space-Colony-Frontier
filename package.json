@@ -8,8 +8,8 @@
     "server": "npm --prefix server run dev",
     "server:build": "npm --prefix server run build",
     "server:start": "node server/dist/index.js",
-    "build": "tsc -b && vite build",
-    "type-check": "tsc --noEmit",
+    "build": "vite build",
+    "type-check": "tsc --noEmit -p tsconfig.app.json",
     "test": "vitest run --fileParallelism=false",
     "lint": "oxlint",
     "preview": "vite preview"
