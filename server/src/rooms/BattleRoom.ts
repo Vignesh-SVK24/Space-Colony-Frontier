@@ -22,8 +22,11 @@ export class BattleRoom extends Room {
     (this.state as BattleStateSchema).gameMode = mode;
     this.maxClients = mode === '1v1' ? 2 : 4;
 
-    // Clean 6-character room code
-    (this.state as BattleStateSchema).roomCode = options.roomCode || this.generateRoomCode();
+    // The room code is also the Colyseus roomId so a shared code always targets
+    // the exact same room. Clients join with joinById().
+    const roomCode = this.generateRoomCode();
+    this.roomId = roomCode;
+    (this.state as BattleStateSchema).roomCode = roomCode;
     (this.state as BattleStateSchema).roomStatus = 'LOBBY';
 
     // Initialize Simulation Loop & Rapier 3D World
@@ -63,6 +66,15 @@ export class BattleRoom extends Room {
     const state = this.state as BattleStateSchema;
     console.log(`[BattleRoom] Client ${client.sessionId} joining room ${state.roomCode}`);
 
+    if (state.roomStatus !== 'LOBBY' && state.roomStatus !== 'WAITING') {
+      throw new Error('MATCH_ALREADY_STARTED');
+    }
+
+    const maxPlayersForMode = state.gameMode === '1v1' ? 2 : 4;
+    if (state.players.size >= maxPlayersForMode) {
+      throw new Error('ROOM_FULL');
+    }
+
     const slot = state.players.size + 1;
     const isHost = state.players.size === 0;
 
@@ -78,9 +90,21 @@ export class BattleRoom extends Room {
     player.maxHp = GAME_CONFIG.MAX_HP;
     player.ammo = GAME_CONFIG.BULLET_MAGAZINE_SIZE;
 
-    // Team Assignment for 2v2
+    // Team Assignment for 2v2 with a hard 2-per-team limit.
     if (state.gameMode === '2v2') {
-      player.team = options?.team || (slot <= 2 ? 'A' : 'B');
+      const teamACount = Array.from(state.players.values()).filter(p => p.team === 'A').length;
+      const teamBCount = Array.from(state.players.values()).filter(p => p.team === 'B').length;
+      const requested = options?.team === 'A' || options?.team === 'B' ? options.team : undefined;
+
+      if (requested === 'A' && teamACount < 2) {
+        player.team = 'A';
+      } else if (requested === 'B' && teamBCount < 2) {
+        player.team = 'B';
+      } else if (teamACount <= teamBCount && teamACount < 2) {
+        player.team = 'A';
+      } else {
+        player.team = 'B';
+      }
     } else {
       player.team = 'NONE';
     }
@@ -140,19 +164,93 @@ export class BattleRoom extends Room {
 
   private registerMessages() {
     // 1. Flight Input Transmission
+    // Keep the existing client prediction model, but validate every proposed
+    // transform on the server and prevent teleport-like movement or obstacle
+    // penetration. Critical combat state still uses the authoritative server state.
     this.onMessage('input', (client, input: any) => {
       const state = this.state as BattleStateSchema;
       const player = state.players.get(client.sessionId);
       if (!player || !player.alive || state.roomStatus !== 'BATTLE') return;
 
-      if (input.position && Array.isArray(input.position)) {
-        player.position.set(input.position[0], input.position[1], input.position[2]);
+      const dt = 1 / GAME_CONFIG.SERVER_TICK_RATE;
+      const previousPosition = {
+        x: player.position.x,
+        y: player.position.y,
+        z: player.position.z
+      };
+
+      if (Array.isArray(input.position) && input.position.length >= 3) {
+        const requested = {
+          x: Number(input.position[0]),
+          y: Number(input.position[1]),
+          z: Number(input.position[2])
+        };
+
+        if (Number.isFinite(requested.x) && Number.isFinite(requested.y) && Number.isFinite(requested.z)) {
+          const dx = requested.x - previousPosition.x;
+          const dy = requested.y - previousPosition.y;
+          const dz = requested.z - previousPosition.z;
+          const distance = Math.hypot(dx, dy, dz);
+
+          const requestedSpeed = Array.isArray(input.velocity) && input.velocity.length >= 3
+            ? Math.hypot(Number(input.velocity[0]) || 0, Number(input.velocity[1]) || 0, Number(input.velocity[2]) || 0)
+            : 0;
+
+          const maxSpeed = Math.min(
+            Math.max(GAME_CONFIG.SHIP_PHYSICS.maxSpeed, requestedSpeed),
+            GAME_CONFIG.SHIP_PHYSICS.boostSpeed
+          );
+
+          // Allow a little network jitter but reject teleport-like jumps.
+          const maxStep = maxSpeed * dt * 1.75 + 1.5;
+
+          let accepted = requested;
+          if (distance > maxStep) {
+            const scale = maxStep / Math.max(distance, 0.0001);
+            accepted = {
+              x: previousPosition.x + dx * scale,
+              y: previousPosition.y + dy * scale,
+              z: previousPosition.z + dz * scale
+            };
+          }
+
+          const obstacleHit = this.simulationLoop.physicsWorld.checkSweptSphereVsObstacles(
+            previousPosition,
+            accepted,
+            GAME_CONFIG.SHIP_PHYSICS.playerColliderRadius
+          );
+
+          if (!obstacleHit.blocked) {
+            player.position.set(accepted.x, accepted.y, accepted.z);
+          } else {
+            // Stop at the last safe position instead of embedding the ship.
+            player.position.set(previousPosition.x, previousPosition.y, previousPosition.z);
+            player.velocity.set(0, 0, 0);
+          }
+        }
       }
-      if (input.rotation && Array.isArray(input.rotation)) {
-        player.rotation.set(input.rotation[0], input.rotation[1], input.rotation[2]);
+
+      if (Array.isArray(input.rotation) && input.rotation.length >= 3) {
+        const rx = Number(input.rotation[0]);
+        const ry = Number(input.rotation[1]);
+        const rz = Number(input.rotation[2]);
+
+        if ([rx, ry, rz].every(Number.isFinite)) {
+          player.rotation.set(rx, ry, rz);
+        }
       }
-      if (input.velocity && Array.isArray(input.velocity)) {
-        player.velocity.set(input.velocity[0], input.velocity[1], input.velocity[2]);
+
+      if (Array.isArray(input.velocity) && input.velocity.length >= 3) {
+        const vx = Number(input.velocity[0]);
+        const vy = Number(input.velocity[1]);
+        const vz = Number(input.velocity[2]);
+
+        if ([vx, vy, vz].every(Number.isFinite)) {
+          const magnitude = Math.hypot(vx, vy, vz);
+          const limit = GAME_CONFIG.SHIP_PHYSICS.boostSpeed;
+          const scale = magnitude > limit ? limit / magnitude : 1;
+          player.velocity.set(vx * scale, vy * scale, vz * scale);
+        }
       }
     });
 
@@ -263,8 +361,33 @@ export class BattleRoom extends Room {
       const player = state.players.get(client.sessionId);
       if (!player || !player.isHost) return;
 
-      const minPlayers = state.gameMode === '1v1' ? 2 : 2;
-      if (state.players.size >= minPlayers) {
+      const requiredPlayers =
+        state.gameMode === '1v1' ? 2 :
+        state.gameMode === '2v2' ? 4 :
+        2;
+
+      if (state.players.size < requiredPlayers) {
+        client.send('match_error', {
+          code: 'NOT_ENOUGH_PLAYERS',
+          message: 'This mode requires ' + requiredPlayers + ' players.'
+        });
+        return;
+      }
+
+      if (state.gameMode === '2v2') {
+        const teamACount = Array.from(state.players.values()).filter(p => p.team === 'A').length;
+        const teamBCount = Array.from(state.players.values()).filter(p => p.team === 'B').length;
+
+        if (teamACount !== 2 || teamBCount !== 2) {
+          client.send('match_error', {
+            code: 'INVALID_TEAMS',
+            message: '2v2 requires exactly 2 players on each team.'
+          });
+          return;
+        }
+      }
+
+      if (state.roomStatus === 'LOBBY') {
         state.roomStatus = 'COUNTDOWN';
         state.countdown = GAME_CONFIG.COUNTDOWN_SECONDS;
         this.broadcast('match_countdown_started', { countdown: GAME_CONFIG.COUNTDOWN_SECONDS });
@@ -288,6 +411,18 @@ export class BattleRoom extends Room {
       const player = state.players.get(client.sessionId);
       if (!player || state.roomStatus !== 'LOBBY') return;
       if (data.team === 'A' || data.team === 'B') {
+        const count = Array.from(state.players.values()).filter(
+          p => p.team === data.team && p.id !== player.id
+        ).length;
+
+        if (count >= 2) {
+          client.send('team_error', {
+            code: 'TEAM_FULL',
+            message: 'Team ' + data.team + ' is already full.'
+          });
+          return;
+        }
+
         player.team = data.team;
       }
     });
