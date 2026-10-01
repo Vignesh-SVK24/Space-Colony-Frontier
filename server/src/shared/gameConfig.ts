@@ -50,7 +50,9 @@ export const GAME_CONFIG = {
     bankFactor: 0.6,
     dampingLinear: 0.95,
     verticalMaxSpeed: 30,
-    collisionDamage: 15
+    collisionDamage: 15,
+    // Server-side ship collision radius. Kept separate from the visual mesh.
+    playerColliderRadius: 5.2
   },
 
   // Network Simulation
