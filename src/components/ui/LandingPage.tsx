@@ -148,8 +148,11 @@ export const LandingPage: React.FC = () => {
       {/* Mobile Landscape & Laptop/Desktop: row layout side-by-side */}
       <div className="relative z-10 flex flex-col md:flex-row landscape:flex-row h-full w-full overflow-hidden">
         
-        {/* Left Operations Panel - Independently scrollable on all viewports */}
-        <div className="w-full sm:w-[390px] md:w-[440px] lg:w-[480px] xl:w-[510px] h-full max-h-screen overflow-y-auto overscroll-contain flex flex-col justify-start p-3 sm:p-5 lg:p-6 border-b md:border-b-0 md:border-r landscape:border-r border-cyan-500/20 bg-black/65 backdrop-blur-md shrink-0 z-10">
+        {/* Left Operations Panel - Independently scrollable on all viewports with touch momentum scrolling */}
+        <div 
+          className="w-full md:w-[440px] lg:w-[480px] xl:w-[510px] landscape:w-[380px] sm:landscape:w-[420px] flex-1 md:flex-none landscape:flex-none min-h-0 h-full max-h-[100dvh] overflow-y-auto overscroll-contain touch-pan-y scroll-touch flex flex-col justify-start p-3 sm:p-5 lg:p-6 border-b md:border-b-0 md:border-r landscape:border-r border-cyan-500/20 bg-black/65 backdrop-blur-md z-10"
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        >
           
           {/* Title Header */}
           <div className="mb-3 sm:mb-4 flex items-start justify-between shrink-0">
@@ -344,7 +347,7 @@ export const LandingPage: React.FC = () => {
 
           {/* VIEW 2: SOLO MATCH CONFIGURATION */}
           {gameModeSelection === 'SOLO_CONFIG' && (
-            <div className="space-y-3.5 sm:space-y-4 animate-fadeIn">
+            <div className="space-y-3.5 sm:space-y-4 animate-fadeIn pb-36 sm:pb-12">
               <div className="flex items-center justify-between pb-2 border-b border-gray-800">
                 <button
                   onClick={() => setGameModeSelection('SELECT')}
@@ -446,7 +449,7 @@ export const LandingPage: React.FC = () => {
 
           {/* VIEW 3: ROOM MATCH CONFIGURATION (1v1, 4-Player FFA, 2v2) */}
           {gameModeSelection === 'ROOM_CONFIG' && (
-            <div className="space-y-3 sm:space-y-3.5 animate-fadeIn">
+            <div className="space-y-3 sm:space-y-3.5 animate-fadeIn pb-36 sm:pb-12">
               <div className="flex items-center justify-between pb-2 border-b border-gray-800">
                 <button
                   onClick={() => setGameModeSelection('SELECT')}
@@ -621,8 +624,12 @@ export const LandingPage: React.FC = () => {
 
         </div>
 
-        {/* Right Visual Panel - Compact on portrait mobile, expands full height on landscape and desktop */}
-        <div className="flex-1 relative h-40 sm:h-56 md:h-full landscape:h-full min-h-0 bg-transparent overflow-hidden flex items-center justify-center">
+        {/* Right Visual Panel - Compact on portrait mobile for SELECT, hidden during configuration to give 100% screen to controls */}
+        <div className={`relative min-h-0 bg-transparent overflow-hidden flex items-center justify-center shrink-0 ${
+          gameModeSelection !== 'SELECT' 
+            ? 'hidden md:flex landscape:flex md:flex-1 landscape:flex-1 h-full' 
+            : 'h-36 sm:h-52 md:h-full landscape:h-full md:flex-1 landscape:flex-1 flex-1'
+        }`}>
           <div 
             className="absolute inset-0 opacity-40 pointer-events-none z-0 transition-colors duration-500"
             style={{

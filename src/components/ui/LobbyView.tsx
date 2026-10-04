@@ -75,7 +75,10 @@ export const LobbyView: React.FC = () => {
   const canLaunch = playerCount >= minRequired && countdown === null;
 
   return (
-    <div className="h-full w-full bg-[#030712] flex flex-col items-center justify-start sm:justify-center font-mono text-gray-100 p-2 sm:p-4 md:p-6 overflow-y-auto overscroll-contain touch-pan-y">
+    <div 
+      className="h-full w-full bg-[#030712] flex flex-col items-center justify-start sm:justify-center font-mono text-gray-100 p-2 sm:p-4 md:p-6 overflow-y-auto overscroll-contain touch-pan-y scroll-touch"
+      style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+    >
       
       <div className="max-w-lg w-full bg-gray-900/90 border border-gray-800 rounded-xl shadow-2xl backdrop-blur-md flex flex-col my-auto max-h-[calc(100%-1rem)] sm:max-h-[92vh] overflow-hidden">
         
@@ -119,7 +122,10 @@ export const LobbyView: React.FC = () => {
         </div>
 
         {/* Player Slot List - independently scrollable on mobile and short screens */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-5 space-y-2 touch-pan-y">
+        <div 
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-5 space-y-2 touch-pan-y scroll-touch"
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        >
           {slots.map((pilot, idx) => {
             const slotIndex = idx + 1;
             const isMe = pilot?.id === playerId;

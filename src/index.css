@@ -17,6 +17,17 @@ html, body, #root {
   -webkit-user-select: none;
 }
 
+input, textarea {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+.scroll-touch {
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  overscroll-behavior: contain !important;
+}
+
 canvas {
   touch-action: none;
 }
