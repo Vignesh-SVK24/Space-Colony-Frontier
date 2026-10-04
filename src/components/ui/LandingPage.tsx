@@ -1,26 +1,37 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMultiplayerStore } from '../../multiplayer/useMultiplayerStore';
 import { createRoom, joinRoom, generateRoomCode } from '../../multiplayer/colyseusClient';
-import { BattleColor } from '../../multiplayer/types';
+import { BattleColor, GameMode } from '../../multiplayer/types';
 import { SpaceshipModel } from '../three/spaceships/SpaceshipModel';
 import { SpaceshipPaintSchemeKey } from '../../config/visualTheme';
 import { CombatDifficulty } from '../../config/combatConfig';
+import { nexusAudio } from '../../utils/nexusAudio';
 import { 
-  AlertCircle, 
-  Bot, 
   Users, 
+  Bot, 
   Sparkles, 
   ArrowRight, 
-  ArrowLeft, 
   Zap, 
   Maximize, 
   Minimize, 
   Shield, 
   Swords, 
-  Info, 
-  RotateCw 
+  RotateCw,
+  Copy,
+  Check,
+  Volume2,
+  VolumeX,
+  Menu,
+  X,
+  Crosshair,
+  Radio,
+  Layers,
+  ChevronRight,
+  Globe,
+  Sliders,
+  AlertCircle
 } from 'lucide-react';
 import { enterFullscreen, toggleFullscreen, useFullscreen } from '../../utils/fullscreenHelper';
 
@@ -33,14 +44,16 @@ const COLORS: Record<BattleColor, { hex: string; label: string; scheme: Spaceshi
 
 const RotatingShipPreview: React.FC<{ scheme: SpaceshipPaintSchemeKey }> = ({ scheme }) => {
   const groupRef = useRef<THREE.Group>(null);
+  
   useFrame((_, delta) => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.55;
+      groupRef.current.rotation.y += delta * 0.45;
+      groupRef.current.position.y = Math.sin(Date.now() * 0.0016) * 0.12 - 0.15;
     }
   });
 
   return (
-    <group ref={groupRef} position={[0, -0.2, 0]} rotation={[0.2, 0, 0]}>
+    <group ref={groupRef} position={[0, -0.15, 0]} rotation={[0.22, 0, 0]}>
       <SpaceshipModel paintScheme={scheme} throttle={0.35} />
     </group>
   );
@@ -48,8 +61,6 @@ const RotatingShipPreview: React.FC<{ scheme: SpaceshipPaintSchemeKey }> = ({ sc
 
 export const LandingPage: React.FC = () => {
   const {
-    gameModeSelection,
-    setGameModeSelection,
     gameMode,
     setGameMode,
     aiDifficulty,
@@ -66,20 +77,27 @@ export const LandingPage: React.FC = () => {
     startSoloGame
   } = useMultiplayerStore();
 
-  const [joinCode, setJoinCode] = React.useState('');
-  const [createCode, setCreateCode] = React.useState(() => generateRoomCode());
-  const [activeInfo, setActiveInfo] = React.useState<'SOLO' | 'ROOM' | null>(null);
+  const [joinModalOpen, setJoinModalOpen] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [soloModalOpen, setSoloModalOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  const [joinCode, setJoinCode] = useState('');
+  const [createCode, setCreateCode] = useState(() => generateRoomCode());
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [isMuted, setIsMuted] = useState(() => nexusAudio.getMuted());
+  
   const { isFullscreen } = useFullscreen();
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [videoLoaded, setVideoLoaded] = React.useState(false);
-  const [videoError, setVideoError] = React.useState(false);
+  const [videoLoaded, setVideoLoaded] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     checkServerReachability();
   }, [checkServerReachability, serverUrl]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (videoRef.current) {
       videoRef.current.play().catch(() => {});
     }
@@ -88,26 +106,51 @@ export const LandingPage: React.FC = () => {
   const effectiveName = playerName.trim() || 'Cadet-01';
 
   const handleCreate = () => {
+    nexusAudio.playConfirm();
     enterFullscreen();
     createRoom(effectiveName, playerColor, gameMode, createCode);
   };
 
   const handleJoin = () => {
     if (!joinCode.trim()) return;
+    nexusAudio.playConfirm();
     enterFullscreen();
     joinRoom(joinCode.trim().toUpperCase(), effectiveName, playerColor);
   };
 
   const handleStartSolo = () => {
+    nexusAudio.playConfirm();
     enterFullscreen();
     startSoloGame();
   };
 
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(createCode);
+    setCopiedCode(true);
+    nexusAudio.playClick(1400);
+    setTimeout(() => setCopiedCode(false), 2200);
+  };
+
+  const toggleAudio = () => {
+    const muted = nexusAudio.toggleMute();
+    setIsMuted(muted);
+  };
+
+  const scrollToSection = (id: string) => {
+    setMobileMenuOpen(false);
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-[#030712] font-mono text-gray-100 select-none">
+    <div className="fixed inset-0 h-screen w-screen overflow-y-auto overflow-x-hidden bg-[#F7FAFF] text-[#071A33] selection:bg-[#1677FF] selection:text-white scroll-smooth scroll-touch">
       
-      {/* LAYER 1: Deep-Space Background Video */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#030712]">
+      {/* ==========================================
+          LAYER 1: Cinematic Deep-Space Background (Behind UI)
+          ========================================== */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#061A35]">
         <img
           src={`${import.meta.env.BASE_URL}space_landing_bg.jpg`}
           alt="Deep Space Vista"
@@ -138,384 +181,793 @@ export const LandingPage: React.FC = () => {
           />
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-r from-[#030712]/90 via-[#030712]/60 to-[#030712]/30 pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#030712]/95 via-transparent to-[#030712]/60 pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_45%,_rgba(3,7,18,0.7)_100%)] pointer-events-none" />
+        {/* Futuristic White + Space Blue Atmospheric Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#061A35]/35 via-[#EEF4FA]/85 to-[#FFFFFF] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_transparent_20%,_rgba(247,250,255,0.7)_70%,_#FFFFFF_100%)] pointer-events-none" />
       </div>
 
-      {/* LAYER 2: Responsive Content Layout */}
-      {/* Mobile Portrait: column layout with compact canvas at top and scrollable panel below */}
-      {/* Mobile Landscape & Laptop/Desktop: row layout side-by-side */}
-      <div className="relative z-10 flex flex-col md:flex-row landscape:flex-row h-full w-full overflow-hidden">
-        
-        {/* Left Operations Panel - Independently scrollable on all viewports with touch momentum scrolling */}
-        <div 
-          className="w-full md:w-[440px] lg:w-[480px] xl:w-[510px] landscape:w-[380px] sm:landscape:w-[420px] flex-1 md:flex-none landscape:flex-none min-h-0 h-full max-h-[100dvh] overflow-y-auto overscroll-contain touch-pan-y scroll-touch flex flex-col justify-start p-3 sm:p-5 lg:p-6 border-b md:border-b-0 md:border-r landscape:border-r border-cyan-500/20 bg-black/65 backdrop-blur-md z-10"
-          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-        >
-          
-          {/* Title Header */}
-          <div className="mb-3 sm:mb-4 flex items-start justify-between shrink-0">
-            <div className="flex items-center gap-2.5 sm:gap-3">
-              <img
-                src={`${import.meta.env.BASE_URL}app-icon.png`}
-                alt="Game App Icon"
-                className="w-11 h-11 sm:w-13 sm:h-13 rounded-xl shadow-[0_0_15px_rgba(234,179,8,0.45)] border border-amber-400/40 shrink-0 object-cover"
+      {/* ==========================================
+          LAYER 2: Foreground Interface
+          ========================================== */}
+      <div className="relative z-10 flex flex-col min-h-screen">
+
+        {/* ---------------- TOP NAVIGATION ---------------- */}
+        <header className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-[#EEF4FA] shadow-[0_2px_15px_rgba(10,40,80,0.04)] transition-all">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
+            
+            {/* Brand Logo & Name */}
+            <div 
+              className="flex items-center gap-3 cursor-pointer group" 
+              onClick={() => scrollToSection('hero')}
+            >
+              <img 
+                src={`${import.meta.env.BASE_URL}app-icon.png`} 
+                alt="Space Colony Frontier Emblem" 
+                className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl shadow-[0_4px_12px_rgba(22,119,255,0.15)] border border-[#D5E3F2] object-cover group-hover:scale-105 transition-transform" 
               />
               <div>
-                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-950/70 border border-sky-400/40 text-sky-300 text-[10px] sm:text-xs tracking-widest uppercase mb-1 shadow-[0_0_10px_rgba(56,189,248,0.2)]">
-                  <Sparkles size={11} className="animate-spin text-sky-400" />
-                  <span>Authoritative 3D Space Dogfight</span>
+                <div className="flex items-center gap-1.5 leading-none">
+                  <span className="text-base sm:text-lg font-black tracking-wider text-[#061A35]">SPACE COLONY</span>
+                  <span className="text-base sm:text-lg font-black tracking-wider text-[#1677FF]">FRONTIER</span>
                 </div>
-                <h1 className="text-xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white leading-none drop-shadow-md">
-                  SPACE BATTLE
-                </h1>
-                <p className="text-gray-300 text-[10px] sm:text-xs tracking-widest mt-0.5 uppercase font-medium">
-                  Space Colony: Frontier · Realtime Combat
+                <p className="text-[9px] uppercase tracking-[0.2em] text-[#53657D] font-mono mt-0.5 hidden sm:block">
+                  Aerospace Combat Operations
                 </p>
               </div>
             </div>
 
-            <button
-              onClick={toggleFullscreen}
-              className="flex items-center gap-1 px-2.5 py-1 rounded bg-black/60 hover:bg-sky-950/80 border border-gray-700/60 hover:border-sky-500/50 text-[10px] text-gray-300 hover:text-sky-300 transition-colors cursor-pointer backdrop-blur-md shadow-md"
-              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            >
-              {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
-              <span className="hidden sm:inline uppercase tracking-wider font-semibold">
-                {isFullscreen ? 'Window' : 'Fullscreen'}
-              </span>
-            </button>
+            {/* Desktop Navigation Links */}
+            <nav className="hidden md:flex items-center gap-8 text-xs font-mono font-bold uppercase tracking-widest text-[#53657D]">
+              <button 
+                onClick={() => { nexusAudio.playClick(1000); scrollToSection('hero'); }} 
+                className="hover:text-[#1677FF] transition-colors cursor-pointer relative py-1 hover:border-b-2 hover:border-[#1677FF]"
+              >
+                HOME
+              </button>
+              <button 
+                onClick={() => { nexusAudio.playClick(1000); scrollToSection('modes'); }} 
+                className="hover:text-[#1677FF] transition-colors cursor-pointer relative py-1 hover:border-b-2 hover:border-[#1677FF]"
+              >
+                GAME MODES
+              </button>
+              <button 
+                onClick={() => { nexusAudio.playClick(1000); scrollToSection('features'); }} 
+                className="hover:text-[#1677FF] transition-colors cursor-pointer relative py-1 hover:border-b-2 hover:border-[#1677FF]"
+              >
+                FEATURES
+              </button>
+              <button 
+                onClick={() => { nexusAudio.playClick(1000); scrollToSection('about'); }} 
+                className="hover:text-[#1677FF] transition-colors cursor-pointer relative py-1 hover:border-b-2 hover:border-[#1677FF]"
+              >
+                ABOUT
+              </button>
+            </nav>
+
+            {/* Right Action Tools */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              
+              {/* Server Status Pill */}
+              <div 
+                className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#EEF4FA] border border-[#D5E3F2] text-[10px] font-mono font-bold text-[#0A2850]"
+                title={serverUrl}
+              >
+                <span className={`w-2 h-2 rounded-full ${isServerOnline === false ? 'bg-red-500 animate-pulse' : 'bg-emerald-500 animate-pulse'}`} />
+                <span>{isServerOnline === false ? 'SERVER OFFLINE' : 'SERVER ONLINE'}</span>
+              </div>
+
+              {/* Audio Toggle */}
+              <button 
+                onClick={toggleAudio} 
+                className="p-2.5 rounded-xl bg-[#EEF4FA] hover:bg-[#E0EBF7] border border-[#D5E3F2] text-[#0A2850] transition-colors cursor-pointer" 
+                title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+              >
+                {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              </button>
+
+              {/* Fullscreen Toggle */}
+              <button 
+                onClick={toggleFullscreen} 
+                className="p-2.5 rounded-xl bg-[#EEF4FA] hover:bg-[#E0EBF7] border border-[#D5E3F2] text-[#0A2850] transition-colors cursor-pointer" 
+                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              >
+                {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+              </button>
+
+              {/* Mobile Hamburger Button */}
+              <button 
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
+                className="md:hidden p-2.5 rounded-xl bg-[#EEF4FA] text-[#0A2850] border border-[#D5E3F2] cursor-pointer"
+                aria-label="Toggle Navigation Menu"
+              >
+                {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+              </button>
+            </div>
           </div>
 
-          {/* Diagnostic Error Banner */}
-          {error && (
-            <div className="mb-3.5 bg-red-950/80 border border-red-500/60 p-3 rounded-xl text-red-200 shadow-[0_0_20px_rgba(239,68,68,0.25)] shrink-0">
-              <div className="flex items-start gap-2.5">
-                <AlertCircle size={18} className="shrink-0 text-red-400 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-[11px] sm:text-xs font-bold text-red-300 uppercase tracking-wider">
-                      Multiplayer Server Notice
-                    </h3>
-                    <button
-                      onClick={() => setError(null)}
-                      className="text-gray-400 hover:text-white text-xs px-1 py-0.5 rounded hover:bg-white/10 cursor-pointer"
-                      title="Dismiss"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-red-200/90 mt-1 leading-relaxed font-sans">
-                    {error}
-                  </p>
+          {/* Mobile Menu Dropdown */}
+          {mobileMenuOpen && (
+            <div className="md:hidden bg-white/95 border-b border-[#EEF4FA] px-6 py-5 space-y-4 font-mono text-xs uppercase tracking-widest text-[#061A35] shadow-xl animate-fadeIn backdrop-blur-md">
+              <button 
+                onClick={() => scrollToSection('hero')} 
+                className="block w-full text-left py-2 hover:text-[#1677FF] font-bold"
+              >
+                HOME
+              </button>
+              <button 
+                onClick={() => scrollToSection('modes')} 
+                className="block w-full text-left py-2 hover:text-[#1677FF] font-bold"
+              >
+                GAME MODES
+              </button>
+              <button 
+                onClick={() => scrollToSection('features')} 
+                className="block w-full text-left py-2 hover:text-[#1677FF] font-bold"
+              >
+                FEATURES
+              </button>
+              <button 
+                onClick={() => scrollToSection('about')} 
+                className="block w-full text-left py-2 hover:text-[#1677FF] font-bold"
+              >
+                ABOUT
+              </button>
+              <div className="pt-3 border-t border-[#EEF4FA] flex items-center justify-between text-[11px] text-[#53657D]">
+                <span>Status:</span>
+                <span className="font-bold text-emerald-600">{isServerOnline === false ? 'Offline' : 'Online'}</span>
+              </div>
+            </div>
+          )}
+        </header>
 
-                  {/* Action Quick-Buttons */}
-                  <div className="mt-2.5 pt-2 border-t border-red-500/30 flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={handleStartSolo}
-                      className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold text-[10px] uppercase tracking-wider flex items-center gap-1 shadow cursor-pointer active:scale-95"
-                    >
-                      <Bot size={12} />
-                      <span>Play Solo (Offline)</span>
-                    </button>
+        {/* ---------------- HERO SECTION ---------------- */}
+        <section id="hero" className="relative min-h-[calc(100vh-5rem)] flex items-center justify-center py-10 lg:py-16 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+            
+            {/* Left Content Column */}
+            <div className="lg:col-span-7 flex flex-col justify-center order-2 lg:order-1 text-center lg:text-left z-10">
+              
+              {/* Futuristic Sub-Header Badge */}
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/90 border border-[#D5E3F2] shadow-[0_2px_8px_rgba(22,119,255,0.08)] text-[10px] sm:text-xs font-mono uppercase tracking-widest text-[#1677FF] self-center lg:self-start mb-4">
+                <Sparkles size={13} className="text-[#1677FF] animate-spin" />
+                <span>AEROSPACE FRONTIER // REALTIME 3D COMBAT</span>
+              </div>
 
-                    <button
-                      type="button"
-                      onClick={handleCreate}
-                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded font-bold text-[10px] uppercase tracking-wider cursor-pointer active:scale-95"
-                    >
-                      Retry Connection
-                    </button>
+              {/* Main Heading */}
+              <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05] text-[#061A35]">
+                SPACE COLONY <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#1677FF] via-[#2F8CFF] to-[#48C7FF]">
+                  FRONTIER
+                </span>
+              </h1>
+
+              {/* Tagline & Subtitle */}
+              <div className="mt-4 sm:mt-5 space-y-2">
+                <p className="text-xs sm:text-sm font-black tracking-[0.25em] uppercase text-[#0A2850]">
+                  ENTER THE FRONTIER. BUILD. EXPLORE. SURVIVE.
+                </p>
+                <p className="text-sm sm:text-base text-[#53657D] max-w-xl mx-auto lg:mx-0 font-sans leading-relaxed">
+                  Command your spacecraft, explore a massive 3D frontier, and battle players across the galaxy in fast-paced authoritative combat.
+                </p>
+              </div>
+
+              {/* Diagnostic Error Notice */}
+              {error && (
+                <div className="mt-4 p-3.5 bg-red-50/95 border border-red-200 rounded-xl text-red-800 text-xs flex items-center justify-between shadow-sm max-w-xl mx-auto lg:mx-0 text-left">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle size={16} className="text-red-500 shrink-0" />
+                    <span>{error}</span>
                   </div>
+                  <button 
+                    onClick={() => setError(null)} 
+                    className="text-red-500 font-bold ml-2 hover:bg-red-100 px-1.5 py-0.5 rounded cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {/* Main Action Area (AAA Control Buttons) */}
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5 sm:gap-4">
+                
+                {/* [ CREATE ROOM ] */}
+                <button
+                  onClick={() => {
+                    nexusAudio.playClick(1200);
+                    setCreateModalOpen(true);
+                  }}
+                  className="w-full sm:w-auto px-8 py-4 rounded-xl bg-[#1677FF] hover:bg-[#2F8CFF] active:scale-[0.98] text-white font-black text-sm tracking-widest uppercase transition-all shadow-[0_10px_25px_rgba(22,119,255,0.35)] hover:shadow-[0_15px_30px_rgba(22,119,255,0.45)] hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-3"
+                >
+                  <Users size={18} />
+                  <span>CREATE ROOM</span>
+                </button>
+
+                {/* [ JOIN ROOM ] */}
+                <button
+                  onClick={() => {
+                    nexusAudio.playClick(1000);
+                    setJoinModalOpen(true);
+                  }}
+                  className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white hover:bg-[#1677FF] text-[#0A2850] hover:text-white active:scale-[0.98] border-2 border-[#1677FF] font-black text-sm tracking-widest uppercase transition-all shadow-[0_8px_20px_rgba(10,40,80,0.06)] hover:shadow-[0_12px_25px_rgba(22,119,255,0.25)] hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-3 group"
+                >
+                  <ArrowRight size={18} className="text-[#1677FF] group-hover:text-white transition-colors" />
+                  <span>JOIN ROOM</span>
+                </button>
+
+                {/* [ SOLO VS AI ] */}
+                <button
+                  onClick={() => {
+                    nexusAudio.playClick(900);
+                    setSoloModalOpen(true);
+                  }}
+                  className="w-full sm:w-auto px-6 py-4 rounded-xl bg-white hover:bg-[#EEF4FA] active:scale-[0.98] text-[#53657D] hover:text-[#061A35] border border-[#D5E3F2] font-bold text-xs tracking-wider uppercase transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Bot size={16} className="text-[#1677FF]" />
+                  <span>SOLO VS AI</span>
+                </button>
+              </div>
+
+              {/* Quick Spec Metrics Bar */}
+              <div className="mt-8 pt-6 border-t border-[#EEF4FA] grid grid-cols-3 max-w-md mx-auto lg:mx-0 text-center lg:text-left gap-4 font-mono">
+                <div>
+                  <p className="text-[10px] text-[#53657D] uppercase tracking-widest">Max Pilots</p>
+                  <p className="text-base sm:text-lg font-black text-[#061A35]">4 PLAYERS</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-[#53657D] uppercase tracking-widest">Physics Rate</p>
+                  <p className="text-base sm:text-lg font-black text-[#1677FF]">60 HZ TICK</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-[#53657D] uppercase tracking-widest">Craft Vitals</p>
+                  <p className="text-base sm:text-lg font-black text-[#061A35]">250 HP BASE</p>
                 </div>
               </div>
+
             </div>
-          )}
 
-          {/* VIEW 1: CLEAN INITIAL MODE SELECTION */}
-          {gameModeSelection === 'SELECT' && (
-            <div className="space-y-3 sm:space-y-4">
-              <p className="text-xs uppercase tracking-widest text-gray-400 mb-1 font-semibold">
-                Select Combat Mode
-              </p>
+            {/* Right Spaceship Visual Column */}
+            <div className="lg:col-span-5 flex flex-col items-center justify-center order-1 lg:order-2 relative">
+              
+              {/* 3D Visual Stage with Holographic Ring */}
+              <div className="relative w-full max-w-[320px] sm:max-w-[420px] lg:max-w-[480px] aspect-square flex items-center justify-center">
+                
+                {/* Holographic Orbital Reticle (Behind Spaceship) */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                  <div className="w-[280px] h-[280px] sm:w-[380px] sm:h-[380px] rounded-full border border-sky-400/25 animate-[spin_60s_linear_infinite]" />
+                  <div className="absolute w-[220px] h-[220px] sm:w-[300px] sm:h-[300px] rounded-full border border-dashed border-sky-500/30 animate-[spin_40s_linear_infinite_reverse]" />
+                  <div className="absolute w-[160px] h-[160px] sm:w-[210px] sm:h-[210px] rounded-full border border-sky-300/20" />
+                  
+                  {/* Subtle Precision Crosshairs */}
+                  <div className="absolute w-[320px] sm:w-[420px] h-px bg-gradient-to-r from-transparent via-sky-400/25 to-transparent" />
+                  <div className="absolute h-[320px] sm:h-[420px] w-px bg-gradient-to-b from-transparent via-sky-400/25 to-transparent" />
+                </div>
 
-              {/* SOLO MATCH CARD - Clean button without descriptive text, small "i" at top right */}
-              <div className="relative group">
-                <button
-                  type="button"
-                  onClick={() => setGameModeSelection('SOLO_CONFIG')}
-                  className="w-full p-4 sm:p-5 rounded-xl bg-gradient-to-r from-emerald-950/40 via-teal-950/30 to-cyan-950/40 border border-emerald-500/40 hover:border-emerald-400/80 transition-all flex items-center gap-3.5 text-left shadow-lg hover:shadow-[0_0_20px_rgba(16,185,129,0.25)] active:scale-[0.99] cursor-pointer"
+                {/* Three.js Interactive 3D Canvas */}
+                <Canvas 
+                  dpr={[1, 2]}
+                  camera={{ position: [0, 1.6, 5.2], fov: 45 }} 
+                  gl={{ alpha: true, antialias: true }}
+                  className="w-full h-full z-10 relative cursor-grab active:cursor-grabbing"
                 >
-                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Bot size={24} className="text-emerald-300" />
-                  </div>
-                  <div className="flex-1 min-w-0 pr-6">
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-base sm:text-lg font-black text-white tracking-wider">SOLO MATCH</h2>
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
-                        Instant Play
-                      </span>
-                    </div>
-                  </div>
-                  <ArrowRight size={18} className="text-emerald-400 group-hover:translate-x-1 transition-transform shrink-0" />
-                </button>
-
-                {/* Info "i" Symbol at Top Right Corner */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveInfo(activeInfo === 'SOLO' ? null : 'SOLO');
-                  }}
-                  onMouseEnter={() => setActiveInfo('SOLO')}
-                  onMouseLeave={() => setActiveInfo(null)}
-                  className="absolute top-3 right-3 p-1.5 rounded-full bg-black/60 hover:bg-emerald-950 border border-emerald-500/40 text-emerald-300 hover:text-white transition-all cursor-pointer z-20 shadow-md"
-                  title="Mode Information"
-                  aria-label="Mode Information"
-                >
-                  <Info size={13} />
-                </button>
-
-                {/* Info Popover / Tooltip */}
-                {activeInfo === 'SOLO' && (
-                  <div 
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute right-2 top-11 z-30 w-64 p-3 bg-gray-950/95 border border-emerald-400/60 rounded-lg shadow-2xl text-[11px] text-gray-200 leading-relaxed backdrop-blur-md animate-fadeIn pointer-events-auto"
-                  >
-                    <div className="font-bold text-emerald-400 uppercase tracking-wider text-[10px] mb-1 flex items-center gap-1">
-                      <Bot size={12} /> Solo AI Battle
-                    </div>
-                    Practice dogfighting against tactical AI with the full 250 HP system, rapid bullets, 3s laser beam, and 10s solar beam. No server connection required.
-                  </div>
-                )}
+                  <ambientLight intensity={1.1} />
+                  <directionalLight position={[6, 8, 5]} intensity={2.2} color="#ffffff" />
+                  <spotLight position={[-5, 6, -3]} intensity={1.8} angle={0.6} penumbra={1} color={COLORS[playerColor].hex} />
+                  <pointLight position={[0, -2, 4]} intensity={1.0} color="#48C7FF" />
+                  <React.Suspense fallback={null}>
+                    <RotatingShipPreview scheme={COLORS[playerColor].scheme} />
+                  </React.Suspense>
+                </Canvas>
               </div>
 
-              {/* ROOM MATCH CARD - Clean button without descriptive text, small "i" at top right */}
-              <div className="relative group">
-                <button
-                  type="button"
-                  onClick={() => setGameModeSelection('ROOM_CONFIG')}
-                  className="w-full p-4 sm:p-5 rounded-xl bg-gradient-to-r from-sky-950/40 via-blue-950/30 to-indigo-950/40 border border-sky-500/40 hover:border-sky-400/80 transition-all flex items-center gap-3.5 text-left shadow-lg hover:shadow-[0_0_20px_rgba(56,189,248,0.25)] active:scale-[0.99] cursor-pointer"
-                >
-                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg bg-sky-500/20 border border-sky-400/40 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Users size={24} className="text-sky-300" />
-                  </div>
-                  <div className="flex-1 min-w-0 pr-6">
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-base sm:text-lg font-black text-white tracking-wider">ROOM MATCH</h2>
-                      <span className="text-[10px] bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
-                        Online Match
-                      </span>
-                    </div>
-                  </div>
-                  <ArrowRight size={18} className="text-sky-400 group-hover:translate-x-1 transition-transform shrink-0" />
-                </button>
-
-                {/* Info "i" Symbol at Top Right Corner */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveInfo(activeInfo === 'ROOM' ? null : 'ROOM');
-                  }}
-                  onMouseEnter={() => setActiveInfo('ROOM')}
-                  onMouseLeave={() => setActiveInfo(null)}
-                  className="absolute top-3 right-3 p-1.5 rounded-full bg-black/60 hover:bg-sky-950 border border-sky-500/40 text-sky-300 hover:text-white transition-all cursor-pointer z-20 shadow-md"
-                  title="Mode Information"
-                  aria-label="Mode Information"
-                >
-                  <Info size={13} />
-                </button>
-
-                {/* Info Popover / Tooltip */}
-                {activeInfo === 'ROOM' && (
-                  <div 
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute right-2 top-11 z-30 w-64 p-3 bg-gray-950/95 border border-sky-400/60 rounded-lg shadow-2xl text-[11px] text-gray-200 leading-relaxed backdrop-blur-md animate-fadeIn pointer-events-auto"
-                  >
-                    <div className="font-bold text-sky-400 uppercase tracking-wider text-[10px] mb-1 flex items-center gap-1">
-                      <Users size={12} /> Colyseus Realtime Room
-                    </div>
-                    Online 1v1 Duel, 4-Player Free-For-All, and 2v2 Team Battles with synchronized 250 HP and authoritative server physics.
-                  </div>
-                )}
+              {/* Hull Chassis Paint Scheme Selector Pill */}
+              <div className="mt-1 flex items-center gap-1.5 p-1.5 rounded-2xl bg-white/90 border border-[#D5E3F2] shadow-[0_4px_16px_rgba(10,40,80,0.06)] backdrop-blur-md z-10">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#53657D] px-2">CHASSIS:</span>
+                {(Object.keys(COLORS) as BattleColor[]).map((c) => {
+                  const isSelected = playerColor === c;
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => {
+                        nexusAudio.playClick(1200);
+                        setPlayerColor(c);
+                      }}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold uppercase transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#1677FF] text-white shadow-sm scale-105'
+                          : 'hover:bg-[#EEF4FA] text-[#53657D]'
+                      }`}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[c].hex }} />
+                      <span className="hidden sm:inline">{c}</span>
+                    </button>
+                  );
+                })}
               </div>
+
             </div>
-          )}
 
-          {/* VIEW 2: SOLO MATCH CONFIGURATION */}
-          {gameModeSelection === 'SOLO_CONFIG' && (
-            <div className="space-y-3.5 sm:space-y-4 animate-fadeIn pb-36 sm:pb-12">
-              <div className="flex items-center justify-between pb-2 border-b border-gray-800">
-                <button
-                  onClick={() => setGameModeSelection('SELECT')}
-                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-white uppercase tracking-widest transition-colors cursor-pointer"
-                >
-                  <ArrowLeft size={13} />
-                  <span>Back</span>
-                </button>
-                <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-1">
-                  <Bot size={13} /> Solo AI Battle (250 HP)
-                </span>
-              </div>
+          </div>
+        </section>
 
+        {/* ---------------- GAME MODES SECTION ---------------- */}
+        <section id="modes" className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+          <div className="text-center max-w-2xl mx-auto mb-12 sm:mb-16">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EEF4FA] text-[#1677FF] text-[10px] sm:text-xs font-mono font-bold uppercase tracking-widest mb-3">
+              COMBAT THEATERS
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-black text-[#061A35] tracking-tight">
+              GAME MODES
+            </h2>
+            <p className="text-sm text-[#53657D] mt-2 font-sans">
+              Choose your engagement protocol. From offline tactical combat to 4-pilot squad dogfights.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            
+            {/* Mode 1: SOLO */}
+            <div 
+              onClick={() => {
+                nexusAudio.playClick(1000);
+                setSoloModalOpen(true);
+              }}
+              className="group p-6 rounded-2xl bg-white border border-[#EEF4FA] hover:border-[#1677FF]/60 shadow-[0_6px_20px_rgba(10,40,80,0.04)] hover:shadow-[0_12px_30px_rgba(22,119,255,0.12)] hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between"
+            >
               <div>
-                <label className="block text-[10px] sm:text-[11px] text-gray-400 mb-1.5 uppercase tracking-widest font-semibold">
+                <div className="w-12 h-12 rounded-xl bg-[#EEF4FA] text-[#1677FF] group-hover:bg-[#1677FF] group-hover:text-white transition-colors flex items-center justify-center mb-4">
+                  <Bot size={24} />
+                </div>
+                <h3 className="text-lg font-black text-[#061A35] tracking-wide mb-1">1. SOLO</h3>
+                <p className="text-xs text-[#53657D] leading-relaxed">
+                  Battle against adaptive computer AI with full 250 HP vitals and tactical weapon loadouts.
+                </p>
+              </div>
+              <div className="mt-5 pt-4 border-t border-[#EEF4FA] flex items-center justify-between text-xs font-mono font-bold text-[#1677FF]">
+                <span>TRAINING MODE</span>
+                <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+
+            {/* Mode 2: 1 VS 1 */}
+            <div 
+              onClick={() => {
+                nexusAudio.playClick(1100);
+                setGameMode('1v1');
+                setCreateModalOpen(true);
+              }}
+              className="group p-6 rounded-2xl bg-white border border-[#EEF4FA] hover:border-[#1677FF]/60 shadow-[0_6px_20px_rgba(10,40,80,0.04)] hover:shadow-[0_12px_30px_rgba(22,119,255,0.12)] hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between"
+            >
+              <div>
+                <div className="w-12 h-12 rounded-xl bg-[#EEF4FA] text-[#1677FF] group-hover:bg-[#1677FF] group-hover:text-white transition-colors flex items-center justify-center mb-4">
+                  <Swords size={24} />
+                </div>
+                <h3 className="text-lg font-black text-[#061A35] tracking-wide mb-1">2. 1 VS 1</h3>
+                <p className="text-xs text-[#53657D] leading-relaxed">
+                  Fight another player in a high-stakes dogfight duel inside the 300m asteroid barrier.
+                </p>
+              </div>
+              <div className="mt-5 pt-4 border-t border-[#EEF4FA] flex items-center justify-between text-xs font-mono font-bold text-[#1677FF]">
+                <span>2 PLAYERS</span>
+                <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+
+            {/* Mode 3: FREE FOR ALL */}
+            <div 
+              onClick={() => {
+                nexusAudio.playClick(1200);
+                setGameMode('FFA');
+                setCreateModalOpen(true);
+              }}
+              className="group p-6 rounded-2xl bg-white border border-[#EEF4FA] hover:border-[#1677FF]/60 shadow-[0_6px_20px_rgba(10,40,80,0.04)] hover:shadow-[0_12px_30px_rgba(22,119,255,0.12)] hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between"
+            >
+              <div>
+                <div className="w-12 h-12 rounded-xl bg-[#EEF4FA] text-[#1677FF] group-hover:bg-[#1677FF] group-hover:text-white transition-colors flex items-center justify-center mb-4">
+                  <Crosshair size={24} />
+                </div>
+                <h3 className="text-lg font-black text-[#061A35] tracking-wide mb-1">3. FREE FOR ALL</h3>
+                <p className="text-xs text-[#53657D] leading-relaxed">
+                  Up to 4 players engage in total deathmatch chaos. Eliminate targets to claim victory.
+                </p>
+              </div>
+              <div className="mt-5 pt-4 border-t border-[#EEF4FA] flex items-center justify-between text-xs font-mono font-bold text-[#1677FF]">
+                <span>4 PLAYERS</span>
+                <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+
+            {/* Mode 4: 2 VS 2 */}
+            <div 
+              onClick={() => {
+                nexusAudio.playClick(1300);
+                setGameMode('2v2');
+                setCreateModalOpen(true);
+              }}
+              className="group p-6 rounded-2xl bg-white border border-[#EEF4FA] hover:border-[#1677FF]/60 shadow-[0_6px_20px_rgba(10,40,80,0.04)] hover:shadow-[0_12px_30px_rgba(22,119,255,0.12)] hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between"
+            >
+              <div>
+                <div className="w-12 h-12 rounded-xl bg-[#EEF4FA] text-[#1677FF] group-hover:bg-[#1677FF] group-hover:text-white transition-colors flex items-center justify-center mb-4">
+                  <Shield size={24} />
+                </div>
+                <h3 className="text-lg font-black text-[#061A35] tracking-wide mb-1">4. 2 VS 2</h3>
+                <p className="text-xs text-[#53657D] leading-relaxed">
+                  Team-based spacecraft combat. Coordinate flanking runs with Team Alpha and Team Bravo.
+                </p>
+              </div>
+              <div className="mt-5 pt-4 border-t border-[#EEF4FA] flex items-center justify-between text-xs font-mono font-bold text-[#1677FF]">
+                <span>SQUAD TEAMS</span>
+                <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        {/* ---------------- FEATURES SECTION ---------------- */}
+        <section id="features" className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#F7FAFF] to-[#FFFFFF] border-y border-[#EEF4FA]">
+          <div className="max-w-7xl mx-auto w-full">
+            <div className="text-center max-w-2xl mx-auto mb-14">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EEF4FA] text-[#1677FF] text-[10px] sm:text-xs font-mono font-bold uppercase tracking-widest mb-3">
+                SYSTEM CAPABILITIES
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-black text-[#061A35] tracking-tight">
+                THE FRONTIER AWAITS
+              </h2>
+              <p className="text-sm text-[#53657D] mt-2 font-sans">
+                Engineered with high-velocity 3D flight mechanics, synchronized ballistics, and tactical dogfighting.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              
+              {/* Feature 1 */}
+              <div className="p-7 rounded-2xl bg-white border border-[#EEF4FA] shadow-[0_4px_16px_rgba(10,40,80,0.03)] hover:border-[#1677FF]/40 transition-colors">
+                <div className="w-12 h-12 rounded-xl bg-[#EEF4FA] text-[#1677FF] flex items-center justify-center mb-5">
+                  <Radio size={22} />
+                </div>
+                <h3 className="text-base font-black text-[#061A35] uppercase tracking-wider mb-2">
+                  REAL-TIME MULTIPLAYER
+                </h3>
+                <p className="text-xs text-[#53657D] leading-relaxed">
+                  Play with friends across mobile, tablet, and PC instantly using private room codes.
+                </p>
+              </div>
+
+              {/* Feature 2 */}
+              <div className="p-7 rounded-2xl bg-white border border-[#EEF4FA] shadow-[0_4px_16px_rgba(10,40,80,0.03)] hover:border-[#1677FF]/40 transition-colors">
+                <div className="w-12 h-12 rounded-xl bg-[#EEF4FA] text-[#1677FF] flex items-center justify-center mb-5">
+                  <Globe size={22} />
+                </div>
+                <h3 className="text-base font-black text-[#061A35] uppercase tracking-wider mb-2">
+                  3D SPACE COMBAT
+                </h3>
+                <p className="text-xs text-[#53657D] leading-relaxed">
+                  Fight inside a large interactive 3D environment with full 6-DOF aerospace motion and physics.
+                </p>
+              </div>
+
+              {/* Feature 3 */}
+              <div className="p-7 rounded-2xl bg-white border border-[#EEF4FA] shadow-[0_4px_16px_rgba(10,40,80,0.03)] hover:border-[#1677FF]/40 transition-colors">
+                <div className="w-12 h-12 rounded-xl bg-[#EEF4FA] text-[#1677FF] flex items-center justify-center mb-5">
+                  <Layers size={22} />
+                </div>
+                <h3 className="text-base font-black text-[#061A35] uppercase tracking-wider mb-2">
+                  TACTICAL COMBAT
+                </h3>
+                <p className="text-xs text-[#53657D] leading-relaxed">
+                  Use asteroids and environmental structures as cover to break enemy radar locks and missile lines.
+                </p>
+              </div>
+
+              {/* Feature 4 */}
+              <div className="p-7 rounded-2xl bg-white border border-[#EEF4FA] shadow-[0_4px_16px_rgba(10,40,80,0.03)] hover:border-[#1677FF]/40 transition-colors">
+                <div className="w-12 h-12 rounded-xl bg-[#EEF4FA] text-[#1677FF] flex items-center justify-center mb-5">
+                  <Zap size={22} />
+                </div>
+                <h3 className="text-base font-black text-[#061A35] uppercase tracking-wider mb-2">
+                  MULTIPLE WEAPONS
+                </h3>
+                <p className="text-xs text-[#53657D] leading-relaxed">
+                  Unleash rapid 260 m/s plasma bullets, precision 3s laser beams, and high-yield 10s solar bursts.
+                </p>
+              </div>
+
+              {/* Feature 5 */}
+              <div className="p-7 rounded-2xl bg-white border border-[#EEF4FA] shadow-[0_4px_16px_rgba(10,40,80,0.03)] hover:border-[#1677FF]/40 transition-colors">
+                <div className="w-12 h-12 rounded-xl bg-[#EEF4FA] text-[#1677FF] flex items-center justify-center mb-5">
+                  <Users size={22} />
+                </div>
+                <h3 className="text-base font-black text-[#061A35] uppercase tracking-wider mb-2">
+                  UP TO 4 PLAYERS
+                </h3>
+                <p className="text-xs text-[#53657D] leading-relaxed">
+                  Battle in competitive multiplayer modes with authoritative server synchronization at 60 Hz.
+                </p>
+              </div>
+
+              {/* Feature 6 */}
+              <div className="p-7 rounded-2xl bg-white border border-[#EEF4FA] shadow-[0_4px_16px_rgba(10,40,80,0.03)] hover:border-[#1677FF]/40 transition-colors">
+                <div className="w-12 h-12 rounded-xl bg-[#EEF4FA] text-[#1677FF] flex items-center justify-center mb-5">
+                  <Sliders size={22} />
+                </div>
+                <h3 className="text-base font-black text-[#061A35] uppercase tracking-wider mb-2">
+                  MAGNETIC AIM ASSIST
+                </h3>
+                <p className="text-xs text-[#53657D] leading-relaxed">
+                  Smart lead indicators and forgiving 9.8m hitboxes provide satisfying hits across network latency.
+                </p>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* ---------------- ABOUT & FOOTER SECTION ---------------- */}
+        <footer id="about" className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 bg-white border-t border-[#EEF4FA] text-[#53657D] text-xs">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
+            
+            <div className="flex items-center gap-3">
+              <img 
+                src={`${import.meta.env.BASE_URL}app-icon.png`} 
+                alt="Emblem" 
+                className="w-8 h-8 rounded-lg shadow-sm border border-[#D5E3F2] object-cover" 
+              />
+              <div>
+                <p className="font-black text-sm text-[#061A35] tracking-wider">SPACE COLONY: FRONTIER</p>
+                <p className="text-[10px] text-[#53657D] font-mono">Real-time 3D Aerospace Combat · 2026 Edition</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6 font-mono text-[11px] uppercase tracking-wider">
+              <span className="hover:text-[#1677FF] cursor-pointer" onClick={() => scrollToSection('hero')}>Top</span>
+              <span className="hover:text-[#1677FF] cursor-pointer" onClick={() => scrollToSection('modes')}>Modes</span>
+              <span className="hover:text-[#1677FF] cursor-pointer" onClick={() => scrollToSection('features')}>Specs</span>
+              <span className="text-emerald-600 font-bold">Colyseus 0.16 Live</span>
+            </div>
+
+            <p className="text-[10px] text-[#53657D]/80">
+              © 2026 Space Colony Frontier. Built with Three.js & Colyseus.
+            </p>
+          </div>
+        </footer>
+
+      </div>
+
+      {/* ==========================================
+          LAYER 3: FUTURISTIC WHITE MODALS
+          ========================================== */}
+
+      {/* ---------------- 1. CREATE ROOM MODAL ---------------- */}
+      {createModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#061A35]/60 backdrop-blur-md animate-fadeIn">
+          <div 
+            className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#EEF4FA] overflow-hidden transform transition-all animate-scaleUp max-h-[92vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 pb-4 border-b border-[#EEF4FA] flex items-center justify-between bg-[#F7FAFF]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#1677FF]/10 text-[#1677FF] flex items-center justify-center">
+                  <Users size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-[#061A35] tracking-wide">
+                    CREATE FRONTIER ROOM
+                  </h3>
+                  <p className="text-[11px] text-[#53657D]">
+                    Configure your squad battle and launch into space.
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setCreateModalOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+              
+              {/* Mode Selection */}
+              <div>
+                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[#53657D] mb-1.5">
+                  Combat Mode
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGameMode('1v1')}
+                    className={`py-2 px-3 rounded-xl border text-center transition-all cursor-pointer ${
+                      gameMode === '1v1'
+                        ? 'border-[#1677FF] bg-[#1677FF]/10 text-[#1677FF] font-bold shadow-sm'
+                        : 'border-[#D5E3F2] bg-[#F7FAFF] text-[#53657D] hover:border-gray-300'
+                    }`}
+                  >
+                    <p className="text-xs font-black">1V1 DUEL</p>
+                    <p className="text-[9px] opacity-75">2 Players</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setGameMode('FFA')}
+                    className={`py-2 px-3 rounded-xl border text-center transition-all cursor-pointer ${
+                      gameMode === 'FFA'
+                        ? 'border-[#1677FF] bg-[#1677FF]/10 text-[#1677FF] font-bold shadow-sm'
+                        : 'border-[#D5E3F2] bg-[#F7FAFF] text-[#53657D] hover:border-gray-300'
+                    }`}
+                  >
+                    <p className="text-xs font-black">4-PLAYER FFA</p>
+                    <p className="text-[9px] opacity-75">All vs All</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setGameMode('2v2')}
+                    className={`py-2 px-3 rounded-xl border text-center transition-all cursor-pointer ${
+                      gameMode === '2v2'
+                        ? 'border-[#1677FF] bg-[#1677FF]/10 text-[#1677FF] font-bold shadow-sm'
+                        : 'border-[#D5E3F2] bg-[#F7FAFF] text-[#53657D] hover:border-gray-300'
+                    }`}
+                  >
+                    <p className="text-xs font-black">2V2 SQUAD</p>
+                    <p className="text-[9px] opacity-75">Team Battles</p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Call Sign Input */}
+              <div>
+                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[#53657D] mb-1.5">
                   Pilot Call Sign
                 </label>
                 <input 
                   type="text" 
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Enter Call Sign (e.g. Maverick)"
+                  placeholder="Enter Call Sign (e.g. Viper)"
                   maxLength={15}
-                  className="w-full bg-gray-900/90 border border-gray-700/80 p-2.5 sm:p-3 rounded-lg text-sm sm:text-base focus:border-emerald-400 focus:outline-none transition-colors"
+                  className="w-full bg-[#F7FAFF] border border-[#D5E3F2] focus:border-[#1677FF] focus:bg-white p-3 rounded-xl text-sm font-bold text-[#061A35] outline-none transition-all"
                 />
               </div>
 
+              {/* Hull Paint Scheme */}
               <div>
-                <label className="block text-[10px] sm:text-[11px] text-gray-400 mb-1.5 uppercase tracking-widest font-semibold">
-                  Computer Difficulty
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['EASY', 'NORMAL', 'HARD'] as CombatDifficulty[]).map((diff) => {
-                    const isSelected = aiDifficulty === diff;
-                    return (
-                      <button
-                        key={diff}
-                        type="button"
-                        onClick={() => setAIDifficulty(diff)}
-                        className={`p-2.5 rounded-lg border font-bold text-xs uppercase tracking-wider transition-all flex flex-col items-center gap-0.5 cursor-pointer ${
-                          isSelected 
-                            ? diff === 'HARD'
-                              ? 'border-red-500 bg-red-950/60 text-red-300 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
-                              : diff === 'NORMAL'
-                              ? 'border-sky-500 bg-sky-950/60 text-sky-300 shadow-[0_0_12px_rgba(56,189,248,0.3)]'
-                              : 'border-emerald-500 bg-emerald-950/60 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
-                            : 'border-gray-800 bg-gray-900/60 text-gray-400 hover:border-gray-700'
-                        }`}
-                      >
-                        <span>{diff}</span>
-                        <span className="text-[8px] font-normal text-gray-400">
-                          {diff === 'EASY' ? 'Relaxed' : diff === 'NORMAL' ? 'Tactical' : 'Relentless'}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] sm:text-[11px] text-gray-400 mb-1.5 uppercase tracking-widest font-semibold">
+                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[#53657D] mb-1.5">
                   Hull Paint Scheme
                 </label>
                 <div className="grid grid-cols-4 gap-2">
-                  {(Object.keys(COLORS) as BattleColor[]).map((color) => {
-                    const isSelected = playerColor === color;
-                    return (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setPlayerColor(color)}
-                        className={`p-2 rounded-lg border transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                          isSelected 
-                            ? 'border-emerald-400 bg-emerald-950/40 shadow-[0_0_10px_rgba(16,185,129,0.3)]' 
-                            : 'border-gray-800 bg-gray-900/60 hover:border-gray-700'
-                        }`}
-                      >
-                        <div 
-                          className={`w-5 h-5 rounded-full ${isSelected ? 'scale-110 ring-2 ring-white ring-offset-2 ring-offset-gray-950' : 'opacity-80'}`}
-                          style={{ backgroundColor: COLORS[color].hex }}
-                        />
-                        <span className="text-[9px] uppercase text-gray-300 font-semibold">{color}</span>
-                      </button>
-                    );
-                  })}
+                  {(Object.keys(COLORS) as BattleColor[]).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setPlayerColor(c)}
+                      className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                        playerColor === c
+                          ? 'border-[#1677FF] bg-[#1677FF]/10 shadow-sm'
+                          : 'border-[#D5E3F2] bg-[#F7FAFF] hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="w-5 h-5 rounded-full" style={{ backgroundColor: COLORS[c].hex }} />
+                      <span className="text-[10px] uppercase font-bold text-[#0A2850]">{c}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
+              {/* Prominent Generated Room Code Card */}
+              <div className="p-4 rounded-xl bg-[#EEF4FA] border border-[#D5E3F2] space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[#53657D]">
+                  <span className="font-bold">ROOM CODE</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreateCode(generateRoomCode());
+                      nexusAudio.playClick(1100);
+                    }}
+                    className="flex items-center gap-1 text-[#1677FF] hover:underline cursor-pointer"
+                  >
+                    <RotateCw size={11} />
+                    <span>Regenerate</span>
+                  </button>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-white border border-[#D5E3F2] rounded-xl py-2.5 px-4 text-center font-mono font-black text-2xl tracking-[0.25em] text-[#061A35]">
+                    {createCode}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyCode}
+                    className="px-4 py-3 rounded-xl bg-white border border-[#D5E3F2] hover:bg-gray-50 text-[#1677FF] font-bold text-xs uppercase flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                    title="Copy code to clipboard"
+                  >
+                    {copiedCode ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
+                    <span>{copiedCode ? 'COPIED' : 'COPY'}</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-[#53657D]">
+                  Share this code with other pilots to connect to your match.
+                </p>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-5 sm:p-6 pt-3 border-t border-[#EEF4FA] flex items-center justify-end gap-3 bg-[#F7FAFF]">
               <button
                 type="button"
-                onClick={handleStartSolo}
-                className="w-full bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-black py-3 sm:py-3.5 px-4 rounded-lg uppercase tracking-widest text-xs sm:text-sm transition-all shadow-[0_0_15px_rgba(16,185,129,0.35)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                onClick={() => setCreateModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase text-[#53657D] hover:bg-gray-200 transition-colors cursor-pointer"
               >
-                <Zap size={16} />
-                <span>Start Solo Battle</span>
+                CANCEL
+              </button>
+              <button
+                type="button"
+                onClick={handleCreate}
+                className="px-6 py-3 rounded-xl bg-[#1677FF] hover:bg-[#2F8CFF] active:scale-95 text-white font-black text-xs uppercase tracking-widest transition-all shadow-[0_6px_20px_rgba(22,119,255,0.35)] flex items-center gap-2 cursor-pointer"
+              >
+                <Users size={16} />
+                <span>ENTER BATTLE</span>
               </button>
             </div>
-          )}
 
-          {/* VIEW 3: ROOM MATCH CONFIGURATION (1v1, 4-Player FFA, 2v2) */}
-          {gameModeSelection === 'ROOM_CONFIG' && (
-            <div className="space-y-3 sm:space-y-3.5 animate-fadeIn pb-36 sm:pb-12">
-              <div className="flex items-center justify-between pb-2 border-b border-gray-800">
-                <button
-                  onClick={() => setGameModeSelection('SELECT')}
-                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-white uppercase tracking-widest transition-colors cursor-pointer"
-                >
-                  <ArrowLeft size={13} />
-                  <span>Back</span>
-                </button>
-                <span className="text-[11px] font-bold text-sky-400 uppercase tracking-widest flex items-center gap-1">
-                  <Users size={13} /> Colyseus Room Match
-                </span>
-              </div>
+          </div>
+        </div>
+      )}
 
-              {/* Game Mode Selector */}
-              <div>
-                <label className="block text-[10px] sm:text-[11px] text-gray-400 mb-1.5 uppercase tracking-widest font-semibold">
-                  Multiplayer Battle Mode
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setGameMode('1v1')}
-                    className={`p-2.5 rounded-lg border flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
-                      gameMode === '1v1'
-                        ? 'border-sky-400 bg-sky-950/60 text-sky-300 shadow-[0_0_12px_rgba(56,189,248,0.3)]'
-                        : 'border-gray-800 bg-gray-900/60 text-gray-400 hover:border-gray-700'
-                    }`}
-                  >
-                    <Swords size={16} />
-                    <span className="text-[11px] font-black">1v1 DUEL</span>
-                    <span className="text-[8px] text-gray-400">2 Players</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setGameMode('FFA')}
-                    className={`p-2.5 rounded-lg border flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
-                      gameMode === 'FFA'
-                        ? 'border-purple-400 bg-purple-950/60 text-purple-300 shadow-[0_0_12px_rgba(168,85,247,0.3)]'
-                        : 'border-gray-800 bg-gray-900/60 text-gray-400 hover:border-gray-700'
-                    }`}
-                  >
-                    <Users size={16} />
-                    <span className="text-[11px] font-black">4-PLAYER FFA</span>
-                    <span className="text-[8px] text-gray-400">All vs All</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setGameMode('2v2')}
-                    className={`p-2.5 rounded-lg border flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
-                      gameMode === '2v2'
-                        ? 'border-emerald-400 bg-emerald-950/60 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
-                        : 'border-gray-800 bg-gray-900/60 text-gray-400 hover:border-gray-700'
-                    }`}
-                  >
-                    <Shield size={16} />
-                    <span className="text-[11px] font-black">2v2 TEAM</span>
-                    <span className="text-[8px] text-gray-400">Team A vs B</span>
-                  </button>
+      {/* ---------------- 2. JOIN ROOM MODAL ---------------- */}
+      {joinModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#061A35]/60 backdrop-blur-md animate-fadeIn">
+          <div 
+            className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#EEF4FA] overflow-hidden transform transition-all animate-scaleUp max-h-[92vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 pb-4 border-b border-[#EEF4FA] flex items-center justify-between bg-[#F7FAFF]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#1677FF]/10 text-[#1677FF] flex items-center justify-center">
+                  <ArrowRight size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-[#061A35] tracking-wide">
+                    JOIN FRONTIER
+                  </h3>
+                  <p className="text-[11px] text-[#53657D]">
+                    Enter the room code to join your squad.
+                  </p>
                 </div>
               </div>
+              <button 
+                onClick={() => setJoinModalOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-              {/* Pilot Call Sign */}
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+              
+              {/* Room Code Input */}
               <div>
-                <label className="block text-[10px] sm:text-[11px] text-gray-400 mb-1.5 uppercase tracking-widest font-semibold">
+                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[#53657D] mb-1.5">
+                  ROOM CODE
+                </label>
+                <input 
+                  type="text" 
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder="ENTER ROOM CODE"
+                  maxLength={6}
+                  className="w-full bg-[#F7FAFF] border-2 border-[#1677FF]/70 focus:border-[#1677FF] focus:bg-white p-3.5 rounded-xl text-center text-xl sm:text-2xl font-mono font-black tracking-[0.3em] text-[#061A35] outline-none shadow-sm transition-all uppercase placeholder:text-gray-300"
+                />
+              </div>
+
+              {/* Call Sign Input */}
+              <div>
+                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[#53657D] mb-1.5">
                   Pilot Call Sign
                 </label>
                 <input 
@@ -524,140 +976,194 @@ export const LandingPage: React.FC = () => {
                   onChange={(e) => setPlayerName(e.target.value)}
                   placeholder="Enter Call Sign"
                   maxLength={15}
-                  className="w-full bg-gray-900/90 border border-gray-700/80 p-2 sm:p-2.5 rounded-lg text-sm sm:text-base focus:border-sky-400 focus:outline-none transition-colors"
+                  className="w-full bg-[#F7FAFF] border border-[#D5E3F2] focus:border-[#1677FF] focus:bg-white p-3 rounded-xl text-sm font-bold text-[#061A35] outline-none transition-all"
                 />
               </div>
 
-              {/* Ship Color Selector */}
+              {/* Hull Paint Scheme */}
               <div>
-                <label className="block text-[10px] sm:text-[11px] text-gray-400 mb-1.5 uppercase tracking-widest font-semibold">
+                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[#53657D] mb-1.5">
                   Hull Paint Scheme
                 </label>
                 <div className="grid grid-cols-4 gap-2">
-                  {(Object.keys(COLORS) as BattleColor[]).map((color) => {
-                    const isSelected = playerColor === color;
-                    return (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setPlayerColor(color)}
-                        className={`p-2 rounded-lg border transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                          isSelected 
-                            ? 'border-sky-400 bg-sky-950/40 shadow-[0_0_10px_rgba(56,189,248,0.3)]' 
-                            : 'border-gray-800 bg-gray-900/60 hover:border-gray-700'
-                        }`}
-                      >
-                        <div 
-                          className={`w-5 h-5 rounded-full ${isSelected ? 'scale-110 ring-2 ring-white ring-offset-2 ring-offset-gray-950' : 'opacity-80'}`}
-                          style={{ backgroundColor: COLORS[color].hex }}
-                        />
-                        <span className="text-[9px] uppercase text-gray-300 font-semibold">{color}</span>
-                      </button>
-                    );
-                  })}
+                  {(Object.keys(COLORS) as BattleColor[]).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setPlayerColor(c)}
+                      className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                        playerColor === c
+                          ? 'border-[#1677FF] bg-[#1677FF]/10 shadow-sm'
+                          : 'border-[#D5E3F2] bg-[#F7FAFF] hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="w-5 h-5 rounded-full" style={{ backgroundColor: COLORS[c].hex }} />
+                      <span className="text-[10px] uppercase font-bold text-[#0A2850]">{c}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* FIXED SINGLE ROOM CODE CREATION SECTION */}
-              <div className="bg-gray-950/70 p-3 rounded-xl border border-sky-500/30 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-sky-300 uppercase tracking-wider">
-                    Host Match Code
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setCreateCode(generateRoomCode())}
-                    className="flex items-center gap-1 text-[9px] text-gray-400 hover:text-sky-300 transition-colors cursor-pointer"
-                    title="Generate another room code"
-                  >
-                    <RotateCw size={10} />
-                    <span>New Code</span>
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-black/70 border border-sky-500/40 rounded-lg py-2 px-3 text-center font-mono font-bold text-base sm:text-lg tracking-widest text-sky-200">
-                    {createCode}
-                  </div>
-                  <button 
-                    type="button"
-                    onClick={handleCreate}
-                    className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white font-bold rounded-lg uppercase tracking-wider text-xs transition-all shadow-[0_0_12px_rgba(2,132,199,0.3)] flex items-center gap-1.5 cursor-pointer shrink-0"
-                  >
-                    <Users size={14} />
-                    <span>Create Room</span>
-                  </button>
-                </div>
-                <p className="text-[9px] text-gray-400">
-                  One stable code for your match. Share this code with friends to join.
+              {/* Validation / Notice */}
+              {joinCode.trim().length > 0 && joinCode.trim().length < 4 && (
+                <p className="text-[11px] text-amber-600 font-mono">
+                  Room codes are 4 to 6 characters in length.
                 </p>
+              )}
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-5 sm:p-6 pt-3 border-t border-[#EEF4FA] flex items-center justify-end gap-3 bg-[#F7FAFF]">
+              <button
+                type="button"
+                onClick={() => setJoinModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase text-[#53657D] hover:bg-gray-200 transition-colors cursor-pointer"
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                onClick={handleJoin}
+                disabled={joinCode.trim().length < 4}
+                className="px-6 py-3 rounded-xl bg-[#1677FF] hover:bg-[#2F8CFF] disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 text-white font-black text-xs uppercase tracking-widest transition-all shadow-[0_6px_20px_rgba(22,119,255,0.35)] flex items-center gap-2 cursor-pointer"
+              >
+                <ArrowRight size={16} />
+                <span>JOIN BATTLE</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- 3. SOLO AI TRAINING MODAL ---------------- */}
+      {soloModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#061A35]/60 backdrop-blur-md animate-fadeIn">
+          <div 
+            className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#EEF4FA] overflow-hidden transform transition-all animate-scaleUp max-h-[92vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 pb-4 border-b border-[#EEF4FA] flex items-center justify-between bg-[#F7FAFF]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                  <Bot size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-[#061A35] tracking-wide">
+                    SOLO AI TRAINING
+                  </h3>
+                  <p className="text-[11px] text-[#53657D]">
+                    Practice tactical dogfighting against computer AI (Offline).
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSoloModalOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+              
+              {/* Difficulty Selection */}
+              <div>
+                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[#53657D] mb-1.5">
+                  AI Difficulty
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['EASY', 'NORMAL', 'HARD'] as CombatDifficulty[]).map((diff) => (
+                    <button
+                      key={diff}
+                      type="button"
+                      onClick={() => setAIDifficulty(diff)}
+                      className={`py-2.5 px-3 rounded-xl border text-center transition-all cursor-pointer ${
+                        aiDifficulty === diff
+                          ? diff === 'HARD'
+                            ? 'border-red-500 bg-red-50 text-red-700 font-bold shadow-sm'
+                            : diff === 'NORMAL'
+                            ? 'border-sky-500 bg-sky-50 text-sky-700 font-bold shadow-sm'
+                            : 'border-emerald-500 bg-emerald-50 text-emerald-700 font-bold shadow-sm'
+                          : 'border-[#D5E3F2] bg-[#F7FAFF] text-[#53657D] hover:border-gray-300'
+                      }`}
+                    >
+                      <p className="text-xs font-black">{diff}</p>
+                      <p className="text-[9px] opacity-75">
+                        {diff === 'EASY' ? 'Relaxed' : diff === 'NORMAL' ? 'Tactical' : 'Relentless'}
+                      </p>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* OR DIVIDER */}
-              <div className="flex items-center gap-2.5 my-0.5 opacity-60">
-                <div className="h-px bg-gray-700 flex-1"></div>
-                <span className="text-[9px] uppercase tracking-widest text-gray-400">OR JOIN WITH CODE</span>
-                <div className="h-px bg-gray-700 flex-1"></div>
-              </div>
-
-              {/* Join Room Input */}
-              <div className="flex gap-2">
+              {/* Call Sign Input */}
+              <div>
+                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[#53657D] mb-1.5">
+                  Pilot Call Sign
+                </label>
                 <input 
                   type="text" 
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  placeholder="ROOM CODE"
-                  maxLength={6}
-                  className="flex-1 min-w-0 bg-gray-900 border border-gray-700 p-2 sm:p-2.5 rounded-lg text-center text-sm sm:text-base font-bold tracking-widest focus:border-sky-400 focus:outline-none transition-colors uppercase"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  placeholder="Enter Call Sign"
+                  maxLength={15}
+                  className="w-full bg-[#F7FAFF] border border-[#D5E3F2] focus:border-emerald-500 focus:bg-white p-3 rounded-xl text-sm font-bold text-[#061A35] outline-none transition-all"
                 />
-                <button 
-                  type="button"
-                  onClick={handleJoin}
-                  disabled={joinCode.trim().length < 4}
-                  className="px-4 sm:px-5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 border border-gray-700 text-white font-bold rounded-lg uppercase tracking-widest text-xs transition-all cursor-pointer disabled:cursor-not-allowed"
-                >
-                  Join Room
-                </button>
+              </div>
+
+              {/* Hull Paint Scheme */}
+              <div>
+                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-[#53657D] mb-1.5">
+                  Hull Paint Scheme
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {(Object.keys(COLORS) as BattleColor[]).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setPlayerColor(c)}
+                      className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                        playerColor === c
+                          ? 'border-emerald-500 bg-emerald-50 shadow-sm'
+                          : 'border-[#D5E3F2] bg-[#F7FAFF] hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="w-5 h-5 rounded-full" style={{ backgroundColor: COLORS[c].hex }} />
+                      <span className="text-[10px] uppercase font-bold text-[#0A2850]">{c}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
             </div>
-          )}
 
-        </div>
+            {/* Modal Footer */}
+            <div className="p-5 sm:p-6 pt-3 border-t border-[#EEF4FA] flex items-center justify-end gap-3 bg-[#F7FAFF]">
+              <button
+                type="button"
+                onClick={() => setSoloModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase text-[#53657D] hover:bg-gray-200 transition-colors cursor-pointer"
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                onClick={handleStartSolo}
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs uppercase tracking-widest transition-all shadow-[0_6px_20px_rgba(16,185,129,0.35)] flex items-center gap-2 cursor-pointer"
+              >
+                <Zap size={16} />
+                <span>START SOLO BATTLE</span>
+              </button>
+            </div>
 
-        {/* Right Visual Panel - Compact on portrait mobile for SELECT, hidden during configuration to give 100% screen to controls */}
-        <div className={`relative min-h-0 bg-transparent overflow-hidden flex items-center justify-center shrink-0 ${
-          gameModeSelection !== 'SELECT' 
-            ? 'hidden md:flex landscape:flex md:flex-1 landscape:flex-1 h-full' 
-            : 'h-36 sm:h-52 md:h-full landscape:h-full md:flex-1 landscape:flex-1 flex-1'
-        }`}>
-          <div 
-            className="absolute inset-0 opacity-40 pointer-events-none z-0 transition-colors duration-500"
-            style={{
-              background: `radial-gradient(circle at center, ${COLORS[playerColor].hex}25 0%, rgba(3,7,18,0.2) 60%, transparent 100%)`
-            }}
-          />
-          
-          <div className="absolute top-3 right-3 z-20 text-right pointer-events-none hidden sm:block bg-black/60 backdrop-blur-md px-3 py-1 rounded-lg border border-cyan-500/25 shadow-lg">
-            <p className="text-[9px] text-sky-400/90 uppercase tracking-widest font-semibold">Active Combat Chassis</p>
-            <p className="text-xs font-bold text-white uppercase tracking-wider">{COLORS[playerColor].label}</p>
           </div>
-
-          <Canvas 
-            dpr={[1, 2]}
-            camera={{ position: [0, 1.8, 5.5], fov: 45 }} 
-            gl={{ alpha: true, antialias: true }}
-            className="w-full h-full z-10 relative cursor-grab active:cursor-grabbing"
-          >
-            <ambientLight intensity={0.7} />
-            <spotLight position={[5, 6, 5]} intensity={2.5} angle={0.6} penumbra={1} color={COLORS[playerColor].hex} />
-            <pointLight position={[-5, -4, -5]} intensity={1.2} color="#38bdf8" />
-            <React.Suspense fallback={null}>
-              <RotatingShipPreview scheme={COLORS[playerColor].scheme} />
-            </React.Suspense>
-          </Canvas>
         </div>
+      )}
 
-      </div>
     </div>
   );
 };
