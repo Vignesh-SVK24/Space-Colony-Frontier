@@ -9,8 +9,8 @@ export const MatchResultScreen: React.FC = () => {
   if (!matchResult) return null;
 
   const isWinner = matchResult.winner === playerId;
-  const mainColor = isWinner ? 'text-amber-400' : 'text-red-500';
-  const glowColor = isWinner ? 'drop-shadow-[0_0_25px_rgba(251,191,36,0.5)]' : 'drop-shadow-[0_0_25px_rgba(239,68,68,0.5)]';
+  const mainColor = isWinner ? 'text-[#FFCC00]' : 'text-red-500';
+  const glowColor = isWinner ? 'drop-shadow-[0_0_25px_rgba(255,204,0,0.6)]' : 'drop-shadow-[0_0_25px_rgba(239,68,68,0.6)]';
 
   const handleMainMenu = () => {
     if (!isSolo) disconnect();
@@ -26,69 +26,69 @@ export const MatchResultScreen: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center font-mono bg-black/85 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center font-mono bg-[#05070B]/85 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
       
-      <div className="w-full max-w-xl bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col">
+      <div className="w-full max-w-xl bg-[#061A35]/90 border border-[#8CCDEB]/40 rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(5,7,11,0.9)] max-h-[92vh] flex flex-col">
         
         {/* Banner */}
-        <div className="p-6 sm:p-8 text-center border-b border-gray-800 bg-gray-950 flex flex-col items-center gap-3">
+        <div className="p-6 sm:p-8 text-center border-b border-[#8CCDEB]/20 bg-[#05070B]/60 flex flex-col items-center gap-3">
           {isWinner ? (
-            <Trophy size={42} className="text-amber-400 animate-bounce" />
+            <Trophy size={44} className="text-[#FFCC00] animate-bounce" />
           ) : (
-            <Skull size={42} className="text-red-500 animate-pulse" />
+            <Skull size={44} className="text-red-500 animate-pulse" />
           )}
           <h1 className={`text-4xl sm:text-6xl font-black tracking-tight ${mainColor} ${glowColor}`}>
             {isWinner ? 'VICTORY' : 'DEFEAT'}
           </h1>
-          <p className="text-gray-300 text-xs sm:text-sm uppercase tracking-wider font-semibold">
+          <p className="text-[#8CCDEB]/80 text-xs sm:text-sm uppercase tracking-wider font-semibold">
             {isWinner ? `Enemy Eliminated: ${matchResult.loserName}` : `Vessel Destroyed by: ${matchResult.winnerName}`}
           </p>
         </div>
 
         {/* Stats Grid */}
-        <div className="p-4 sm:p-6 grid grid-cols-2 gap-2.5 sm:gap-4 bg-gray-900 overflow-y-auto">
+        <div className="p-4 sm:p-6 grid grid-cols-2 gap-2.5 sm:gap-4 bg-[#05070B]/40 overflow-y-auto">
           
-          <div className="bg-gray-950/80 p-3.5 sm:p-5 rounded-lg border border-gray-800 flex flex-col items-center text-center">
-            <Target className="text-gray-400 mb-1.5 sm:mb-2 text-sky-400" size={20} />
-            <p className="text-2xl sm:text-3xl font-black text-white">{matchResult.damageDealt}</p>
-            <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-widest">Damage Inflicted</p>
+          <div className="bg-[#08264A]/60 p-3.5 sm:p-5 rounded-xl border border-[#8CCDEB]/20 flex flex-col items-center text-center">
+            <Target className="mb-1.5 sm:mb-2 text-[#8CCDEB]" size={20} />
+            <p className="text-2xl sm:text-3xl font-black text-[#F4F7FA]">{matchResult.damageDealt}</p>
+            <p className="text-[10px] sm:text-xs text-[#8CCDEB]/70 uppercase tracking-widest">Damage Inflicted</p>
           </div>
 
-          <div className="bg-gray-950/80 p-3.5 sm:p-5 rounded-lg border border-gray-800 flex flex-col items-center text-center">
-            <Crosshair className="text-gray-400 mb-1.5 sm:mb-2 text-emerald-400" size={20} />
-            <p className="text-2xl sm:text-3xl font-black text-white">{matchResult.accuracy}%</p>
-            <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-widest">Aim Accuracy</p>
+          <div className="bg-[#08264A]/60 p-3.5 sm:p-5 rounded-xl border border-[#8CCDEB]/20 flex flex-col items-center text-center">
+            <Crosshair className="mb-1.5 sm:mb-2 text-[#22c55e]" size={20} />
+            <p className="text-2xl sm:text-3xl font-black text-[#F4F7FA]">{matchResult.accuracy}%</p>
+            <p className="text-[10px] sm:text-xs text-[#8CCDEB]/70 uppercase tracking-widest">Aim Accuracy</p>
           </div>
 
-          <div className="bg-gray-950/80 p-3.5 sm:p-5 rounded-lg border border-gray-800 flex flex-col items-center text-center">
-            <ShieldAlert className="text-gray-400 mb-1.5 sm:mb-2 text-amber-400" size={20} />
-            <p className="text-2xl sm:text-3xl font-black text-white">{matchResult.shotsFired}</p>
-            <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-widest">Blasters Fired</p>
+          <div className="bg-[#08264A]/60 p-3.5 sm:p-5 rounded-xl border border-[#8CCDEB]/20 flex flex-col items-center text-center">
+            <ShieldAlert className="mb-1.5 sm:mb-2 text-[#FFCC00]" size={20} />
+            <p className="text-2xl sm:text-3xl font-black text-[#F4F7FA]">{matchResult.shotsFired}</p>
+            <p className="text-[10px] sm:text-xs text-[#8CCDEB]/70 uppercase tracking-widest">Blasters Fired</p>
           </div>
 
-          <div className="bg-gray-950/80 p-3.5 sm:p-5 rounded-lg border border-gray-800 flex flex-col items-center text-center">
-            <Clock className="text-gray-400 mb-1.5 sm:mb-2 text-purple-400" size={20} />
-            <p className="text-2xl sm:text-3xl font-black text-white">
+          <div className="bg-[#08264A]/60 p-3.5 sm:p-5 rounded-xl border border-[#8CCDEB]/20 flex flex-col items-center text-center">
+            <Clock className="mb-1.5 sm:mb-2 text-purple-400" size={20} />
+            <p className="text-2xl sm:text-3xl font-black text-[#F4F7FA]">
               {Math.floor(matchResult.matchDuration / 60)}:{(matchResult.matchDuration % 60).toString().padStart(2, '0')}
             </p>
-            <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-widest">Combat Time</p>
+            <p className="text-[10px] sm:text-xs text-[#8CCDEB]/70 uppercase tracking-widest">Combat Time</p>
           </div>
 
         </div>
 
         {/* Actions */}
-        <div className="p-4 sm:p-6 border-t border-gray-800 bg-gray-950 flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="p-4 sm:p-6 border-t border-[#8CCDEB]/20 bg-[#05070B]/70 flex flex-col sm:flex-row gap-3 justify-center">
           <button 
             onClick={handlePlayAgain}
-            className="flex-1 py-3 px-6 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg uppercase tracking-wider text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-sky-600/30"
+            className="flex-1 py-3 px-6 bg-gradient-to-r from-[#0D3B73] via-[#0A2850] to-[#061A35] hover:from-[#1677FF] hover:to-[#0D3B73] text-[#F4F7FA] font-bold rounded-xl uppercase tracking-wider text-xs sm:text-sm transition-all border border-[#8CCDEB]/50 hover:border-[#FFCC00] flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(140,205,235,0.3)]"
           >
-            <RotateCcw size={16} />
-            <span>{isSolo ? 'Play Solo Again' : 'Rematch / New Room'}</span>
+            <RotateCcw size={16} className="text-[#FFCC00]" />
+            <span>{isSolo ? 'Play Solo Again' : 'Rematch / New Sector'}</span>
           </button>
 
           <button 
             onClick={handleMainMenu}
-            className="py-3 px-6 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold rounded-lg uppercase tracking-wider text-xs sm:text-sm transition-colors border border-gray-700 flex items-center justify-center gap-2 cursor-pointer"
+            className="py-3 px-6 bg-[#05070B]/80 hover:bg-[#061A35] text-[#8CCDEB] hover:text-[#F4F7FA] font-bold rounded-xl uppercase tracking-wider text-xs sm:text-sm transition-colors border border-[#8CCDEB]/30 flex items-center justify-center gap-2 cursor-pointer"
           >
             <Home size={16} />
             <span>Main Menu</span>
@@ -100,3 +100,4 @@ export const MatchResultScreen: React.FC = () => {
     </div>
   );
 };
+
