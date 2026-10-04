@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMultiplayerStore } from '../../multiplayer/useMultiplayerStore';
-import { createRoom, joinRoom, updateServerUrl, generateRoomCode } from '../../multiplayer/colyseusClient';
+import { createRoom, joinRoom, generateRoomCode } from '../../multiplayer/colyseusClient';
 import { BattleColor } from '../../multiplayer/types';
 import { SpaceshipModel } from '../three/spaceships/SpaceshipModel';
 import { SpaceshipPaintSchemeKey } from '../../config/visualTheme';
@@ -17,8 +17,6 @@ import {
   Zap, 
   Maximize, 
   Minimize, 
-  Server, 
-  Edit2, 
   Shield, 
   Swords, 
   Info, 
@@ -71,8 +69,6 @@ export const LandingPage: React.FC = () => {
   const [joinCode, setJoinCode] = React.useState('');
   const [createCode, setCreateCode] = React.useState(() => generateRoomCode());
   const [activeInfo, setActiveInfo] = React.useState<'SOLO' | 'ROOM' | null>(null);
-  const [editingServer, setEditingServer] = React.useState(false);
-  const [customServerUrl, setCustomServerUrl] = React.useState(serverUrl);
   const { isFullscreen } = useFullscreen();
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -224,22 +220,10 @@ export const LandingPage: React.FC = () => {
 
                     <button
                       type="button"
-                      onClick={() => {
-                        setEditingServer(true);
-                        setGameModeSelection('ROOM_CONFIG');
-                      }}
-                      className="px-2.5 py-1.5 bg-sky-950 hover:bg-sky-900 border border-sky-500/50 text-sky-300 rounded text-[10px] uppercase tracking-wider flex items-center gap-1 cursor-pointer font-bold active:scale-95"
-                    >
-                      <Server size={12} />
-                      <span>Configure Server URL</span>
-                    </button>
-
-                    <button
-                      type="button"
                       onClick={handleCreate}
-                      className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded text-[10px] uppercase tracking-wider cursor-pointer font-semibold"
+                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded font-bold text-[10px] uppercase tracking-wider cursor-pointer active:scale-95"
                     >
-                      Retry
+                      Retry Connection
                     </button>
                   </div>
                 </div>
@@ -630,83 +614,6 @@ export const LandingPage: React.FC = () => {
                 >
                   Join Room
                 </button>
-              </div>
-
-              {/* Server Connection Bar */}
-              <div className="pt-1.5 border-t border-gray-800/80">
-                <div className="flex items-center justify-between text-[10px] text-gray-400 bg-gray-950/60 p-2 rounded-lg border border-gray-800">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <Server size={12} className="text-sky-400 shrink-0" />
-                    <span className="truncate">Server: <span className="text-gray-300 font-mono">{serverUrl}</span></span>
-                    {isServerOnline === true && (
-                      <span className="inline-flex items-center gap-1 text-[8px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/40 px-1 py-0.5 rounded shrink-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        ONLINE
-                      </span>
-                    )}
-                    {isServerOnline === false && (
-                      <span className="inline-flex items-center gap-1 text-[8px] font-bold text-rose-400 bg-rose-950/80 border border-rose-500/40 px-1 py-0.5 rounded shrink-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                        OFFLINE
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
-                    <button
-                      type="button"
-                      onClick={() => checkServerReachability()}
-                      className="text-gray-400 hover:text-white uppercase tracking-wider text-[8px] cursor-pointer"
-                      title="Test Connection"
-                    >
-                      Check
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingServer(!editingServer)}
-                      className="text-sky-400 hover:text-sky-300 uppercase tracking-wider font-bold cursor-pointer flex items-center gap-0.5 text-[8px]"
-                    >
-                      <Edit2 size={9} />
-                      <span>{editingServer ? 'Close' : 'Config'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {editingServer && (
-                  <div className="mt-2 p-2.5 bg-gray-950/90 border border-gray-700/80 rounded-lg space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[9px] uppercase tracking-wider font-bold text-gray-300">
-                        Colyseus Server URL
-                      </span>
-                      <span className="text-[8px] text-gray-400">
-                        Local: http://localhost:3001
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={customServerUrl}
-                        onChange={(e) => setCustomServerUrl(e.target.value)}
-                        placeholder="http://localhost:3001"
-                        className="flex-1 bg-gray-900 border border-gray-700 text-xs px-2.5 py-1.5 rounded text-white font-mono focus:border-sky-400 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (customServerUrl.trim()) {
-                            updateServerUrl(customServerUrl.trim());
-                            setEditingServer(false);
-                          }
-                        }}
-                        className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white text-xs font-bold rounded uppercase tracking-wider cursor-pointer transition-colors shadow-sm"
-                      >
-                        Save
-                      </button>
-                    </div>
-                    <p className="text-[9px] text-gray-400 leading-normal">
-                      💡 Tip: For online multiplayer with friends, host the server on Render and paste your Render URL above.
-                    </p>
-                  </div>
-                )}
               </div>
 
             </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMultiplayerStore } from '../../multiplayer/useMultiplayerStore';
-import { disconnect, startMatch, updateServerUrl, sendSetTeam } from '../../multiplayer/colyseusClient';
-import { Copy, Check, Users, Bot, ArrowLeft, Play, Server, Edit2 } from 'lucide-react';
+import { disconnect, startMatch, sendSetTeam } from '../../multiplayer/colyseusClient';
+import { Copy, Check, Users, Bot, ArrowLeft, Play } from 'lucide-react';
 import { BattleColor, Team } from '../../multiplayer/types';
 
 export const LobbyView: React.FC = () => {
@@ -12,20 +12,20 @@ export const LobbyView: React.FC = () => {
     playerId,
     isHost,
     roomPlayers,
+    otherPlayers,
     countdown,
     gameMode,
-    serverUrl,
     startSoloGame
   } = useMultiplayerStore();
 
   const [copied, setCopied] = useState(false);
-  const [editingServer, setEditingServer] = useState(false);
-  const [customServerUrl, setCustomServerUrl] = useState(serverUrl);
 
   const copyCode = () => {
-    navigator.clipboard.writeText(roomCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (roomCode) {
+      navigator.clipboard.writeText(roomCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleLeave = () => {
@@ -35,14 +35,6 @@ export const LobbyView: React.FC = () => {
 
   const handleLaunchBattle = () => {
     startMatch();
-  };
-
-  const handleSaveServer = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (customServerUrl.trim()) {
-      updateServerUrl(customServerUrl.trim());
-      setEditingServer(false);
-    }
   };
 
   const colorMap: Record<BattleColor, string> = {
@@ -76,9 +68,11 @@ export const LobbyView: React.FC = () => {
     return effectivePlayers.find(p => p.slot === slotNum) || null;
   });
 
-  const playerCount = effectivePlayers.length;
+  // Calculate live player count from both roomPlayers and otherPlayers to never miss a join
+  const playerCount = Math.max(effectivePlayers.length, (otherPlayers?.length || 0) + 1);
   const minRequired = 2;
-  const canLaunch = isHost && playerCount >= minRequired && countdown === null;
+  // Any connected pilot can launch the match once at least 2 players are in the room!
+  const canLaunch = playerCount >= minRequired && countdown === null;
 
   return (
     <div className="min-h-[100dvh] w-full bg-[#030712] flex flex-col items-center justify-center font-mono text-gray-100 p-3 sm:p-6 overflow-y-auto">
@@ -90,7 +84,7 @@ export const LobbyView: React.FC = () => {
           <div className="flex items-center justify-between mb-2">
             <button
               onClick={handleLeave}
-              className="flex items-center gap-1 text-xs text-gray-400 hover:text-white uppercase tracking-wider cursor-pointer"
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-white uppercase tracking-wider cursor-pointer transition-colors"
             >
               <ArrowLeft size={14} />
               <span>Leave</span>
@@ -120,7 +114,7 @@ export const LobbyView: React.FC = () => {
           </button>
 
           <p className="text-[10px] text-gray-500 mt-1.5 tracking-wider uppercase">
-            {copied ? 'Code copied to clipboard!' : `Share code with players (${playerCount}/${maxSlots} Connected)`}
+            {copied ? 'Code copied to clipboard!' : `Share code with friends (${playerCount}/${maxSlots} Connected)`}
           </p>
         </div>
 
@@ -207,7 +201,7 @@ export const LobbyView: React.FC = () => {
 
         {/* Action Controls & Countdown */}
         <div className="p-4 sm:p-6 pt-0 flex flex-col items-center">
-          <div className="min-h-[50px] flex items-center justify-center mb-3">
+          <div className="min-h-[46px] flex items-center justify-center mb-3">
             {countdown !== null ? (
               <div className="text-center animate-bounce">
                 <p className="text-xs text-sky-400 uppercase tracking-widest mb-0.5">Engaging in</p>
@@ -215,81 +209,42 @@ export const LobbyView: React.FC = () => {
                   {countdown}
                 </p>
               </div>
-            ) : isHost ? (
-              canLaunch ? (
-                <p className="text-emerald-400 text-[11px] text-center uppercase tracking-widest font-semibold">
-                  {playerCount === maxSlots 
-                    ? 'Lobby full! Ready to launch!' 
-                    : `${playerCount}/${maxSlots} pilots connected. Ready to launch or wait for more!`}
-                </p>
-              ) : (
-                <p className="text-gray-400 text-[11px] text-center uppercase tracking-widest animate-pulse">
-                  Waiting for at least 1 more pilot to connect... ({playerCount}/{maxSlots})
-                </p>
-              )
+            ) : canLaunch ? (
+              <p className="text-emerald-400 text-xs text-center uppercase tracking-widest font-bold animate-pulse">
+                {playerCount === maxSlots 
+                  ? 'All pilots connected! Click Launch Battle to start!' 
+                  : `${playerCount}/${maxSlots} pilots connected. Ready to start or wait for more!`}
+              </p>
             ) : (
-              <p className="text-sky-300 text-[11px] text-center uppercase tracking-widest animate-pulse">
-                Waiting for Host to launch the battle ({playerCount}/${maxSlots} connected)...
+              <p className="text-gray-400 text-xs text-center uppercase tracking-widest animate-pulse">
+                Waiting for other members to join with code <span className="text-sky-400 font-bold">{roomCode}</span> ({playerCount}/{maxSlots})
               </p>
             )}
           </div>
 
-          {/* Host Launch Battle Button */}
+          {/* Launch Battle Button - Visible to all pilots once at least 2 players have joined! */}
           {canLaunch && (
             <button
               onClick={handleLaunchBattle}
-              className="w-full py-3.5 px-4 mb-3.5 bg-gradient-to-r from-sky-600 via-cyan-500 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 active:scale-[0.99] text-white rounded-lg text-sm font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_25px_rgba(56,189,248,0.4)]"
+              className="w-full py-3.5 px-4 mb-3.5 bg-gradient-to-r from-sky-600 via-cyan-500 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 active:scale-[0.99] text-white rounded-lg text-sm sm:text-base font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-[0_0_25px_rgba(56,189,248,0.4)] animate-pulse"
             >
               <Play size={18} fill="currentColor" />
               <span>Launch Battle ({playerCount}/{maxSlots} Pilots)</span>
             </button>
           )}
 
-          {/* Switch to Solo Mode if waiting */}
+          {/* Switch to Solo Mode if waiting alone */}
           {playerCount === 1 && (
             <button 
               onClick={() => {
                 disconnect();
                 startSoloGame();
               }}
-              className="w-full py-2.5 px-4 mb-3 bg-emerald-950/60 border border-emerald-500/40 hover:bg-emerald-900/60 active:scale-[0.99] text-emerald-300 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+              className="w-full py-2.5 px-4 mb-2 bg-emerald-950/60 border border-emerald-500/40 hover:bg-emerald-900/60 active:scale-[0.99] text-emerald-300 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.2)]"
             >
               <Bot size={16} />
-              <span>Don't wait · Play Solo vs AI Drone (250 HP)</span>
+              <span>Play Solo vs AI Drone (Offline)</span>
             </button>
-          )}
-
-          {/* Server Connection Bar */}
-          <div className="w-full mb-3 px-3 py-1.5 bg-gray-950/70 border border-gray-800 rounded-lg flex items-center justify-between text-[10px]">
-            <div className="flex items-center gap-1.5 text-gray-400 truncate">
-              <Server size={12} className="text-sky-400 shrink-0" />
-              <span className="truncate">Server: <span className="text-gray-300">{serverUrl}</span></span>
-            </div>
-            <button
-              onClick={() => setEditingServer(!editingServer)}
-              className="text-sky-400 hover:text-sky-300 uppercase tracking-wider font-bold ml-2 shrink-0 cursor-pointer flex items-center gap-1"
-            >
-              <Edit2 size={10} />
-              <span>{editingServer ? 'Close' : 'Change'}</span>
-            </button>
-          </div>
-
-          {editingServer && (
-            <form onSubmit={handleSaveServer} className="w-full mb-3 flex gap-2">
-              <input
-                type="text"
-                value={customServerUrl}
-                onChange={(e) => setCustomServerUrl(e.target.value)}
-                placeholder="ws://localhost:3001"
-                className="flex-1 bg-gray-950 border border-gray-700 text-xs px-2.5 py-1.5 rounded text-white font-mono focus:border-sky-400 focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded uppercase tracking-wider cursor-pointer"
-              >
-                Save
-              </button>
-            </form>
           )}
         </div>
 

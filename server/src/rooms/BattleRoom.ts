@@ -259,14 +259,14 @@ export class BattleRoom extends Room {
       }
     });
 
-    // 5. Host Launch Match
+    // 5. Launch Match (allow when >= 2 players in room)
     this.onMessage('start_match', (client) => {
       const state = this.state as BattleStateSchema;
       const player = state.players.get(client.sessionId);
-      if (!player || !player.isHost) return;
+      if (!player) return;
 
-      const minPlayers = state.gameMode === '1v1' ? 2 : 2;
-      if (state.players.size >= minPlayers) {
+      const minPlayers = 2;
+      if (state.players.size >= minPlayers && (state.roomStatus === 'LOBBY' || state.roomStatus === 'WAITING')) {
         state.roomStatus = 'COUNTDOWN';
         state.countdown = GAME_CONFIG.COUNTDOWN_SECONDS;
         this.broadcast('match_countdown_started', { countdown: GAME_CONFIG.COUNTDOWN_SECONDS });
