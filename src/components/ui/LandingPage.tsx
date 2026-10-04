@@ -28,7 +28,10 @@ import {
   AlertCircle,
   ChevronUp,
   ChevronDown,
-  Info
+  Info,
+  Loader2,
+  Play,
+  Settings
 } from 'lucide-react';
 import { enterFullscreen, toggleFullscreen, useFullscreen } from '../../utils/fullscreenHelper';
 
@@ -37,6 +40,12 @@ const CHASSIS_CONFIG: Record<BattleColor, { hex: string; label: string; scheme: 
   blue: { hex: '#8CCDEB', label: 'Frost Interceptor', scheme: 'battle_blue' },
   red: { hex: '#ef4444', label: 'Crimson Raptor', scheme: 'battle_red' },
   green: { hex: '#107E57', label: 'Emerald Phantom', scheme: 'battle_green' }
+};
+
+const MODE_DESCRIPTIONS = {
+  '1v1': '1v1 Orbital Duel — 2 Pilots duel to 250 HP elimination.',
+  'FFA': '4-Player FFA — Free-for-all dogfight, last survivor wins.',
+  '2v2': '2v2 Squad Strike — 2 vs 2 coordinated team battle.'
 };
 
 const RotatingHeroShip: React.FC<{ scheme: SpaceshipPaintSchemeKey }> = ({ scheme }) => {
@@ -69,19 +78,24 @@ export const LandingPage: React.FC = () => {
     error,
     setError,
     serverUrl,
+    setServerUrl,
     isServerOnline,
     checkServerReachability,
     startSoloGame
   } = useMultiplayerStore();
 
-  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [joinModalOpen, setJoinModalOpen] = useState(false);
   const [soloModalOpen, setSoloModalOpen] = useState(false);
   const [intelDrawerOpen, setIntelDrawerOpen] = useState(false);
+  const [showModeInfo, setShowModeInfo] = useState(false);
+  const [showServerConfig, setShowServerConfig] = useState(false);
+  const [customServerUrl, setCustomServerUrl] = useState(serverUrl);
 
   const [joinCode, setJoinCode] = useState('');
   const [createCode, setCreateCode] = useState(() => generateRoomCode());
   const [copiedCode, setCopiedCode] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   const [isMuted, setIsMuted] = useState(() => nexusAudio.getMuted());
   
   const { isFullscreen } = useFullscreen();
@@ -102,22 +116,38 @@ export const LandingPage: React.FC = () => {
 
   const effectiveName = playerName.trim() || 'Cadet-01';
 
-  const handleCreate = () => {
+  // Smooth, direct Room Creation
+  const handleDirectCreate = async () => {
+    if (isCreating) return;
+    setIsCreating(true);
+    setError(null);
     nexusAudio.playConfirm();
     enterFullscreen();
-    createRoom(effectiveName, playerColor, gameMode, createCode);
+    const success = await createRoom(effectiveName, playerColor, gameMode, createCode);
+    setIsCreating(false);
+    if (!success) {
+      // Regenerate fresh code for next try
+      setCreateCode(generateRoomCode());
+    }
   };
 
-  const handleJoin = () => {
-    if (!joinCode.trim()) return;
+  const handleJoin = async () => {
+    if (!joinCode.trim() || isJoining) return;
+    setIsJoining(true);
+    setError(null);
     nexusAudio.playConfirm();
     enterFullscreen();
-    joinRoom(joinCode.trim().toUpperCase(), effectiveName, playerColor);
+    const success = await joinRoom(joinCode.trim().toUpperCase(), effectiveName, playerColor);
+    setIsJoining(false);
+    if (success) {
+      setJoinModalOpen(false);
+    }
   };
 
   const handleStartSolo = () => {
     nexusAudio.playConfirm();
     enterFullscreen();
+    setSoloModalOpen(false);
     startSoloGame();
   };
 
@@ -134,7 +164,7 @@ export const LandingPage: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-[#05070B] font-mono text-[#F4F7FA] select-none">
+    <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-[#05070B] font-mono text-[#F4F7FA] select-none flex flex-col justify-between p-2 sm:p-4 md:p-6">
       
       {/* =========================================================================
           1. BACKGROUND CINEMATIC SPACE VIDEO (85-90% HIGHLY VISIBLE, NO WHITE OVERLAYS)
@@ -170,133 +200,189 @@ export const LandingPage: React.FC = () => {
           />
         )}
 
-        {/* Controlled Midnight Black & Deep Navy Vignette (Subtle, ensures text readability on Left) */}
+        {/* Controlled Midnight Black & Deep Navy Vignette */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#05070B]/90 via-[#061A35]/45 to-transparent pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#05070B]/80 via-transparent to-[#05070B]/40 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#05070B]/85 via-transparent to-[#05070B]/40 pointer-events-none" />
       </div>
 
       {/* =========================================================================
-          2. FOREGROUND GAME LAUNCHER INTERFACE (LEFT 40% / RIGHT 60%)
+          2. TOP HEADER HUD
           ========================================================================= */}
-      <div className="relative z-10 w-full h-full flex flex-col justify-between p-3 sm:p-5 lg:p-6 pointer-events-none">
-        
-        {/* TOP HUD BAR */}
-        <header className="flex items-center justify-between w-full pointer-events-auto">
-          {/* Logo & Branding */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <img 
-              src={`${import.meta.env.BASE_URL}app-icon.png`} 
-              alt="Space Colony Frontier Emblem" 
-              className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg border border-[#8CCDEB]/40 shadow-[0_0_15px_rgba(140,205,235,0.25)] object-cover" 
-            />
-            <div>
-              <div className="flex items-center gap-1.5 leading-none">
-                <span className="text-sm sm:text-lg font-black tracking-wider text-[#F4F7FA]">SPACE COLONY</span>
-                <span className="text-sm sm:text-lg font-black tracking-wider text-[#FFCC00]">FRONTIER</span>
-              </div>
-              <p className="text-[8px] sm:text-[10px] uppercase tracking-[0.2em] text-[#8CCDEB]/80 mt-0.5">
-                BATTLE • EXPLORE • SURVIVE
-              </p>
+      <header className="relative z-20 flex items-center justify-between w-full shrink-0 mb-1 sm:mb-2 pointer-events-auto">
+        {/* Logo & Branding */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <img 
+            src={`${import.meta.env.BASE_URL}app-icon.png`} 
+            alt="Space Colony Frontier Emblem" 
+            className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg border border-[#8CCDEB]/40 shadow-[0_0_15px_rgba(140,205,235,0.25)] object-cover" 
+          />
+          <div>
+            <div className="flex items-center gap-1.5 leading-none">
+              <span className="text-sm sm:text-lg font-black tracking-wider text-[#F4F7FA]">SPACE COLONY</span>
+              <span className="text-sm sm:text-lg font-black tracking-wider text-[#FFCC00]">FRONTIER</span>
             </div>
+            <p className="text-[8px] sm:text-[10px] uppercase tracking-[0.2em] text-[#8CCDEB]/80 mt-0.5">
+              BATTLE • EXPLORE • SURVIVE
+            </p>
           </div>
+        </div>
 
-          {/* Right Top Status Tools */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div 
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#061A35]/80 border border-[#8CCDEB]/30 backdrop-blur-md text-[9px] sm:text-[10px] text-[#F4F7FA]"
-              title={serverUrl}
+        {/* Right Status & Tools */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
+          <button 
+            onClick={() => setShowServerConfig(!showServerConfig)}
+            className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-[#061A35]/80 hover:bg-[#0B315A] border border-[#8CCDEB]/30 backdrop-blur-md text-[9px] sm:text-[10px] text-[#F4F7FA] transition-colors cursor-pointer"
+            title="Click to check or configure server URL"
+          >
+            <span className={`w-2 h-2 rounded-full ${isServerOnline === false ? 'bg-red-500 animate-pulse' : 'bg-[#107E57] animate-pulse'}`} />
+            <span className="hidden sm:inline font-bold">
+              {isServerOnline === false ? 'OFFLINE' : 'SERVER ONLINE'}
+            </span>
+            <Settings size={11} className="text-[#8CCDEB]/70" />
+          </button>
+
+          <button 
+            onClick={toggleAudio} 
+            className="p-1.5 sm:p-2 rounded-lg bg-[#061A35]/80 hover:bg-[#0B315A] border border-[#8CCDEB]/30 text-[#8CCDEB] transition-colors cursor-pointer"
+            title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+          >
+            {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+          </button>
+
+          <button 
+            onClick={toggleFullscreen} 
+            className="p-1.5 sm:p-2 rounded-lg bg-[#061A35]/80 hover:bg-[#0B315A] border border-[#8CCDEB]/30 text-[#8CCDEB] transition-colors cursor-pointer"
+            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+          >
+            {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+          </button>
+        </div>
+      </header>
+
+      {/* Server URL Config Drawer (Collapsible) */}
+      {showServerConfig && (
+        <div className="relative z-30 mb-2 p-2.5 sm:p-3 bg-[#061A35]/95 border border-[#8CCDEB]/40 rounded-xl shadow-xl backdrop-blur-md text-xs pointer-events-auto max-w-lg mx-auto w-full animate-fadeIn">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="font-bold text-[#8CCDEB] uppercase text-[10px] tracking-wider">Multiplayer Server Endpoint</span>
+            <button onClick={() => setShowServerConfig(false)} className="text-slate-400 hover:text-white cursor-pointer">✕</button>
+          </div>
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              value={customServerUrl} 
+              onChange={(e) => setCustomServerUrl(e.target.value)}
+              placeholder="https://space-colony-frontier.onrender.com"
+              className="flex-1 bg-[#05070B] border border-[#8CCDEB]/40 rounded-lg px-2.5 py-1 text-xs text-[#F4F7FA] font-mono outline-none"
+            />
+            <button 
+              onClick={() => {
+                setServerUrl(customServerUrl.trim());
+                setShowServerConfig(false);
+              }}
+              className="px-3 py-1 bg-[#0B315A] hover:bg-[#0E3E73] border border-[#8CCDEB] text-white font-bold rounded-lg text-xs uppercase cursor-pointer"
             >
-              <span className={`w-2 h-2 rounded-full ${isServerOnline === false ? 'bg-red-500 animate-pulse' : 'bg-[#107E57] animate-pulse'}`} />
-              <span className="hidden sm:inline font-bold">
-                {isServerOnline === false ? 'OFFLINE' : 'SERVER ONLINE'}
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          3. MAIN RESPONSIVE BATTLE ARENA DISPLAY:
+             - Desktop: 40% Left Controls / 60% Right 3D Spaceship
+             - Landscape Mobile: Side-by-Side 50/50, scrollable controls
+             - Portrait Mobile: Compact spaceship banner on top, scrollable controls below
+          ========================================================================= */}
+      <main className="relative z-10 flex-1 w-full min-h-0 grid grid-cols-1 md:grid-cols-12 landscape:grid-cols-12 items-center my-auto pointer-events-none gap-2 sm:gap-4 overflow-hidden">
+        
+        {/* ========================================================
+            LEFT COLUMN: FULLY SCROLLABLE DETAILS & GAME ACTIONS
+            ======================================================== */}
+        <div 
+          className="md:col-span-5 landscape:col-span-5 flex flex-col justify-start md:justify-center gap-2 sm:gap-2.5 z-20 pointer-events-auto max-w-md w-full h-full max-h-full overflow-y-auto overscroll-contain touch-pan-y scroll-touch pr-1 sm:pr-2 order-2 md:order-1 landscape:order-1"
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        >
+          
+          {/* 1. Pilot Profile Card */}
+          <div className="bg-[#061A35]/85 border border-[#8CCDEB]/35 rounded-xl p-2.5 sm:p-3 backdrop-blur-md shadow-[0_4px_20px_rgba(5,7,11,0.7)] shrink-0">
+            <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#0B315A]">
+              <span className="text-[10px] font-bold text-[#8CCDEB] uppercase tracking-wider flex items-center gap-1.5">
+                <Radio size={12} className="text-[#8CCDEB] animate-pulse" />
+                PILOT PROFILE
+              </span>
+              <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#107E57]/20 border border-[#107E57]/40 text-emerald-300 font-bold uppercase tracking-wider">
+                READY
               </span>
             </div>
 
-            <button 
-              onClick={toggleAudio} 
-              className="p-2 sm:p-2.5 rounded-lg bg-[#061A35]/80 hover:bg-[#0B315A] border border-[#8CCDEB]/30 text-[#8CCDEB] transition-colors cursor-pointer"
-              title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
-            >
-              {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-            </button>
-
-            <button 
-              onClick={toggleFullscreen} 
-              className="p-2 sm:p-2.5 rounded-lg bg-[#061A35]/80 hover:bg-[#0B315A] border border-[#8CCDEB]/30 text-[#8CCDEB] transition-colors cursor-pointer"
-              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            >
-              {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
-            </button>
-          </div>
-        </header>
-
-        {/* MAIN BATTLE ARENA DISPLAY:
-            - Desktop & Landscape: Left 40% Controls / Right 60% 3D Spaceship
-            - Portrait Mobile: Top Spaceship / Bottom Compact Controls */}
-        <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-12 landscape:grid-cols-12 items-center my-auto min-h-0 pointer-events-none">
-          
-          {/* ========================================================
-              LEFT COLUMN: PLAYER PROFILE & GAME ACTIONS (40%)
-              ======================================================== */}
-          <div className="md:col-span-5 landscape:col-span-5 flex flex-col justify-center gap-3 sm:gap-3.5 z-20 pointer-events-auto max-w-md w-full order-2 md:order-1 landscape:order-1">
-            
-            {/* 1. Player Profile HUD Card */}
-            <div className="bg-[#061A35]/85 border border-[#8CCDEB]/35 rounded-xl p-3 sm:p-3.5 backdrop-blur-md shadow-[0_4px_25px_rgba(5,7,11,0.7)]">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#0B315A]">
-                <span className="text-[10px] font-bold text-[#8CCDEB] uppercase tracking-wider flex items-center gap-1.5">
-                  <Radio size={12} className="text-[#8CCDEB] animate-pulse" />
-                  PILOT PROFILE
-                </span>
-                <span className="text-[9px] px-2 py-0.5 rounded bg-[#107E57]/20 border border-[#107E57]/40 text-emerald-300 font-bold uppercase tracking-wider">
-                  ACTIVE
-                </span>
-              </div>
-
-              {/* Callsign Input */}
-              <div className="flex items-center gap-2 mb-2.5">
-                <input 
-                  type="text" 
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Enter Callsign"
-                  maxLength={15}
-                  className="flex-1 bg-[#05070B]/90 border border-[#8CCDEB]/40 focus:border-[#8CCDEB] px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold text-[#F4F7FA] outline-none transition-colors"
-                />
-              </div>
-
-              {/* Hull Scheme Selector */}
-              <div>
-                <div className="flex items-center justify-between text-[9px] text-[#8CCDEB]/80 uppercase tracking-widest mb-1.5 font-bold">
-                  <span>CHASSIS PAINT</span>
-                  <span className="text-[#FFCC00]">{CHASSIS_CONFIG[playerColor].label}</span>
-                </div>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(Object.keys(CHASSIS_CONFIG) as BattleColor[]).map((c) => {
-                    const isSelected = playerColor === c;
-                    return (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => {
-                          nexusAudio.playClick(1200);
-                          setPlayerColor(c);
-                        }}
-                        className={`py-1 px-1.5 rounded-md border flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                          isSelected
-                            ? 'border-[#FFCC00] bg-[#FFB000]/15 text-[#FFCC00] shadow-[0_0_8px_rgba(255,204,0,0.3)]'
-                            : 'border-[#0B315A] bg-[#05070B]/60 text-slate-400 hover:border-[#8CCDEB]/40'
-                        }`}
-                      >
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHASSIS_CONFIG[c].hex }} />
-                        <span className="text-[9px] uppercase font-bold">{c.slice(0, 3)}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+            {/* Callsign Input */}
+            <div className="mb-2">
+              <input 
+                type="text" 
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                placeholder="Enter Callsign (Cadet-01)"
+                maxLength={15}
+                className="w-full bg-[#05070B]/90 border border-[#8CCDEB]/40 focus:border-[#8CCDEB] px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold text-[#F4F7FA] outline-none transition-colors"
+              />
             </div>
 
-            {/* 2. Combat Mode Selector */}
+            {/* Hull Scheme Selector */}
+            <div>
+              <div className="flex items-center justify-between text-[9px] text-[#8CCDEB]/80 uppercase tracking-widest mb-1 font-bold">
+                <span>CHASSIS PAINT</span>
+                <span className="text-[#FFCC00]">{CHASSIS_CONFIG[playerColor].label}</span>
+              </div>
+              <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
+                {(Object.keys(CHASSIS_CONFIG) as BattleColor[]).map((c) => {
+                  const isSelected = playerColor === c;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => {
+                        nexusAudio.playClick(1200);
+                        setPlayerColor(c);
+                      }}
+                      className={`py-1 px-1 rounded-md border flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                        isSelected
+                          ? 'border-[#FFCC00] bg-[#FFB000]/15 text-[#FFCC00] shadow-[0_0_8px_rgba(255,204,0,0.3)]'
+                          : 'border-[#0B315A] bg-[#05070B]/60 text-slate-400 hover:border-[#8CCDEB]/40'
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CHASSIS_CONFIG[c].hex }} />
+                      <span className="text-[9px] uppercase font-bold">{c.slice(0, 3)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Combat Mode Selector with top-right 'i' info popover */}
+          <div className="bg-[#061A35]/85 border border-[#8CCDEB]/35 rounded-xl p-2 sm:p-2.5 backdrop-blur-md shadow-md shrink-0 relative">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[9px] font-bold text-[#8CCDEB] uppercase tracking-wider">
+                COMBAT DOCTRINE
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowModeInfo(!showModeInfo)}
+                className="text-[#FFCC00] hover:text-[#FFB000] p-0.5 rounded cursor-pointer"
+                title="Combat Mode Info"
+              >
+                <Info size={13} />
+              </button>
+            </div>
+
+            {/* Info Popover */}
+            {showModeInfo && (
+              <div className="p-2 mb-2 bg-[#05070B] border border-[#8CCDEB]/40 rounded-lg text-[10px] text-slate-300 leading-tight">
+                {MODE_DESCRIPTIONS[gameMode]}
+              </div>
+            )}
+
+            {/* Clean Mode Buttons (No extra descriptive text inside buttons) */}
             <div className="grid grid-cols-3 gap-1.5">
               <button
                 type="button"
@@ -304,17 +390,14 @@ export const LandingPage: React.FC = () => {
                   nexusAudio.playClick(1000);
                   setGameMode('1v1');
                 }}
-                className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer ${
+                className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   gameMode === '1v1'
-                    ? 'border-[#8CCDEB] bg-[#0B315A] text-[#F4F7FA] shadow-[0_0_12px_rgba(140,205,235,0.3)] font-bold'
-                    : 'border-[#0B315A] bg-[#061A35]/60 text-slate-400 hover:border-[#8CCDEB]/30'
+                    ? 'border-[#8CCDEB] bg-[#0B315A] text-[#F4F7FA] shadow-[0_0_12px_rgba(140,205,235,0.3)] font-black'
+                    : 'border-[#0B315A] bg-[#05070B]/60 text-slate-400 hover:border-[#8CCDEB]/30'
                 }`}
               >
-                <div className="flex items-center justify-center gap-1">
-                  <Swords size={12} className={gameMode === '1v1' ? 'text-[#8CCDEB]' : 'text-slate-500'} />
-                  <span className="text-[10px] font-black">1V1</span>
-                </div>
-                <span className="text-[8px] opacity-75">Duel</span>
+                <Swords size={13} className={gameMode === '1v1' ? 'text-[#8CCDEB]' : 'text-slate-500'} />
+                <span className="text-[11px] font-black tracking-wider">1V1</span>
               </button>
 
               <button
@@ -323,17 +406,14 @@ export const LandingPage: React.FC = () => {
                   nexusAudio.playClick(1100);
                   setGameMode('FFA');
                 }}
-                className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer ${
+                className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   gameMode === 'FFA'
-                    ? 'border-[#8CCDEB] bg-[#0B315A] text-[#F4F7FA] shadow-[0_0_12px_rgba(140,205,235,0.3)] font-bold'
-                    : 'border-[#0B315A] bg-[#061A35]/60 text-slate-400 hover:border-[#8CCDEB]/30'
+                    ? 'border-[#8CCDEB] bg-[#0B315A] text-[#F4F7FA] shadow-[0_0_12px_rgba(140,205,235,0.3)] font-black'
+                    : 'border-[#0B315A] bg-[#05070B]/60 text-slate-400 hover:border-[#8CCDEB]/30'
                 }`}
               >
-                <div className="flex items-center justify-center gap-1">
-                  <Crosshair size={12} className={gameMode === 'FFA' ? 'text-[#8CCDEB]' : 'text-slate-500'} />
-                  <span className="text-[10px] font-black">FFA</span>
-                </div>
-                <span className="text-[8px] opacity-75">4 Pilots</span>
+                <Crosshair size={13} className={gameMode === 'FFA' ? 'text-[#8CCDEB]' : 'text-slate-500'} />
+                <span className="text-[11px] font-black tracking-wider">FFA</span>
               </button>
 
               <button
@@ -342,52 +422,106 @@ export const LandingPage: React.FC = () => {
                   nexusAudio.playClick(1200);
                   setGameMode('2v2');
                 }}
-                className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer ${
+                className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   gameMode === '2v2'
-                    ? 'border-[#8CCDEB] bg-[#0B315A] text-[#F4F7FA] shadow-[0_0_12px_rgba(140,205,235,0.3)] font-bold'
+                    ? 'border-[#8CCDEB] bg-[#0B315A] text-[#F4F7FA] shadow-[0_0_12px_rgba(140,205,235,0.3)] font-black'
                     : 'border-[#0B315A] bg-[#061A35]/60 text-slate-400 hover:border-[#8CCDEB]/30'
                 }`}
               >
-                <div className="flex items-center justify-center gap-1">
-                  <Shield size={12} className={gameMode === '2v2' ? 'text-[#8CCDEB]' : 'text-slate-500'} />
-                  <span className="text-[10px] font-black">2V2</span>
-                </div>
-                <span className="text-[8px] opacity-75">Squad</span>
+                <Shield size={13} className={gameMode === '2v2' ? 'text-[#8CCDEB]' : 'text-slate-500'} />
+                <span className="text-[11px] font-black tracking-wider">2V2</span>
               </button>
             </div>
+          </div>
 
-            {/* Error Banner */}
-            {error && (
-              <div className="p-2.5 bg-[#05070B]/90 border border-red-500/60 rounded-lg text-red-300 text-[11px] flex items-center justify-between shadow-lg">
-                <div className="flex items-center gap-2 min-w-0">
-                  <AlertCircle size={14} className="text-red-400 shrink-0" />
-                  <span className="truncate">{error}</span>
-                </div>
+          {/* 3. Stable Room Code Preview Box */}
+          <div className="bg-[#05070B]/80 border border-[#8CCDEB]/30 rounded-xl p-2 sm:p-2.5 flex items-center justify-between shrink-0 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] uppercase font-bold text-[#8CCDEB]">SECTOR KEY:</span>
+              <span className="font-black text-sm sm:text-base text-[#FFCC00] tracking-widest">{createCode}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                className="px-2 py-1 rounded bg-[#061A35] hover:bg-[#0B315A] border border-[#8CCDEB]/40 text-[#8CCDEB] text-[10px] font-bold uppercase flex items-center gap-1 cursor-pointer transition-colors"
+                title="Copy Room Key"
+              >
+                {copiedCode ? <Check size={12} className="text-[#22c55e]" /> : <Copy size={12} />}
+                <span>{copiedCode ? 'COPIED' : 'COPY'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreateCode(generateRoomCode());
+                  nexusAudio.playClick(1100);
+                }}
+                className="p-1 rounded bg-[#061A35] hover:bg-[#0B315A] border border-[#8CCDEB]/40 text-[#FFCC00] cursor-pointer transition-colors"
+                title="Regenerate Sector Key"
+              >
+                <RotateCw size={12} />
+              </button>
+            </div>
+          </div>
+
+          {/* Error Banner */}
+          {error && (
+            <div className="p-2 sm:p-2.5 bg-[#05070B]/95 border border-red-500/80 rounded-xl text-red-300 text-[10px] sm:text-[11px] flex flex-col gap-1.5 shadow-xl shrink-0">
+              <div className="flex items-start gap-1.5">
+                <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                <span className="flex-1 leading-snug">{error}</span>
                 <button 
                   onClick={() => setError(null)}
-                  className="text-red-400 font-bold ml-2 hover:bg-white/10 px-1 rounded cursor-pointer"
+                  className="text-red-400 font-bold hover:bg-white/10 px-1 rounded cursor-pointer"
                 >
                   ✕
                 </button>
               </div>
-            )}
+              <div className="flex items-center gap-2 mt-0.5">
+                <button
+                  type="button"
+                  onClick={handleDirectCreate}
+                  className="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded font-bold text-[9px] uppercase tracking-wider cursor-pointer"
+                >
+                  Retry Connection
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStartSolo}
+                  className="px-2.5 py-1 bg-[#107E57] hover:bg-emerald-600 text-white rounded font-bold text-[9px] uppercase tracking-wider cursor-pointer"
+                >
+                  Play Solo vs AI Drone
+                </button>
+              </div>
+            </div>
+          )}
 
-            {/* 3. Primary Game Action Buttons */}
-            <div className="flex flex-col gap-2">
+          {/* 4. Primary Game Action Buttons (Guaranteed Visible on Mobile & Landscape) */}
+          <div className="flex flex-col gap-2 shrink-0 pt-0.5">
+            
+            {/* [ CREATE ROOM ] - Primary CTA */}
+            <button
+              type="button"
+              onClick={handleDirectCreate}
+              disabled={isCreating}
+              className="w-full py-3 sm:py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#0B315A] via-[#08264A] to-[#0B315A] hover:from-[#0E3E73] hover:to-[#0E3E73] active:scale-[0.99] border-2 border-[#8CCDEB] text-[#F4F7FA] font-black text-xs sm:text-sm tracking-[0.2em] uppercase transition-all shadow-[0_0_20px_rgba(140,205,235,0.25)] flex items-center justify-center gap-2 cursor-pointer group"
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 size={16} className="text-[#FFCC00] animate-spin" />
+                  <span>CREATING ROOM...</span>
+                </>
+              ) : (
+                <>
+                  <Users size={16} className="text-[#FFCC00] group-hover:scale-110 transition-transform" />
+                  <span>CREATE ROOM</span>
+                </>
+              )}
+            </button>
+
+            {/* 2-Column Action Grid: [ JOIN ROOM ] & [ SOLO MODE ] SIDE-BY-SIDE */}
+            <div className="grid grid-cols-2 gap-2">
               
-              {/* [ CREATE ROOM ] */}
-              <button
-                type="button"
-                onClick={() => {
-                  nexusAudio.playClick(1200);
-                  setCreateModalOpen(true);
-                }}
-                className="w-full py-3 sm:py-3.5 px-5 rounded-xl bg-gradient-to-r from-[#0B315A] via-[#08264A] to-[#0B315A] hover:from-[#0E3E73] hover:to-[#0E3E73] active:scale-[0.99] border-2 border-[#8CCDEB] text-[#F4F7FA] font-black text-xs sm:text-sm tracking-[0.2em] uppercase transition-all shadow-[0_0_20px_rgba(140,205,235,0.25)] flex items-center justify-center gap-2.5 cursor-pointer group"
-              >
-                <Users size={16} className="text-[#FFCC00] group-hover:scale-110 transition-transform" />
-                <span>CREATE ROOM</span>
-              </button>
-
               {/* [ JOIN ROOM ] */}
               <button
                 type="button"
@@ -395,122 +529,122 @@ export const LandingPage: React.FC = () => {
                   nexusAudio.playClick(1000);
                   setJoinModalOpen(true);
                 }}
-                className="w-full py-2.5 sm:py-3 px-5 rounded-xl bg-[#05070B]/85 hover:bg-[#061A35] active:scale-[0.99] border border-[#8CCDEB]/60 hover:border-[#8CCDEB] text-[#8CCDEB] hover:text-[#F4F7FA] font-black text-xs sm:text-sm tracking-[0.2em] uppercase transition-all shadow-md flex items-center justify-center gap-2.5 cursor-pointer"
+                className="py-2.5 px-3 rounded-xl bg-[#05070B]/85 hover:bg-[#061A35] active:scale-[0.99] border border-[#8CCDEB]/60 hover:border-[#8CCDEB] text-[#8CCDEB] hover:text-[#F4F7FA] font-black text-[11px] sm:text-xs tracking-wider uppercase transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <ArrowRight size={16} />
+                <ArrowRight size={14} />
                 <span>JOIN ROOM</span>
               </button>
 
-              {/* [ SOLO VS AI ] */}
+              {/* [ SOLO MODE ] - ALWAYS VISIBLE */}
               <button
                 type="button"
                 onClick={() => {
                   nexusAudio.playClick(900);
                   setSoloModalOpen(true);
                 }}
-                className="w-full py-2 px-4 rounded-lg bg-[#061A35]/50 hover:bg-[#08264A] active:scale-[0.99] border border-[#0B315A] text-[#8CCDEB]/80 hover:text-[#8CCDEB] font-bold text-[10px] tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                className="py-2.5 px-3 rounded-xl bg-[#107E57]/20 hover:bg-[#107E57]/40 active:scale-[0.99] border border-[#107E57]/60 hover:border-emerald-400 text-emerald-300 hover:text-white font-black text-[11px] sm:text-xs tracking-wider uppercase transition-all shadow-[0_0_12px_rgba(16,126,87,0.25)] flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <Bot size={13} className="text-[#107E57]" />
-                <span>SOLO TRAINING (AI DRONE)</span>
+                <Bot size={15} className="text-[#22c55e]" />
+                <span>SOLO MODE</span>
               </button>
-            </div>
-
-          </div>
-
-          {/* ========================================================
-              RIGHT COLUMN: 3D SPACESHIP & SPACE ENVIRONMENT (60%)
-              ======================================================== */}
-          <div className="md:col-span-7 landscape:col-span-7 h-[220px] sm:h-[300px] md:h-full landscape:h-full flex items-center justify-center relative order-1 md:order-2 landscape:order-2 pointer-events-auto">
-            
-            {/* Subtle Aerospace Holographic Reticle */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-40">
-              <div className="w-[260px] h-[260px] sm:w-[380px] sm:h-[380px] rounded-full border border-[#8CCDEB]/20 animate-[spin_80s_linear_infinite]" />
-              <div className="absolute w-[200px] h-[200px] sm:w-[300px] sm:h-[300px] rounded-full border border-dashed border-[#8CCDEB]/25 animate-[spin_50s_linear_infinite_reverse]" />
-            </div>
-
-            {/* Three.js Interactive 3D Canvas */}
-            <div className="w-full h-full max-h-[58vh] aspect-square flex items-center justify-center relative">
-              <Canvas 
-                dpr={[1, 2]}
-                camera={{ position: [0, 1.4, 4.8], fov: 45 }} 
-                gl={{ alpha: true, antialias: true }}
-                className="w-full h-full z-10 relative cursor-grab active:cursor-grabbing"
-              >
-                <ambientLight intensity={0.9} />
-                <directionalLight position={[6, 8, 5]} intensity={2.0} color="#F4F7FA" />
-                <spotLight position={[-5, 6, -3]} intensity={1.6} angle={0.6} penumbra={1} color={CHASSIS_CONFIG[playerColor].hex} />
-                <pointLight position={[0, -2, 4]} intensity={0.9} color="#8CCDEB" />
-                <React.Suspense fallback={null}>
-                  <RotatingHeroShip scheme={CHASSIS_CONFIG[playerColor].scheme} />
-                </React.Suspense>
-              </Canvas>
-            </div>
-
-            {/* Subtle Telemetry Overlay */}
-            <div className="absolute bottom-2 right-2 text-right pointer-events-none font-mono text-[9px] text-[#8CCDEB]/60 hidden sm:block">
-              <p>SECTOR // FRONTIER-04</p>
-              <p className="text-[#FFCC00]/70">ARENA 300M ENGAGED</p>
             </div>
 
           </div>
 
         </div>
 
-        {/* BOTTOM HUD / INTEL DRAWER TRIGGER */}
-        <footer className="w-full flex items-center justify-between pointer-events-auto border-t border-[#0B315A]/60 pt-2 text-[10px] text-[#8CCDEB]/70">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#107E57]" />
-            <span className="hidden sm:inline font-mono">WASD / JOYSTICK TO FLY • MOUSE / TOUCH TO FIRE</span>
-            <span className="sm:hidden font-mono">TOUCH JOYSTICK TO FLY</span>
+        {/* ========================================================
+            RIGHT COLUMN: 3D HERO SPACESHIP & SPACE ENVIRONMENT (60%)
+            ======================================================== */}
+        <div className="md:col-span-7 landscape:col-span-7 h-[130px] sm:h-[220px] md:h-full landscape:h-full flex items-center justify-center relative order-1 md:order-2 landscape:order-2 pointer-events-auto">
+          
+          {/* Holographic Aerospace Reticle */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-40">
+            <div className="w-[180px] h-[180px] sm:w-[320px] sm:h-[320px] md:w-[380px] md:h-[380px] rounded-full border border-[#8CCDEB]/20 animate-[spin_80s_linear_infinite]" />
+            <div className="absolute w-[130px] h-[130px] sm:w-[240px] sm:h-[240px] md:w-[300px] md:h-[300px] rounded-full border border-dashed border-[#8CCDEB]/25 animate-[spin_50s_linear_infinite_reverse]" />
           </div>
 
-          {/* Toggle Tactical Intel Slide-up */}
-          <button 
-            onClick={() => setIntelDrawerOpen(!intelDrawerOpen)}
-            className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#061A35]/80 hover:bg-[#0B315A] border border-[#8CCDEB]/30 text-[#F4F7FA] font-bold uppercase tracking-wider transition-colors cursor-pointer"
-          >
-            <Info size={12} className="text-[#FFCC00]" />
-            <span>TACTICAL INTEL</span>
-            {intelDrawerOpen ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
-          </button>
-
-          <div className="hidden sm:block text-[#8CCDEB]/60">
-            SYS // 60HZ TICK • V2.4.0
+          {/* Three.js Interactive 3D Canvas */}
+          <div className="w-full h-full max-h-[58vh] aspect-square flex items-center justify-center relative">
+            <Canvas 
+              dpr={[1, 2]}
+              camera={{ position: [0, 1.4, 4.8], fov: 45 }} 
+              gl={{ alpha: true, antialias: true }}
+              className="w-full h-full z-10 relative cursor-grab active:cursor-grabbing"
+            >
+              <ambientLight intensity={0.9} />
+              <directionalLight position={[6, 8, 5]} intensity={2.0} color="#F4F7FA" />
+              <spotLight position={[-5, 6, -3]} intensity={1.6} angle={0.6} penumbra={1} color={CHASSIS_CONFIG[playerColor].hex} />
+              <pointLight position={[0, -2, 4]} intensity={0.9} color="#8CCDEB" />
+              <React.Suspense fallback={null}>
+                <RotatingHeroShip scheme={CHASSIS_CONFIG[playerColor].scheme} />
+              </React.Suspense>
+            </Canvas>
           </div>
-        </footer>
 
-      </div>
+          {/* Subtle Telemetry Overlay */}
+          <div className="absolute bottom-1 right-1 text-right pointer-events-none font-mono text-[9px] text-[#8CCDEB]/60 hidden sm:block">
+            <p>SECTOR // FRONTIER-04</p>
+            <p className="text-[#FFCC00]/70">ARENA 300M READY</p>
+          </div>
+
+        </div>
+
+      </main>
 
       {/* =========================================================================
-          3. SECONDARY TACTICAL INTEL DRAWER (LIMITED / PARTIAL GAME-STYLE SCROLL)
+          4. BOTTOM HUD / TACTICAL INTEL TRIGGER
+          ========================================================================= */}
+      <footer className="relative z-20 w-full flex items-center justify-between pointer-events-auto border-t border-[#0B315A]/60 pt-1.5 sm:pt-2 text-[9px] sm:text-[10px] text-[#8CCDEB]/70 shrink-0">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#107E57]" />
+          <span className="hidden sm:inline font-mono">WASD / JOYSTICK TO FLY • MOUSE / TOUCH TO FIRE</span>
+          <span className="sm:hidden font-mono">TOUCH JOYSTICK TO FLY</span>
+        </div>
+
+        {/* Toggle Tactical Intel Slide-up */}
+        <button 
+          onClick={() => setIntelDrawerOpen(!intelDrawerOpen)}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#061A35]/80 hover:bg-[#0B315A] border border-[#8CCDEB]/30 text-[#F4F7FA] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+        >
+          <Info size={11} className="text-[#FFCC00]" />
+          <span>TACTICAL INTEL</span>
+          {intelDrawerOpen ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+        </button>
+
+        <div className="hidden sm:block text-[#8CCDEB]/60">
+          SYS // 60HZ TICK • V2.4.0
+        </div>
+      </footer>
+
+      {/* =========================================================================
+          5. TACTICAL INTEL DRAWER (SLIDE-UP MODAL)
           ========================================================================= */}
       {intelDrawerOpen && (
         <div className="fixed inset-0 z-40 bg-[#05070B]/80 backdrop-blur-md flex items-end justify-center animate-fadeIn pointer-events-auto">
           <div 
-            className="w-full max-w-4xl bg-[#061A35]/95 border-t-2 border-[#8CCDEB] rounded-t-2xl p-5 sm:p-7 max-h-[75vh] overflow-y-auto overscroll-contain shadow-2xl flex flex-col gap-5 text-[#F4F7FA]"
+            className="w-full max-w-4xl bg-[#061A35]/95 border-t-2 border-[#8CCDEB] rounded-t-2xl p-4 sm:p-6 max-h-[75vh] overflow-y-auto overscroll-contain shadow-2xl flex flex-col gap-4 text-[#F4F7FA]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-[#0B315A]">
+            <div className="flex items-center justify-between pb-2 border-b border-[#0B315A]">
               <div>
-                <h3 className="text-base sm:text-lg font-black tracking-wider text-[#F4F7FA]">
+                <h3 className="text-sm sm:text-base font-black tracking-wider text-[#F4F7FA]">
                   TACTICAL INTEL & DOCTRINES
                 </h3>
                 <p className="text-[10px] text-[#8CCDEB] uppercase tracking-widest">
-                  Spacecraft combat specifications & operational protocols
+                  Authoritative combat parameters & operational rules
                 </p>
               </div>
               <button 
                 onClick={() => setIntelDrawerOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#0B315A] cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#0B315A] cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Intel Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              
-              <div className="p-3.5 rounded-xl bg-[#05070B]/70 border border-[#0B315A]">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3 rounded-xl bg-[#05070B]/70 border border-[#0B315A]">
                 <div className="text-[#FFCC00] font-bold text-xs uppercase mb-1 flex items-center gap-1.5">
                   <Zap size={14} /> RAPID PLASMA BOLTS
                 </div>
@@ -519,7 +653,7 @@ export const LandingPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-[#05070B]/70 border border-[#0B315A]">
+              <div className="p-3 rounded-xl bg-[#05070B]/70 border border-[#0B315A]">
                 <div className="text-[#8CCDEB] font-bold text-xs uppercase mb-1 flex items-center gap-1.5">
                   <Crosshair size={14} /> DIRECTED LASER BEAM
                 </div>
@@ -528,7 +662,7 @@ export const LandingPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-[#05070B]/70 border border-[#0B315A]">
+              <div className="p-3 rounded-xl bg-[#05070B]/70 border border-[#0B315A]">
                 <div className="text-amber-400 font-bold text-xs uppercase mb-1 flex items-center gap-1.5">
                   <Radio size={14} /> HIGH-YIELD SOLAR BURST
                 </div>
@@ -536,14 +670,13 @@ export const LandingPage: React.FC = () => {
                   30 HP heavy piercing blast with 10.0s cooldown. Devastating punch through asteroid cover.
                 </p>
               </div>
-
             </div>
 
-            <div className="p-3 rounded-xl bg-[#08264A]/60 border border-[#8CCDEB]/20 text-[11px] text-slate-300 flex items-center justify-between">
+            <div className="p-2.5 rounded-xl bg-[#08264A]/60 border border-[#8CCDEB]/20 text-[11px] text-slate-300 flex items-center justify-between">
               <span>Authoritative Colyseus Server • 60Hz State Synchronization</span>
               <button
                 onClick={() => setIntelDrawerOpen(false)}
-                className="px-4 py-1.5 bg-[#0B315A] hover:bg-[#0E3E73] text-[#F4F7FA] font-bold uppercase rounded-lg text-[10px] cursor-pointer"
+                className="px-3 py-1 bg-[#0B315A] hover:bg-[#0E3E73] text-[#F4F7FA] font-bold uppercase rounded-lg text-[10px] cursor-pointer"
               >
                 Close Intel
               </button>
@@ -553,200 +686,24 @@ export const LandingPage: React.FC = () => {
       )}
 
       {/* =========================================================================
-          4. CREATE ROOM GAME MODAL (MIDNIGHT BLACK + DEEP NAVY + CYAN + GOLD)
-          ========================================================================= */}
-      {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#05070B]/80 backdrop-blur-md animate-fadeIn pointer-events-auto">
-          <div 
-            className="w-full max-w-lg bg-[#061A35]/95 border-2 border-[#8CCDEB]/60 rounded-2xl shadow-[0_0_40px_rgba(5,7,11,0.9)] overflow-hidden flex flex-col max-h-[92vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="p-4 sm:p-5 pb-3 border-b border-[#0B315A] flex items-center justify-between bg-[#08264A]/80">
-              <div className="flex items-center gap-2">
-                <Users size={18} className="text-[#FFCC00]" />
-                <div>
-                  <h3 className="text-sm sm:text-base font-black tracking-wider text-[#F4F7FA]">
-                    CREATE FRONTIER ROOM
-                  </h3>
-                  <p className="text-[10px] text-[#8CCDEB]">
-                    Authoritative multiplayer combat room
-                  </p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setCreateModalOpen(false)}
-                className="p-1 rounded text-slate-400 hover:text-white cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto">
-              
-              {/* Prominent Generated Room Code */}
-              <div className="p-3.5 rounded-xl bg-[#05070B]/80 border border-[#8CCDEB]/40 space-y-1.5">
-                <div className="flex items-center justify-between text-[10px] uppercase font-bold text-[#8CCDEB]">
-                  <span>ROOM CODE</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCreateCode(generateRoomCode());
-                      nexusAudio.playClick(1100);
-                    }}
-                    className="flex items-center gap-1 text-[#FFCC00] hover:underline cursor-pointer"
-                  >
-                    <RotateCw size={11} />
-                    <span>Regenerate</span>
-                  </button>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-[#061A35] border border-[#8CCDEB]/50 rounded-lg py-2 px-3 text-center font-black text-2xl tracking-[0.25em] text-[#FFCC00]">
-                    {createCode}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleCopyCode}
-                    className="px-3.5 py-2.5 rounded-lg bg-[#0B315A] hover:bg-[#0E3E73] border border-[#8CCDEB]/60 text-[#8CCDEB] hover:text-[#F4F7FA] font-bold text-xs uppercase flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
-                  >
-                    {copiedCode ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
-                    <span>{copiedCode ? 'COPIED' : 'COPY'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Mode Selection */}
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1">
-                  COMBAT DOCTRINE
-                </label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setGameMode('1v1')}
-                    className={`py-2 px-2 rounded-lg border text-center transition-all cursor-pointer ${
-                      gameMode === '1v1'
-                        ? 'border-[#8CCDEB] bg-[#0B315A] text-[#F4F7FA] font-bold'
-                        : 'border-[#0B315A] bg-[#05070B]/60 text-slate-400'
-                    }`}
-                  >
-                    <p className="text-xs font-black">1V1</p>
-                    <p className="text-[8px] opacity-75">Duel (2P)</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setGameMode('FFA')}
-                    className={`py-2 px-2 rounded-lg border text-center transition-all cursor-pointer ${
-                      gameMode === 'FFA'
-                        ? 'border-[#8CCDEB] bg-[#0B315A] text-[#F4F7FA] font-bold'
-                        : 'border-[#0B315A] bg-[#05070B]/60 text-slate-400'
-                    }`}
-                  >
-                    <p className="text-xs font-black">FFA</p>
-                    <p className="text-[8px] opacity-75">4 Pilots</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setGameMode('2v2')}
-                    className={`py-2 px-2 rounded-lg border text-center transition-all cursor-pointer ${
-                      gameMode === '2v2'
-                        ? 'border-[#8CCDEB] bg-[#0B315A] text-[#F4F7FA] font-bold'
-                        : 'border-[#0B315A] bg-[#05070B]/60 text-slate-400'
-                    }`}
-                  >
-                    <p className="text-xs font-black">2V2</p>
-                    <p className="text-[8px] opacity-75">Squads</p>
-                  </button>
-                </div>
-              </div>
-
-              {/* Pilot Callsign */}
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1">
-                  CALLSIGN
-                </label>
-                <input 
-                  type="text" 
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Enter Callsign"
-                  maxLength={15}
-                  className="w-full bg-[#05070B]/90 border border-[#8CCDEB]/40 focus:border-[#8CCDEB] p-2.5 rounded-lg text-xs font-bold text-[#F4F7FA] outline-none"
-                />
-              </div>
-
-              {/* Hull Chassis Paint Scheme */}
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1">
-                  CHASSIS SCHEME
-                </label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(Object.keys(CHASSIS_CONFIG) as BattleColor[]).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setPlayerColor(c)}
-                      className={`p-1.5 rounded-lg border flex flex-col items-center gap-1 cursor-pointer ${
-                        playerColor === c
-                          ? 'border-[#FFCC00] bg-[#FFB000]/15'
-                          : 'border-[#0B315A] bg-[#05070B]/60'
-                      }`}
-                    >
-                      <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: CHASSIS_CONFIG[c].hex }} />
-                      <span className="text-[9px] uppercase font-bold text-[#F4F7FA]">{c}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 sm:p-5 pt-2 border-t border-[#0B315A] flex items-center justify-end gap-2.5 bg-[#08264A]/80">
-              <button
-                type="button"
-                onClick={() => setCreateModalOpen(false)}
-                className="px-4 py-2 rounded-lg text-xs font-bold uppercase text-slate-300 hover:text-white cursor-pointer"
-              >
-                BACK
-              </button>
-              <button
-                type="button"
-                onClick={handleCreate}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#0B315A] to-[#08264A] hover:from-[#0E3E73] hover:to-[#0E3E73] border-2 border-[#8CCDEB] text-[#F4F7FA] font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(140,205,235,0.3)] flex items-center gap-2 cursor-pointer"
-              >
-                <Users size={15} className="text-[#FFCC00]" />
-                <span>ENTER BATTLE</span>
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          5. JOIN ROOM GAME MODAL (MIDNIGHT BLACK + DEEP NAVY + CYAN)
+          6. JOIN ROOM GAME MODAL (MIDNIGHT BLACK + DEEP NAVY + CYAN)
           ========================================================================= */}
       {joinModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#05070B]/80 backdrop-blur-md animate-fadeIn pointer-events-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#05070B]/85 backdrop-blur-md animate-fadeIn pointer-events-auto">
           <div 
-            className="w-full max-w-lg bg-[#061A35]/95 border-2 border-[#8CCDEB]/60 rounded-2xl shadow-[0_0_40px_rgba(5,7,11,0.9)] overflow-hidden flex flex-col max-h-[92vh]"
+            className="w-full max-w-lg bg-[#061A35]/95 border-2 border-[#8CCDEB]/60 rounded-2xl shadow-[0_0_40px_rgba(5,7,11,0.9)] overflow-hidden flex flex-col max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 pb-3 border-b border-[#0B315A] flex items-center justify-between bg-[#08264A]/80">
+            <div className="p-3.5 sm:p-4 pb-2.5 border-b border-[#0B315A] flex items-center justify-between bg-[#08264A]/80">
               <div className="flex items-center gap-2">
-                <ArrowRight size={18} className="text-[#8CCDEB]" />
+                <ArrowRight size={16} className="text-[#8CCDEB]" />
                 <div>
                   <h3 className="text-sm sm:text-base font-black tracking-wider text-[#F4F7FA]">
-                    JOIN FRONTIER
+                    JOIN FRONTIER MATCH
                   </h3>
                   <p className="text-[10px] text-[#8CCDEB]">
-                    Connect to existing squad match
+                    Connect to an existing squad sector
                   </p>
                 </div>
               </div>
@@ -759,8 +716,7 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto">
-              
+            <div className="p-4 sm:p-5 space-y-3 overflow-y-auto">
               {/* Room Code Input */}
               <div>
                 <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1">
@@ -772,14 +728,15 @@ export const LandingPage: React.FC = () => {
                   onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                   placeholder="ROOM CODE"
                   maxLength={6}
-                  className="w-full bg-[#05070B] border-2 border-[#8CCDEB] focus:border-[#FFCC00] p-3 rounded-xl text-center text-xl sm:text-2xl font-black tracking-[0.3em] text-[#FFCC00] outline-none shadow-[0_0_15px_rgba(140,205,235,0.25)] transition-all uppercase placeholder:text-slate-600"
+                  autoFocus
+                  className="w-full bg-[#05070B] border-2 border-[#8CCDEB] focus:border-[#FFCC00] p-2.5 sm:p-3 rounded-xl text-center text-xl sm:text-2xl font-black tracking-[0.3em] text-[#FFCC00] outline-none shadow-[0_0_15px_rgba(140,205,235,0.25)] transition-all uppercase placeholder:text-slate-600"
                 />
               </div>
 
               {/* Callsign */}
               <div>
                 <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1">
-                  CALLSIGN
+                  PILOT CALLSIGN
                 </label>
                 <input 
                   type="text" 
@@ -787,32 +744,8 @@ export const LandingPage: React.FC = () => {
                   onChange={(e) => setPlayerName(e.target.value)}
                   placeholder="Enter Callsign"
                   maxLength={15}
-                  className="w-full bg-[#05070B]/90 border border-[#8CCDEB]/40 focus:border-[#8CCDEB] p-2.5 rounded-lg text-xs font-bold text-[#F4F7FA] outline-none"
+                  className="w-full bg-[#05070B]/90 border border-[#8CCDEB]/40 focus:border-[#8CCDEB] p-2 rounded-lg text-xs font-bold text-[#F4F7FA] outline-none"
                 />
-              </div>
-
-              {/* Hull Scheme */}
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1">
-                  CHASSIS SCHEME
-                </label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(Object.keys(CHASSIS_CONFIG) as BattleColor[]).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setPlayerColor(c)}
-                      className={`p-1.5 rounded-lg border flex flex-col items-center gap-1 cursor-pointer ${
-                        playerColor === c
-                          ? 'border-[#FFCC00] bg-[#FFB000]/15'
-                          : 'border-[#0B315A] bg-[#05070B]/60'
-                      }`}
-                    >
-                      <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: CHASSIS_CONFIG[c].hex }} />
-                      <span className="text-[9px] uppercase font-bold text-[#F4F7FA]">{c}</span>
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {joinCode.trim().length > 0 && joinCode.trim().length < 4 && (
@@ -820,52 +753,59 @@ export const LandingPage: React.FC = () => {
                   Room code must be 4 to 6 characters.
                 </p>
               )}
-
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 sm:p-5 pt-2 border-t border-[#0B315A] flex items-center justify-end gap-2.5 bg-[#08264A]/80">
+            <div className="p-3.5 sm:p-4 pt-2 border-t border-[#0B315A] flex items-center justify-end gap-2 bg-[#08264A]/80">
               <button
                 type="button"
                 onClick={() => setJoinModalOpen(false)}
-                className="px-4 py-2 rounded-lg text-xs font-bold uppercase text-slate-300 hover:text-white cursor-pointer"
+                className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase text-slate-300 hover:text-white cursor-pointer"
               >
                 BACK
               </button>
               <button
                 type="button"
                 onClick={handleJoin}
-                disabled={joinCode.trim().length < 4}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#0B315A] to-[#08264A] hover:from-[#0E3E73] hover:to-[#0E3E73] disabled:opacity-40 border-2 border-[#8CCDEB] text-[#F4F7FA] font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(140,205,235,0.3)] flex items-center gap-2 cursor-pointer"
+                disabled={joinCode.trim().length < 4 || isJoining}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#0B315A] to-[#08264A] hover:from-[#0E3E73] hover:to-[#0E3E73] disabled:opacity-40 border-2 border-[#8CCDEB] text-[#F4F7FA] font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(140,205,235,0.3)] flex items-center gap-1.5 cursor-pointer"
               >
-                <ArrowRight size={15} />
-                <span>JOIN BATTLE</span>
+                {isJoining ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin text-[#8CCDEB]" />
+                    <span>CONNECTING...</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowRight size={14} />
+                    <span>ENTER SECTOR</span>
+                  </>
+                )}
               </button>
             </div>
-
           </div>
         </div>
       )}
 
       {/* =========================================================================
-          6. SOLO AI TRAINING MODAL
+          7. SOLO AI TRAINING MODAL
           ========================================================================= */}
       {soloModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#05070B]/80 backdrop-blur-md animate-fadeIn pointer-events-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#05070B]/85 backdrop-blur-md animate-fadeIn pointer-events-auto">
           <div 
-            className="w-full max-w-lg bg-[#061A35]/95 border-2 border-[#8CCDEB]/60 rounded-2xl shadow-[0_0_40px_rgba(5,7,11,0.9)] overflow-hidden flex flex-col max-h-[92vh]"
+            className="w-full max-w-lg bg-[#061A35]/95 border-2 border-emerald-500/60 rounded-2xl shadow-[0_0_40px_rgba(5,7,11,0.9)] overflow-hidden flex flex-col max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 pb-3 border-b border-[#0B315A] flex items-center justify-between bg-[#08264A]/80">
+            <div className="p-3.5 sm:p-4 pb-2.5 border-b border-[#0B315A] flex items-center justify-between bg-[#08264A]/80">
               <div className="flex items-center gap-2">
-                <Bot size={18} className="text-[#107E57]" />
+                <Bot size={18} className="text-[#22c55e]" />
                 <div>
                   <h3 className="text-sm sm:text-base font-black tracking-wider text-[#F4F7FA]">
                     SOLO AI TRAINING
                   </h3>
-                  <p className="text-[10px] text-[#8CCDEB]">
-                    Offline tactical combat vs computer drone
+                  <p className="text-[10px] text-emerald-400">
+                    Offline tactical combat vs autonomous drone (Zero lag)
                   </p>
                 </div>
               </div>
@@ -878,12 +818,11 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto">
-              
+            <div className="p-4 sm:p-5 space-y-3 overflow-y-auto">
               {/* Difficulty Selection */}
               <div>
-                <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1">
-                  AI DIFFICULTY
+                <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1.5">
+                  DRONE COMBAT PROTOCOL
                 </label>
                 <div className="grid grid-cols-3 gap-1.5">
                   {(['EASY', 'NORMAL', 'HARD'] as CombatDifficulty[]).map((diff) => (
@@ -913,7 +852,7 @@ export const LandingPage: React.FC = () => {
               {/* Callsign */}
               <div>
                 <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1">
-                  CALLSIGN
+                  PILOT CALLSIGN
                 </label>
                 <input 
                   type="text" 
@@ -921,55 +860,29 @@ export const LandingPage: React.FC = () => {
                   onChange={(e) => setPlayerName(e.target.value)}
                   placeholder="Enter Callsign"
                   maxLength={15}
-                  className="w-full bg-[#05070B]/90 border border-[#8CCDEB]/40 focus:border-[#8CCDEB] p-2.5 rounded-lg text-xs font-bold text-[#F4F7FA] outline-none"
+                  className="w-full bg-[#05070B]/90 border border-[#8CCDEB]/40 focus:border-[#8CCDEB] p-2 rounded-lg text-xs font-bold text-[#F4F7FA] outline-none"
                 />
               </div>
-
-              {/* Hull Scheme */}
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1">
-                  CHASSIS SCHEME
-                </label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(Object.keys(CHASSIS_CONFIG) as BattleColor[]).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setPlayerColor(c)}
-                      className={`p-1.5 rounded-lg border flex flex-col items-center gap-1 cursor-pointer ${
-                        playerColor === c
-                          ? 'border-[#FFCC00] bg-[#FFB000]/15'
-                          : 'border-[#0B315A] bg-[#05070B]/60'
-                      }`}
-                    >
-                      <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: CHASSIS_CONFIG[c].hex }} />
-                      <span className="text-[9px] uppercase font-bold text-[#F4F7FA]">{c}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 sm:p-5 pt-2 border-t border-[#0B315A] flex items-center justify-end gap-2.5 bg-[#08264A]/80">
+            <div className="p-3.5 sm:p-4 pt-2 border-t border-[#0B315A] flex items-center justify-end gap-2 bg-[#08264A]/80">
               <button
                 type="button"
                 onClick={() => setSoloModalOpen(false)}
-                className="px-4 py-2 rounded-lg text-xs font-bold uppercase text-slate-300 hover:text-white cursor-pointer"
+                className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase text-slate-300 hover:text-white cursor-pointer"
               >
                 BACK
               </button>
               <button
                 type="button"
                 onClick={handleStartSolo}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#107E57] to-[#0B315A] hover:from-emerald-600 hover:to-[#0E3E73] border-2 border-emerald-400 text-white font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(16,126,87,0.4)] flex items-center gap-2 cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#107E57] to-[#0B315A] hover:from-emerald-600 hover:to-[#0E3E73] border-2 border-emerald-400 text-white font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(16,126,87,0.4)] flex items-center gap-1.5 cursor-pointer"
               >
-                <Zap size={15} />
+                <Play size={14} fill="currentColor" />
                 <span>LAUNCH BATTLE</span>
               </button>
             </div>
-
           </div>
         </div>
       )}

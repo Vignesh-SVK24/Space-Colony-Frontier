@@ -154,6 +154,8 @@ interface MultiplayerState {
 
 let hitConfirmTimer: any = null;
 
+export const DEFAULT_PRODUCTION_SERVER = 'https://space-colony-frontier.onrender.com';
+
 const getDefaultServerUrl = () => {
   if (typeof window === 'undefined') return 'http://localhost:3001';
   try {
@@ -170,8 +172,8 @@ const getDefaultServerUrl = () => {
   if (isLocal) {
     return 'http://localhost:3001';
   }
-  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-  return isHttps ? `https://${host}:3001` : `http://${host}:3001`;
+  // Production default: connect to live Render backend
+  return DEFAULT_PRODUCTION_SERVER;
 };
 
 export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({

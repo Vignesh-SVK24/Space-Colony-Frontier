@@ -64,7 +64,7 @@ const getColyseusEndpoint = (): string => {
   if (isLocal) {
     return 'ws://localhost:3001';
   }
-  return `${isHttps ? 'wss' : 'ws'}://${host}:3001`;
+  return 'wss://space-colony-frontier.onrender.com';
 };
 
 export const getClient = (): Client => {
@@ -95,7 +95,7 @@ export const generateRoomCode = (): string => {
   return code;
 };
 
-export const createRoom = async (playerName: string, playerColor: BattleColor, mode: GameMode = '1v1', customRoomCode?: string) => {
+export const createRoom = async (playerName: string, playerColor: BattleColor, mode: GameMode = '1v1', customRoomCode?: string): Promise<boolean> => {
   const endpoint = getColyseusEndpoint();
   const roomCode = (customRoomCode || generateRoomCode()).trim().toUpperCase();
   try {
@@ -106,12 +106,18 @@ export const createRoom = async (playerName: string, playerColor: BattleColor, m
     const colyseusClient = new Client(endpoint);
     client = colyseusClient;
 
-    currentRoom = await colyseusClient.create('battle', {
+    const createPromise = colyseusClient.create('battle', {
       roomCode,
       playerName,
       playerColor,
       mode
     }, BattleStateSchema);
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Connection timed out. The server may be spinning up or unreachable.')), 15000)
+    );
+
+    currentRoom = await Promise.race([createPromise, timeoutPromise]);
 
     bindRoomEvents(currentRoom);
 
@@ -123,15 +129,17 @@ export const createRoom = async (playerName: string, playerColor: BattleColor, m
     useMultiplayerStore.getState().setAppView('LOBBY');
     useMultiplayerStore.getState().setConnectionQuality('good');
     useMultiplayerStore.getState().setError(null);
+    return true;
   } catch (err: any) {
     console.error('Failed to create Colyseus room:', err);
     const friendlyError = formatConnectionError(err, endpoint);
     useMultiplayerStore.getState().setError(friendlyError);
     useMultiplayerStore.getState().setConnectionQuality('disconnected');
+    return false;
   }
 };
 
-export const joinRoom = async (roomCode: string, playerName: string, playerColor: BattleColor) => {
+export const joinRoom = async (roomCode: string, playerName: string, playerColor: BattleColor): Promise<boolean> => {
   const endpoint = getColyseusEndpoint();
   const cleanCode = roomCode.trim().toUpperCase();
   try {
@@ -141,12 +149,17 @@ export const joinRoom = async (roomCode: string, playerName: string, playerColor
     const colyseusClient = new Client(endpoint);
     client = colyseusClient;
 
-    // Join strictly by roomCode filter - fails clearly if room doesn't exist
-    currentRoom = await colyseusClient.join('battle', {
+    const joinPromise = colyseusClient.join('battle', {
       roomCode: cleanCode,
       playerName,
       playerColor
     }, BattleStateSchema);
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Connection timed out. The server may be spinning up or unreachable.')), 15000)
+    );
+
+    currentRoom = await Promise.race([joinPromise, timeoutPromise]);
 
     bindRoomEvents(currentRoom);
 
@@ -157,6 +170,7 @@ export const joinRoom = async (roomCode: string, playerName: string, playerColor
     useMultiplayerStore.getState().setAppView('LOBBY');
     useMultiplayerStore.getState().setConnectionQuality('good');
     useMultiplayerStore.getState().setError(null);
+    return true;
   } catch (err: any) {
     console.error('Failed to join Colyseus room:', err);
     let friendlyError = formatConnectionError(err, endpoint);
@@ -166,6 +180,7 @@ export const joinRoom = async (roomCode: string, playerName: string, playerColor
     }
     useMultiplayerStore.getState().setError(friendlyError);
     useMultiplayerStore.getState().setConnectionQuality('disconnected');
+    return false;
   }
 };
 
