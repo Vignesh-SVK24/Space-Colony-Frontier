@@ -92,12 +92,19 @@ export const LobbyView: React.FC = () => {
               <ArrowLeft size={14} />
               <span>Leave</span>
             </button>
-            <p className="text-gray-400 text-[10px] sm:text-xs tracking-[0.15em] uppercase flex items-center gap-1.5">
-              <Users size={13} className="text-sky-400" />
-              <span>
-                {gameMode === '2v2' ? '2v2 Team Battle Lobby' : gameMode === 'FFA' ? '4-Player FFA Lobby' : '1v1 Duel Lobby'}
-              </span>
-            </p>
+            <div className="flex items-center gap-2">
+              <img 
+                src={`${import.meta.env.BASE_URL}app-icon.png`} 
+                alt="Emblem" 
+                className="w-5 h-5 rounded-md border border-sky-400/30 object-cover shadow-sm" 
+              />
+              <p className="text-gray-400 text-[10px] sm:text-xs tracking-[0.15em] uppercase flex items-center gap-1.5">
+                <Users size={13} className="text-sky-400" />
+                <span>
+                  {gameMode === '2v2' ? '2v2 Team Battle Lobby' : gameMode === 'FFA' ? '4-Player FFA Lobby' : '1v1 Duel Lobby'}
+                </span>
+              </p>
+            </div>
             <div className="w-10" />
           </div>
           

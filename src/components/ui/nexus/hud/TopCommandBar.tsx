@@ -46,10 +46,11 @@ export const TopCommandBar: FC = () => {
     <header className="fixed top-0 left-0 right-0 z-30 px-3 sm:px-6 py-2 flex items-center justify-between pointer-events-none font-mono text-xs select-none">
       {/* Left: Sleek Colony Beacon Crest */}
       <div className="flex items-center gap-2.5 bg-[#080d1a]/85 backdrop-blur-md px-3 py-1.5 rounded-md border border-cyan-500/25 pointer-events-auto shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
-        <div className="relative flex items-center justify-center">
-          <Radio className="w-4 h-4 text-cyan-400" />
-          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-        </div>
+        <img 
+          src={`${import.meta.env.BASE_URL}app-icon.png`} 
+          alt="Space Colony Frontier Emblem" 
+          className="w-5 h-5 rounded object-cover border border-cyan-400/40 shadow-sm" 
+        />
         <div className="flex items-center gap-1.5">
           <span className="font-bold tracking-wider text-cyan-300">NEXUS</span>
           <span className="text-slate-600">/</span>
