@@ -22,9 +22,11 @@ export class BattleRoom extends Room {
     (this.state as BattleStateSchema).gameMode = mode;
     this.maxClients = mode === '1v1' ? 2 : 4;
 
-    // Clean 6-character room code
-    (this.state as BattleStateSchema).roomCode = options.roomCode || this.generateRoomCode();
+    // Clean 6-character room code (immutable per room match)
+    const roomCode = (options.roomCode || this.generateRoomCode()).trim().toUpperCase();
+    (this.state as BattleStateSchema).roomCode = roomCode;
     (this.state as BattleStateSchema).roomStatus = 'LOBBY';
+    this.setMetadata({ roomCode });
 
     // Initialize Simulation Loop & Rapier 3D World
     this.simulationLoop = new SimulationLoop();

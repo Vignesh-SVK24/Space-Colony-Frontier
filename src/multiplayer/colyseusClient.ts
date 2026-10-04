@@ -86,16 +86,28 @@ export const updateServerUrl = (url: string) => {
   client = new Client(clean);
 };
 
-export const createRoom = async (playerName: string, playerColor: BattleColor, mode: GameMode = '1v1') => {
+export const generateRoomCode = (): string => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+};
+
+export const createRoom = async (playerName: string, playerColor: BattleColor, mode: GameMode = '1v1', customRoomCode?: string) => {
   const endpoint = getColyseusEndpoint();
+  const roomCode = (customRoomCode || generateRoomCode()).trim().toUpperCase();
   try {
     useMultiplayerStore.getState().setError(null);
     useMultiplayerStore.getState().setConnectionQuality('connecting');
+    useMultiplayerStore.getState().setRoomCode(roomCode);
 
     const colyseusClient = new Client(endpoint);
     client = colyseusClient;
 
     currentRoom = await colyseusClient.create('battle', {
+      roomCode,
       playerName,
       playerColor,
       mode
@@ -103,6 +115,7 @@ export const createRoom = async (playerName: string, playerColor: BattleColor, m
 
     bindRoomEvents(currentRoom);
 
+    useMultiplayerStore.getState().setRoomCode(roomCode);
     useMultiplayerStore.getState().setPlayerId(currentRoom.sessionId);
     useMultiplayerStore.getState().setIsHost(true);
     useMultiplayerStore.getState().setGameMode(mode);
@@ -120,6 +133,7 @@ export const createRoom = async (playerName: string, playerColor: BattleColor, m
 
 export const joinRoom = async (roomCode: string, playerName: string, playerColor: BattleColor) => {
   const endpoint = getColyseusEndpoint();
+  const cleanCode = roomCode.trim().toUpperCase();
   try {
     useMultiplayerStore.getState().setError(null);
     useMultiplayerStore.getState().setConnectionQuality('connecting');
@@ -127,15 +141,16 @@ export const joinRoom = async (roomCode: string, playerName: string, playerColor
     const colyseusClient = new Client(endpoint);
     client = colyseusClient;
 
-    // Join by roomCode filter
-    currentRoom = await colyseusClient.joinOrCreate('battle', {
-      roomCode: roomCode.toUpperCase(),
+    // Join strictly by roomCode filter - fails clearly if room doesn't exist
+    currentRoom = await colyseusClient.join('battle', {
+      roomCode: cleanCode,
       playerName,
       playerColor
     }, BattleStateSchema);
 
     bindRoomEvents(currentRoom);
 
+    useMultiplayerStore.getState().setRoomCode(cleanCode);
     useMultiplayerStore.getState().setPlayerId(currentRoom.sessionId);
     useMultiplayerStore.getState().setIsHost(false);
     useMultiplayerStore.getState().setRoomStatus('LOBBY');
@@ -144,7 +159,11 @@ export const joinRoom = async (roomCode: string, playerName: string, playerColor
     useMultiplayerStore.getState().setError(null);
   } catch (err: any) {
     console.error('Failed to join Colyseus room:', err);
-    const friendlyError = formatConnectionError(err, endpoint);
+    let friendlyError = formatConnectionError(err, endpoint);
+    const rawMsg = err?.message || String(err || '');
+    if (rawMsg.toLowerCase().includes('no rooms found') || rawMsg.toLowerCase().includes('not found') || err?.code === 4212) {
+      friendlyError = `Room "${cleanCode}" was not found or is already full. Please verify the code with the host.`;
+    }
     useMultiplayerStore.getState().setError(friendlyError);
     useMultiplayerStore.getState().setConnectionQuality('disconnected');
   }

@@ -20,6 +20,6 @@ listen(config({
     });
   },
   initializeGameServer: (gameServer) => {
-    gameServer.define('battle', BattleRoom);
+    gameServer.define('battle', BattleRoom).filterBy(['roomCode']);
   }
 }), PORT);

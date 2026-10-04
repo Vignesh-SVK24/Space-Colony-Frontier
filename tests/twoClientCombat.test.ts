@@ -11,8 +11,8 @@ describe('Authoritative Colyseus 2-Client Combat Acceptance Tests', () => {
   let room2: Room;
 
   beforeAll(async () => {
-    client1 = new Client('ws://localhost:3001');
-    client2 = new Client('ws://localhost:3001');
+    client1 = new Client('ws://127.0.0.1:3001');
+    client2 = new Client('ws://127.0.0.1:3001');
   });
 
   afterAll(() => {
