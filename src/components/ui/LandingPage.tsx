@@ -10,6 +10,7 @@ import { CombatDifficulty } from '../../config/combatConfig';
 import { nexusAudio } from '../../utils/nexusAudio';
 import { 
   Users, 
+  User,
   Bot, 
   ArrowRight, 
   Zap, 
@@ -122,7 +123,6 @@ export const LandingPage: React.FC = () => {
     setIsCreating(true);
     setError(null);
     nexusAudio.playConfirm();
-    enterFullscreen();
     const success = await createRoom(effectiveName, playerColor, gameMode, createCode);
     setIsCreating(false);
     if (!success) {
@@ -136,7 +136,6 @@ export const LandingPage: React.FC = () => {
     setIsJoining(true);
     setError(null);
     nexusAudio.playConfirm();
-    enterFullscreen();
     const success = await joinRoom(joinCode.trim().toUpperCase(), effectiveName, playerColor);
     setIsJoining(false);
     if (success) {
@@ -146,7 +145,6 @@ export const LandingPage: React.FC = () => {
 
   const handleStartSolo = () => {
     nexusAudio.playConfirm();
-    enterFullscreen();
     setSoloModalOpen(false);
     startSoloGame();
   };
@@ -315,15 +313,19 @@ export const LandingPage: React.FC = () => {
               </span>
             </div>
 
-            {/* Callsign Input */}
-            <div className="mb-2">
+            {/* Enter Pilot Name / Callsign */}
+            <div className="mb-2.5">
+              <label className="block text-[10px] sm:text-[11px] font-black uppercase text-[#8CCDEB] tracking-wider mb-1 flex items-center gap-1.5">
+                <User size={13} className="text-[#FFCC00]" />
+                <span>ENTER PILOT NAME / CALLSIGN</span>
+              </label>
               <input 
                 type="text" 
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="Enter Callsign (Cadet-01)"
+                placeholder="Type your pilot callsign"
                 maxLength={15}
-                className="w-full bg-[#05070B]/90 border border-[#8CCDEB]/40 focus:border-[#8CCDEB] px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold text-[#F4F7FA] outline-none transition-colors"
+                className="w-full bg-[#05070B] border-2 border-[#8CCDEB]/60 focus:border-[#FFCC00] px-3 py-2 rounded-xl text-sm sm:text-base font-black text-white placeholder:text-slate-500 outline-none shadow-inner transition-colors"
               />
             </div>
 
@@ -735,16 +737,17 @@ export const LandingPage: React.FC = () => {
 
               {/* Callsign */}
               <div>
-                <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1">
-                  PILOT CALLSIGN
+                <label className="block text-[10px] sm:text-[11px] font-black uppercase text-[#8CCDEB] tracking-wider mb-1 flex items-center gap-1.5">
+                  <User size={13} className="text-[#FFCC00]" />
+                  <span>ENTER PILOT NAME / CALLSIGN</span>
                 </label>
                 <input 
                   type="text" 
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Enter Callsign"
+                  placeholder="Type your pilot name"
                   maxLength={15}
-                  className="w-full bg-[#05070B]/90 border border-[#8CCDEB]/40 focus:border-[#8CCDEB] p-2 rounded-lg text-xs font-bold text-[#F4F7FA] outline-none"
+                  className="w-full bg-[#05070B] border-2 border-[#8CCDEB]/60 focus:border-[#FFCC00] px-3 py-2 rounded-xl text-sm sm:text-base font-black text-white placeholder:text-slate-500 outline-none transition-colors"
                 />
               </div>
 
@@ -851,16 +854,17 @@ export const LandingPage: React.FC = () => {
 
               {/* Callsign */}
               <div>
-                <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1">
-                  PILOT CALLSIGN
+                <label className="block text-[10px] sm:text-[11px] font-black uppercase text-[#8CCDEB] tracking-wider mb-1 flex items-center gap-1.5">
+                  <User size={13} className="text-[#FFCC00]" />
+                  <span>ENTER PILOT NAME / CALLSIGN</span>
                 </label>
                 <input 
                   type="text" 
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Enter Callsign"
+                  placeholder="Type your pilot name"
                   maxLength={15}
-                  className="w-full bg-[#05070B]/90 border border-[#8CCDEB]/40 focus:border-[#8CCDEB] p-2 rounded-lg text-xs font-bold text-[#F4F7FA] outline-none"
+                  className="w-full bg-[#05070B] border-2 border-[#8CCDEB]/60 focus:border-[#FFCC00] px-3 py-2 rounded-xl text-sm sm:text-base font-black text-white placeholder:text-slate-500 outline-none transition-colors"
                 />
               </div>
             </div>

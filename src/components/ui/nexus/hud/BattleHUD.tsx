@@ -34,9 +34,7 @@ export const BattleHUD: React.FC = () => {
   const opponentList = otherPlayers.length > 0 ? otherPlayers : (opponentState ? [opponentState] : []);
   const { isFullscreen } = useFullscreen();
 
-  useEffect(() => {
-    enterFullscreen();
-  }, []);
+  // Fullscreen is user-controlled via HUD toggle to avoid repetitive browser pop-up alerts
 
   // 'M' Key shortcut for map, 'R' key for reload
   useEffect(() => {
