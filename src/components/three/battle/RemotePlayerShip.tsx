@@ -13,8 +13,34 @@ interface RemotePlayerShipProps {
 export const RemotePlayerShip: React.FC<RemotePlayerShipProps> = ({ player }) => {
   const group = useRef<THREE.Group>(null);
   
+  const currentPos = useRef(new THREE.Vector3());
+  const currentQuat = useRef(new THREE.Quaternion());
   const targetPos = useRef(new THREE.Vector3());
   const targetQuat = useRef(new THREE.Quaternion());
+  const targetVel = useRef(new THREE.Vector3());
+  const lastPacketTime = useRef(performance.now());
+  const initialPosSet = useRef(false);
+
+  React.useEffect(() => {
+    if (!player) return;
+    targetPos.current.set(player.position[0], player.position[1], player.position[2]);
+    if (player.velocity) {
+      targetVel.current.set(player.velocity[0], player.velocity[1], player.velocity[2]);
+    }
+    const euler = new THREE.Euler(player.rotation[0], player.rotation[1], player.rotation[2], 'YXZ');
+    targetQuat.current.setFromEuler(euler);
+    lastPacketTime.current = performance.now();
+
+    if (!initialPosSet.current) {
+      currentPos.current.copy(targetPos.current);
+      currentQuat.current.copy(targetQuat.current);
+      if (group.current) {
+        group.current.position.copy(targetPos.current);
+        group.current.quaternion.copy(targetQuat.current);
+      }
+      initialPosSet.current = true;
+    }
+  }, [player?.position[0], player?.position[1], player?.position[2], player?.rotation[0], player?.rotation[1], player?.rotation[2]]);
 
   const getPaintScheme = (color: string): SpaceshipPaintSchemeKey => {
     switch (color) {
@@ -43,7 +69,7 @@ export const RemotePlayerShip: React.FC<RemotePlayerShipProps> = ({ player }) =>
       ctx.fillText(player.alive ? (player.name || 'Pilot') : `${player.name || 'Pilot'} [ELIMINATED]`, 256, 38);
       
       // HP Bar
-      const hpPercent = Math.max(0, player.hp / 100);
+      const hpPercent = Math.max(0, player.hp / 250);
       ctx.fillStyle = '#450a0a';
       ctx.fillRect(56, 74, 400, 22);
       ctx.fillStyle = hpPercent > 0.6 ? '#22c55e' : hpPercent > 0.3 ? '#eab308' : '#ef4444';
@@ -57,12 +83,18 @@ export const RemotePlayerShip: React.FC<RemotePlayerShipProps> = ({ player }) =>
   useFrame((_, delta) => {
     if (!group.current || !player) return;
     
-    targetPos.current.set(player.position[0], player.position[1], player.position[2]);
-    const euler = new THREE.Euler(player.rotation[0], player.rotation[1], player.rotation[2], 'YXZ');
-    targetQuat.current.setFromEuler(euler);
+    const now = performance.now();
+    const timeSincePacket = Math.min((now - lastPacketTime.current) / 1000, 0.20);
 
-    group.current.position.lerp(targetPos.current, delta * 12);
-    group.current.quaternion.slerp(targetQuat.current, delta * 12);
+    // Dead Reckoning: Extrapolate position forward along velocity vector between network ticks
+    const extrapolatedPos = targetPos.current.clone().addScaledVector(targetVel.current, timeSincePacket);
+
+    // Smooth convergence without stuttering
+    currentPos.current.lerp(extrapolatedPos, Math.min(1, delta * 15));
+    currentQuat.current.slerp(targetQuat.current, Math.min(1, delta * 14));
+
+    group.current.position.copy(currentPos.current);
+    group.current.quaternion.copy(currentQuat.current);
   });
 
   if (!player) return null;

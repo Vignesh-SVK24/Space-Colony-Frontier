@@ -184,14 +184,14 @@ export const LocalPlayerShip: React.FC = () => {
     // ==========================================
     // 2. Server Reconciliation (Multiplayer)
     // ==========================================
+    // Do NOT pull local ship back towards delayed network echoes (eliminates forward/backward dragging)
+    // Only snap on severe respawn/teleport discrepancies
     if (!isSolo && selfState) {
       const serverPos = new THREE.Vector3(...selfState.position);
       const posError = group.current.position.distanceTo(serverPos);
 
-      if (posError > 8.0) {
+      if (posError > 60.0) {
         group.current.position.copy(serverPos);
-      } else if (posError > 0.4) {
-        group.current.position.lerp(serverPos, dt * 4.0);
       }
     }
 
@@ -294,6 +294,21 @@ export const LocalPlayerShip: React.FC = () => {
     const aimTargetPoint = camera.position.clone().addScaledVector(camDir, aimDist);
     const aimFireDir = new THREE.Vector3().subVectors(aimTargetPoint, muzzlePos).normalize();
 
+    // Intelligent Aim Magnetism: Magnetically curve plasma stream towards enemy lead spot when aiming near target!
+    let finalBulletDir = aimFireDir.clone();
+    if (bestTarget && bestDist < COMBAT_CONFIG.AIM_ASSIST_MAX_DIST) {
+      const oppPos = new THREE.Vector3(...bestTarget.position);
+      const oppVel = new THREE.Vector3(...bestTarget.velocity);
+      const timeToHit = bestDist / COMBAT_CONFIG.BULLET_SPEED;
+      const targetIntercept = oppPos.clone().add(oppVel.clone().multiplyScalar(timeToHit));
+      const toTargetDir = new THREE.Vector3().subVectors(targetIntercept, muzzlePos).normalize();
+
+      const angleToTarget = aimFireDir.angleTo(toTargetDir);
+      if (angleToTarget < COMBAT_CONFIG.AIM_ASSIST_ANGLE) {
+        finalBulletDir.lerp(toTargetDir, 0.70).normalize();
+      }
+    }
+
     // ==========================================
     // 5. Weapon 1: Rapid Plasma Bullet (2 HP, 0.1s rate, 30 magazine, 2s reload)
     // ==========================================
@@ -321,7 +336,7 @@ export const LocalPlayerShip: React.FC = () => {
           ownerId: 'solo_player',
           weaponType: 'BULLET',
           position: [muzzlePos.x, muzzlePos.y, muzzlePos.z],
-          direction: [aimFireDir.x, aimFireDir.y, aimFireDir.z],
+          direction: [finalBulletDir.x, finalBulletDir.y, finalBulletDir.z],
           color: playerColor,
           team: 'NONE',
           speed: COMBAT_CONFIG.BULLET_SPEED,
@@ -332,7 +347,7 @@ export const LocalPlayerShip: React.FC = () => {
       } else {
         sendBullet(
           [muzzlePos.x, muzzlePos.y, muzzlePos.z],
-          [aimFireDir.x, aimFireDir.y, aimFireDir.z],
+          [finalBulletDir.x, finalBulletDir.y, finalBulletDir.z],
           attackId
         );
         nexusAudio.playLaser();

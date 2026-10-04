@@ -2,12 +2,13 @@ import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMultiplayerStore } from '../../../multiplayer/useMultiplayerStore';
+import { GAME_CONFIG } from '../../../shared/gameConfig';
 
 const COLOR_MAP: Record<string, string> = {
-  yellow: '#eab308',
-  blue: '#3b82f6',
-  red: '#ef4444',
-  green: '#22c55e'
+  yellow: '#fbbf24',
+  blue: '#60a5fa',
+  red: '#f87171',
+  green: '#4ade80'
 };
 
 export const LaserProjectiles: React.FC = () => {
@@ -18,6 +19,8 @@ export const LaserProjectiles: React.FC = () => {
   useFrame((_, delta) => {
     if (!group.current) return;
     
+    const bulletSpeed = GAME_CONFIG.BULLET_SPEED || 260;
+
     // Client-side prediction & interpolation with authoritative position
     projectiles.forEach(p => {
       let loc = localProjectiles.current.get(p.id);
@@ -30,7 +33,7 @@ export const LaserProjectiles: React.FC = () => {
       } else {
         // Reconcile toward authoritative snapshot position and advance
         loc.pos.lerp(incomingPos, Math.min(1, delta * 15));
-        loc.pos.addScaledVector(loc.dir, 145 * delta);
+        loc.pos.addScaledVector(loc.dir, bulletSpeed * delta);
       }
     });
 
@@ -61,14 +64,20 @@ export const LaserProjectiles: React.FC = () => {
   return (
     <group ref={group}>
       {projectiles.map(p => {
-        const color = COLOR_MAP[p.color] || '#ffffff';
+        const color = COLOR_MAP[p.color] || '#38bdf8';
         return (
           <group key={p.id}>
+            {/* High-intensity glowing plasma core */}
             <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.05, 0.05, 1.5, 8]} />
-              <meshBasicMaterial color={color} transparent opacity={0.8} blending={THREE.AdditiveBlending} />
+              <cylinderGeometry args={[0.12, 0.12, 2.8, 8]} />
+              <meshBasicMaterial color="#ffffff" />
             </mesh>
-            <pointLight distance={10} intensity={2} color={color} />
+            {/* Outer radiant plasma envelope */}
+            <mesh rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.32, 0.32, 3.4, 8]} />
+              <meshBasicMaterial color={color} transparent opacity={0.85} blending={THREE.AdditiveBlending} />
+            </mesh>
+            <pointLight distance={15} intensity={3} color={color} />
           </group>
         );
       })}

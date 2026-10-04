@@ -126,21 +126,21 @@ export const ARENA_RADIUS = 300;
 export const COMBAT = {
     MAX_HP: 100,
     BULLET_DAMAGE: 10,
-    BULLET_SPEED: 145,
+    BULLET_SPEED: 260,
     BULLET_COOLDOWN: 450, // ms
     BULLET_LIFETIME: 2200, // ms
-    BULLET_MAX_DISTANCE: 320,
-    BULLET_HITBOX_RADIUS: 4.8, // 10-20% forgiving combat hitbox
-    HITBOX_RADIUS: 4.8, // alias
+    BULLET_MAX_DISTANCE: 400,
+    BULLET_HITBOX_RADIUS: 9.8, // Generous, user-friendly combat hitbox (effective for network latency)
+    HITBOX_RADIUS: 9.8, // alias
 
     LASER_DAMAGE: 20,
-    LASER_RANGE: 220,
+    LASER_RANGE: 280,
     LASER_COOLDOWN: 5000, // 5.0 seconds
-    LASER_AIM_CONE: 0.12, // ~6.9 degrees tolerance
+    LASER_AIM_CONE: 0.20, // Generous tolerance (~11.5 deg)
 
     AIM_ASSIST_ENABLED: true,
-    AIM_ASSIST_ANGLE: 0.08, // ~4.6 degrees
-    AIM_ASSIST_STRENGTH: 0.55,
+    AIM_ASSIST_ANGLE: 0.28, // ~16.0 degrees
+    AIM_ASSIST_STRENGTH: 0.70,
     AIM_ASSIST_MAX_DIST: 280,
 
     SPAWN_PROTECTION_TIME: 2000, // ms

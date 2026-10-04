@@ -16,29 +16,29 @@ export const GAME_CONFIG = {
   BULLET_FIRE_INTERVAL_MS: 100, // 0.1s minimum server interval
   BULLET_MAGAZINE_SIZE: 30,
   BULLET_RELOAD_MS: 2000, // 2.0s automatic reload
-  BULLET_SPEED: 180,
+  BULLET_SPEED: 260, // Faster bullet speed (less lead time required)
   BULLET_LIFETIME_MS: 2200,
-  BULLET_MAX_DISTANCE: 350,
-  BULLET_HITBOX_RADIUS: 5.2, // 10-15% forgiving combat hitbox
+  BULLET_MAX_DISTANCE: 400,
+  BULLET_HITBOX_RADIUS: 9.8, // Generous, user-friendly combat hitbox (effective for network latency)
 
   // Weapon 2: Directed Laser Beam
   LASER_DAMAGE: 12,
   LASER_RECHARGE_MS: 3000, // 3.0s recharge interval
-  LASER_RANGE: 260,
-  LASER_AIM_CONE: 0.12, // ~6.9 degrees cone tolerance
+  LASER_RANGE: 280,
+  LASER_AIM_CONE: 0.20, // Generous cone tolerance (~11.5 deg)
   LASER_BEAM_DURATION_MS: 600,
 
   // Weapon 3: Special High-Yield Solar Beam
   SOLAR_DAMAGE: 30,
   SOLAR_RECHARGE_MS: 10000, // 10.0s recharge interval
-  SOLAR_RANGE: 320,
-  SOLAR_AIM_CONE: 0.08, // ~4.6 degrees narrow beam tolerance
+  SOLAR_RANGE: 340,
+  SOLAR_AIM_CONE: 0.14, // Generous narrow beam tolerance (~8 deg)
   SOLAR_BEAM_DURATION_MS: 900,
 
   // Aim Assist & Lead Indicator
   AIM_ASSIST_ENABLED: true,
-  AIM_ASSIST_ANGLE: 0.08,
-  AIM_ASSIST_MAX_DIST: 240,
+  AIM_ASSIST_ANGLE: 0.28, // ~16.0 degrees magnetic lock-on cone
+  AIM_ASSIST_MAX_DIST: 280,
 
   // Ship Physics
   SHIP_PHYSICS: {

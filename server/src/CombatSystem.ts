@@ -98,7 +98,7 @@ export class CombatSystem {
 
                 // If within aim cone, gently correct trajectory toward opponent
                 if (angle < COMBAT.AIM_ASSIST_ANGLE) {
-                    const pull = 0.55; // 55% pull towards target
+                    const pull = COMBAT.AIM_ASSIST_STRENGTH || 0.70; // Magnetic bullet guidance towards target
                     dir = {
                         x: dir.x * (1 - pull) + toX * pull,
                         y: dir.y * (1 - pull) + toY * pull,
