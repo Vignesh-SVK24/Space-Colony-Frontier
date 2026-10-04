@@ -157,17 +157,24 @@ export const LandingPage: React.FC = () => {
           
           {/* Title Header */}
           <div className="mb-3 sm:mb-4 flex items-start justify-between shrink-0">
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-950/70 border border-sky-400/40 text-sky-300 text-[10px] sm:text-xs tracking-widest uppercase mb-1.5 shadow-[0_0_10px_rgba(56,189,248,0.2)]">
-                <Sparkles size={11} className="animate-spin text-sky-400" />
-                <span>Authoritative 3D Space Dogfight</span>
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <img
+                src={`${import.meta.env.BASE_URL}app-icon.png`}
+                alt="Game App Icon"
+                className="w-11 h-11 sm:w-13 sm:h-13 rounded-xl shadow-[0_0_15px_rgba(234,179,8,0.45)] border border-amber-400/40 shrink-0 object-cover"
+              />
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-950/70 border border-sky-400/40 text-sky-300 text-[10px] sm:text-xs tracking-widest uppercase mb-1 shadow-[0_0_10px_rgba(56,189,248,0.2)]">
+                  <Sparkles size={11} className="animate-spin text-sky-400" />
+                  <span>Authoritative 3D Space Dogfight</span>
+                </div>
+                <h1 className="text-xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white leading-none drop-shadow-md">
+                  SPACE BATTLE
+                </h1>
+                <p className="text-gray-300 text-[10px] sm:text-xs tracking-widest mt-0.5 uppercase font-medium">
+                  Space Colony: Frontier · Realtime Combat
+                </p>
               </div>
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-none drop-shadow-md">
-                SPACE BATTLE
-              </h1>
-              <p className="text-gray-300 text-[10px] sm:text-xs tracking-widest mt-1 uppercase font-medium">
-                Space Colony: Frontier · Realtime Combat
-              </p>
             </div>
 
             <button
