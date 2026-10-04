@@ -288,52 +288,70 @@ export const LandingPage: React.FC = () => {
       {/* =========================================================================
           3. MAIN RESPONSIVE BATTLE ARENA DISPLAY:
              - Desktop: 40% Left Controls / 60% Right 3D Spaceship
-             - Landscape Mobile: Side-by-Side 50/50, scrollable controls
-             - Portrait Mobile: Compact spaceship banner on top, scrollable controls below
+             - Landscape Mobile: Side-by-Side 50/50, top-aligned scrollable controls
+             - Portrait Mobile: Pilot Profile & Actions at TOP (Guaranteed Visible), 3D Spaceship below
           ========================================================================= */}
-      <main className="relative z-10 flex-1 w-full min-h-0 grid grid-cols-1 md:grid-cols-12 landscape:grid-cols-12 items-center my-auto pointer-events-none gap-2 sm:gap-4 overflow-hidden">
+      <main className="relative z-10 flex-1 w-full min-h-0 grid grid-cols-1 md:grid-cols-12 landscape:grid-cols-12 items-start md:items-center my-0 md:my-auto pointer-events-none gap-2 sm:gap-4 overflow-hidden">
         
         {/* ========================================================
             LEFT COLUMN: FULLY SCROLLABLE DETAILS & GAME ACTIONS
+            - order-1 on ALL screens guarantees Pilot Name is visible at top!
             ======================================================== */}
         <div 
-          className="md:col-span-5 landscape:col-span-5 flex flex-col justify-start md:justify-center gap-2 sm:gap-2.5 z-20 pointer-events-auto max-w-md w-full h-full max-h-full overflow-y-auto overscroll-contain touch-pan-y scroll-touch pr-1 sm:pr-2 order-2 md:order-1 landscape:order-1"
+          className="md:col-span-5 landscape:col-span-5 flex flex-col justify-start gap-2 sm:gap-2.5 z-20 pointer-events-auto max-w-md w-full h-full max-h-full overflow-y-auto overscroll-contain touch-pan-y scroll-touch pr-1 sm:pr-2 order-1 md:order-1 landscape:order-1"
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
         >
           
-          {/* 1. Pilot Profile Card */}
-          <div className="bg-[#061A35]/85 border border-[#8CCDEB]/35 rounded-xl p-2.5 sm:p-3 backdrop-blur-md shadow-[0_4px_20px_rgba(5,7,11,0.7)] shrink-0">
-            <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#0B315A]">
-              <span className="text-[10px] font-bold text-[#8CCDEB] uppercase tracking-wider flex items-center gap-1.5">
-                <Radio size={12} className="text-[#8CCDEB] animate-pulse" />
-                PILOT PROFILE
+          {/* 1. Pilot Profile Card - High Visibility Pilot Name & Callsign */}
+          <div className="bg-[#061A35]/95 border-2 border-[#8CCDEB] rounded-xl p-2.5 sm:p-3.5 backdrop-blur-md shadow-[0_0_20px_rgba(140,205,235,0.25)] shrink-0">
+            <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-[#0B315A]">
+              <span className="text-[10px] sm:text-[11px] font-black text-[#8CCDEB] uppercase tracking-wider flex items-center gap-1.5">
+                <Radio size={13} className="text-[#FFCC00] animate-pulse" />
+                <span>PILOT PROFILE</span>
               </span>
-              <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#107E57]/20 border border-[#107E57]/40 text-emerald-300 font-bold uppercase tracking-wider">
-                READY
+              <span className="text-[9px] px-2 py-0.5 rounded bg-[#107E57]/30 border border-[#107E57]/60 text-emerald-300 font-black uppercase tracking-wider">
+                ACTIVE
               </span>
             </div>
 
-            {/* Enter Pilot Name / Callsign */}
+            {/* Enter Pilot Name / Callsign - Maximum Contrast & Mobile Legibility */}
             <div className="mb-2.5">
-              <label className="block text-[10px] sm:text-[11px] font-black uppercase text-[#8CCDEB] tracking-wider mb-1 flex items-center gap-1.5">
-                <User size={13} className="text-[#FFCC00]" />
-                <span>ENTER PILOT NAME / CALLSIGN</span>
-              </label>
-              <input 
-                type="text" 
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="Type your pilot callsign"
-                maxLength={15}
-                className="w-full bg-[#05070B] border-2 border-[#8CCDEB]/60 focus:border-[#FFCC00] px-3 py-2 rounded-xl text-sm sm:text-base font-black text-white placeholder:text-slate-500 outline-none shadow-inner transition-colors"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] sm:text-xs font-black uppercase text-[#FFCC00] tracking-wider flex items-center gap-1.5">
+                  <User size={14} className="text-[#FFCC00]" />
+                  <span>PILOT CALLSIGN / NAME:</span>
+                </label>
+                <span className="text-[9px] text-[#8CCDEB]/80 font-mono">
+                  {playerName.trim() ? `${playerName.length}/15` : 'Required'}
+                </span>
+              </div>
+              <div className="relative flex items-center">
+                <input 
+                  type="text" 
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  placeholder="Enter pilot callsign..."
+                  maxLength={15}
+                  className="w-full bg-[#05070B] border-2 border-[#8CCDEB] focus:border-[#FFCC00] focus:ring-2 focus:ring-[#FFCC00]/30 px-3.5 py-2 sm:py-2.5 rounded-xl text-base font-black text-white placeholder:text-slate-500 outline-none shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)] transition-all"
+                />
+                {playerName && (
+                  <button
+                    type="button"
+                    onClick={() => setPlayerName('')}
+                    className="absolute right-2.5 px-1.5 py-0.5 text-xs text-slate-400 hover:text-white rounded cursor-pointer"
+                    title="Clear Callsign"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Hull Scheme Selector */}
             <div>
-              <div className="flex items-center justify-between text-[9px] text-[#8CCDEB]/80 uppercase tracking-widest mb-1 font-bold">
+              <div className="flex items-center justify-between text-[9px] sm:text-[10px] text-[#8CCDEB]/80 uppercase tracking-widest mb-1 font-bold">
                 <span>CHASSIS PAINT</span>
-                <span className="text-[#FFCC00]">{CHASSIS_CONFIG[playerColor].label}</span>
+                <span className="text-[#FFCC00] font-black">{CHASSIS_CONFIG[playerColor].label}</span>
               </div>
               <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
                 {(Object.keys(CHASSIS_CONFIG) as BattleColor[]).map((c) => {
@@ -348,11 +366,11 @@ export const LandingPage: React.FC = () => {
                       }}
                       className={`py-1 px-1 rounded-md border flex items-center justify-center gap-1 transition-all cursor-pointer ${
                         isSelected
-                          ? 'border-[#FFCC00] bg-[#FFB000]/15 text-[#FFCC00] shadow-[0_0_8px_rgba(255,204,0,0.3)]'
-                          : 'border-[#0B315A] bg-[#05070B]/60 text-slate-400 hover:border-[#8CCDEB]/40'
+                          ? 'border-[#FFCC00] bg-[#FFB000]/20 text-[#FFCC00] shadow-[0_0_10px_rgba(255,204,0,0.35)] font-black'
+                          : 'border-[#0B315A] bg-[#05070B]/70 text-slate-400 hover:border-[#8CCDEB]/40'
                       }`}
                     >
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CHASSIS_CONFIG[c].hex }} />
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: CHASSIS_CONFIG[c].hex }} />
                       <span className="text-[9px] uppercase font-bold">{c.slice(0, 3)}</span>
                     </button>
                   );
@@ -558,7 +576,7 @@ export const LandingPage: React.FC = () => {
         {/* ========================================================
             RIGHT COLUMN: 3D HERO SPACESHIP & SPACE ENVIRONMENT (60%)
             ======================================================== */}
-        <div className="md:col-span-7 landscape:col-span-7 h-[130px] sm:h-[220px] md:h-full landscape:h-full flex items-center justify-center relative order-1 md:order-2 landscape:order-2 pointer-events-auto">
+        <div className="md:col-span-7 landscape:col-span-7 h-[150px] sm:h-[220px] md:h-full landscape:h-full flex items-center justify-center relative order-2 md:order-2 landscape:order-2 pointer-events-auto shrink-0">
           
           {/* Holographic Aerospace Reticle */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-40">
@@ -737,17 +755,17 @@ export const LandingPage: React.FC = () => {
 
               {/* Callsign */}
               <div>
-                <label className="block text-[10px] sm:text-[11px] font-black uppercase text-[#8CCDEB] tracking-wider mb-1 flex items-center gap-1.5">
-                  <User size={13} className="text-[#FFCC00]" />
+                <label className="block text-[11px] sm:text-xs font-black uppercase text-[#FFCC00] tracking-wider mb-1 flex items-center gap-1.5">
+                  <User size={14} className="text-[#FFCC00]" />
                   <span>ENTER PILOT NAME / CALLSIGN</span>
                 </label>
                 <input 
                   type="text" 
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Type your pilot name"
+                  placeholder="Enter your pilot callsign..."
                   maxLength={15}
-                  className="w-full bg-[#05070B] border-2 border-[#8CCDEB]/60 focus:border-[#FFCC00] px-3 py-2 rounded-xl text-sm sm:text-base font-black text-white placeholder:text-slate-500 outline-none transition-colors"
+                  className="w-full bg-[#05070B] border-2 border-[#8CCDEB] focus:border-[#FFCC00] px-3.5 py-2.5 rounded-xl text-base font-black text-white placeholder:text-slate-500 outline-none transition-colors"
                 />
               </div>
 
@@ -854,17 +872,17 @@ export const LandingPage: React.FC = () => {
 
               {/* Callsign */}
               <div>
-                <label className="block text-[10px] sm:text-[11px] font-black uppercase text-[#8CCDEB] tracking-wider mb-1 flex items-center gap-1.5">
-                  <User size={13} className="text-[#FFCC00]" />
+                <label className="block text-[11px] sm:text-xs font-black uppercase text-[#FFCC00] tracking-wider mb-1 flex items-center gap-1.5">
+                  <User size={14} className="text-[#FFCC00]" />
                   <span>ENTER PILOT NAME / CALLSIGN</span>
                 </label>
                 <input 
                   type="text" 
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Type your pilot name"
+                  placeholder="Enter your pilot callsign..."
                   maxLength={15}
-                  className="w-full bg-[#05070B] border-2 border-[#8CCDEB]/60 focus:border-[#FFCC00] px-3 py-2 rounded-xl text-sm sm:text-base font-black text-white placeholder:text-slate-500 outline-none transition-colors"
+                  className="w-full bg-[#05070B] border-2 border-[#8CCDEB] focus:border-[#FFCC00] px-3.5 py-2.5 rounded-xl text-base font-black text-white placeholder:text-slate-500 outline-none transition-colors"
                 />
               </div>
             </div>
