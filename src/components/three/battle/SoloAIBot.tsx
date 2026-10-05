@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMultiplayerStore } from '../../../multiplayer/useMultiplayerStore';
@@ -42,6 +42,7 @@ function distancePointToSegment(point: THREE.Vector3, start: THREE.Vector3, end:
 export const SoloAIBot: React.FC = () => {
   const isSolo = useMultiplayerStore(state => state.isSolo);
   const aiDifficulty = useMultiplayerStore(state => state.aiDifficulty);
+  const matchSessionId = useMultiplayerStore(state => state.matchSessionId);
 
   const updateSoloOpponent = useMultiplayerStore(state => state.updateSoloOpponent);
   const addSoloProjectile = useMultiplayerStore(state => state.addSoloProjectile);
@@ -52,8 +53,8 @@ export const SoloAIBot: React.FC = () => {
   const setActiveSolarBeam = useMultiplayerStore(state => state.setActiveSolarBeam);
   const handleMatchEnd = useMultiplayerStore(state => state.handleMatchEnd);
 
-  // AI physical transform refs
-  const dronePos = useRef(new THREE.Vector3(0, 10, 80));
+  // AI physical transform refs (starts at slot 2 spawn [0, 15, 80])
+  const dronePos = useRef(new THREE.Vector3(0, 15, 80));
   const droneEuler = useRef(new THREE.Euler(0, Math.PI, 0, 'YXZ'));
   const droneQuat = useRef(new THREE.Quaternion().setFromEuler(droneEuler.current));
   const droneVel = useRef(new THREE.Vector3(0, 0, 15));
@@ -82,10 +83,49 @@ export const SoloAIBot: React.FC = () => {
   const totalShotsHit = useRef(0);
   const lastOpponentSyncTime = useRef(0);
 
+  const resetBot = () => {
+    const opp = useMultiplayerStore.getState().opponentState;
+    const startX = opp?.position ? opp.position[0] : 0;
+    const startY = opp?.position ? opp.position[1] : 15;
+    const startZ = opp?.position ? opp.position[2] : 80;
+    dronePos.current.set(startX, startY, startZ);
+    droneEuler.current.set(0, Math.PI, 0, 'YXZ');
+    droneQuat.current.setFromEuler(droneEuler.current);
+    droneVel.current.set(0, 0, 15);
+    currentState.current = 'IDLE';
+    lastStateChange.current = 0;
+    currentWaypointIndex.current = 0;
+    evasionVector.current.set(0, 0, 0);
+    evasionEndTime.current = 0;
+    targetCoverPoint.current = null;
+    lastBulletTime.current = 0;
+    lastLaserTime.current = 0;
+    lastSolarTime.current = 0;
+    aiAmmo.current = COMBAT_CONFIG.BULLET_MAGAZINE_SIZE;
+    aiIsReloading.current = false;
+    aiReloadEndTime.current = 0;
+    matchStartTime.current = Date.now();
+    matchEnded.current = false;
+    totalShotsFired.current = 0;
+    totalShotsHit.current = 0;
+    lastOpponentSyncTime.current = 0;
+  };
+
+  useEffect(() => {
+    resetBot();
+  }, [matchSessionId]);
+
   useFrame((state, delta) => {
     const liveOpponent = useMultiplayerStore.getState().opponentState;
     const liveSelf = useMultiplayerStore.getState().selfState;
-    if (!isSolo || !liveSelf || !liveOpponent || matchEnded.current) return;
+    if (!isSolo || !liveSelf || !liveOpponent) return;
+
+    // Self-healing reset: If matchEnded was true but a fresh rematch started with positive HP
+    if (matchEnded.current && liveSelf.alive && liveOpponent.alive && liveSelf.hp > 0 && liveOpponent.hp > 0) {
+      resetBot();
+    }
+
+    if (matchEnded.current) return;
 
     const dt = Math.min(delta, 0.1);
     const now = state.clock.elapsedTime;

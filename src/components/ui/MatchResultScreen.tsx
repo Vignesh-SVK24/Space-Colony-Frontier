@@ -2,6 +2,7 @@ import React from 'react';
 import { useMultiplayerStore } from '../../multiplayer/useMultiplayerStore';
 import { disconnect, requestRematch } from '../../multiplayer/colyseusClient';
 import { Crosshair, ShieldAlert, Target, Clock, Trophy, Skull, RotateCcw, Home } from 'lucide-react';
+import { nexusAudio } from '../../utils/nexusAudio';
 
 export const MatchResultScreen: React.FC = () => {
   const { matchResult, playerId, reset, isSolo, startSoloGame } = useMultiplayerStore();
@@ -13,11 +14,13 @@ export const MatchResultScreen: React.FC = () => {
   const glowColor = isWinner ? 'drop-shadow-[0_0_25px_rgba(255,204,0,0.6)]' : 'drop-shadow-[0_0_25px_rgba(239,68,68,0.6)]';
 
   const handleMainMenu = () => {
+    nexusAudio.playClick();
     if (!isSolo) disconnect();
     reset();
   };
 
   const handlePlayAgain = () => {
+    nexusAudio.playConfirm();
     if (isSolo) {
       startSoloGame();
     } else {

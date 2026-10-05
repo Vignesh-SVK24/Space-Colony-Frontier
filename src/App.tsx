@@ -15,6 +15,7 @@ import { VirtualJoystick } from './components/ui/nexus/hud/VirtualJoystick';
 
 export const App: FC = () => {
   const appView = useMultiplayerStore((state) => state.appView);
+  const matchSessionId = useMultiplayerStore((state) => state.matchSessionId);
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#030712] font-mono select-none text-slate-100">
@@ -30,11 +31,11 @@ export const App: FC = () => {
           </ErrorBoundary>
 
           {/* Battle HUD Overlays */}
-          <BattleHUD />
-          <BoundaryWarning />
+          <BattleHUD key={`hud-${matchSessionId}`} />
+          <BoundaryWarning key={`warn-${matchSessionId}`} />
 
           {/* Mobile Flight Controls */}
-          <VirtualJoystick />
+          <VirtualJoystick key={`joy-${matchSessionId}`} />
 
           {/* Post-Match Result Screen Overlay */}
           {appView === 'RESULT' && <MatchResultScreen />}

@@ -70,6 +70,7 @@ interface MultiplayerState {
   leadIndicator: LeadIndicatorInfo | null;
   hitConfirmActive: boolean;
   joystickAxis: { x: number; y: number };
+  matchSessionId: number;
 
   // Combat Debug & Telemetry
   showCombatHitboxes: boolean;
@@ -243,6 +244,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   leadIndicator: null,
   hitConfirmActive: false,
   joystickAxis: { x: 0, y: 0 },
+  matchSessionId: 1,
 
   showCombatHitboxes: false,
   showCombatTrajectories: false,
@@ -365,7 +367,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
 
   handleMatchEnd: (stats) => set({ matchResult: stats, appView: 'RESULT', roomStatus: 'FINISHED' }),
   
-  handleRematchReset: () => set({
+  handleRematchReset: () => set(state => ({
+    matchSessionId: (state.matchSessionId || 0) + 1,
     matchResult: null,
     appView: 'BATTLE',
     roomStatus: 'COUNTDOWN',
@@ -377,9 +380,10 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     isReloading: false,
     reloadTimeRemaining: 0,
     projectiles: []
-  }),
+  })),
 
-  reset: () => set({
+  reset: () => set(state => ({
+    matchSessionId: (state.matchSessionId || 0) + 1,
     appView: 'LANDING',
     gameModeSelection: 'SELECT',
     roomCode: '',
@@ -412,7 +416,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     hitConfirmActive: false,
     combatTelemetryLog: [],
     lastAppliedServerTick: 0
-  }),
+  })),
 
   setError: (error) => set({ error }),
   setRoomStatus: (status) => set({ roomStatus: status }),
@@ -499,7 +503,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
       solarCooldownRemaining: 0
     };
 
-    set({
+    set(state => ({
+      matchSessionId: (state.matchSessionId || 0) + 1,
       isSolo: true,
       playerId: 'solo_player',
       playerName: name,
@@ -524,6 +529,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
       countdown: null,
       error: null,
       isMapOpen: false,
+      joystickAxis: { x: 0, y: 0 },
       ammo: COMBAT_CONFIG.BULLET_MAGAZINE_SIZE,
       isReloading: false,
       reloadTimeRemaining: 0,
@@ -534,8 +540,9 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
       activeSolarBeam: null,
       targetLock: null,
       leadIndicator: null,
-      hitConfirmActive: false
-    });
+      hitConfirmActive: false,
+      combatTelemetryLog: []
+    }));
   },
 
   updateSoloSelf: (pos, rot, vel, explicitHp, isBoosting, throttle) => {

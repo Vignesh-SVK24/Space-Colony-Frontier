@@ -27,6 +27,7 @@ export const BattleScene: React.FC = () => {
   const isSolo = useMultiplayerStore((state) => state.isSolo);
   const otherPlayers = useMultiplayerStore((state) => state.otherPlayers);
   const opponentState = useMultiplayerStore((state) => state.opponentState);
+  const matchSessionId = useMultiplayerStore((state) => state.matchSessionId);
   const far = getViewDistanceFar(graphicsSettings.viewDistance);
   const isMobile = isMobileDevice();
   const dpr = getOptimalDPR();
@@ -71,17 +72,17 @@ export const BattleScene: React.FC = () => {
       <MoonSystem />
       <ExpandedAsteroidBelts />
       
-      {/* Battle Components */}
-      <BattleArena />
-      <LocalPlayerShip />
+      {/* Battle Components - Keyed by matchSessionId to cleanly re-mount and reset on rematch */}
+      <BattleArena key={`arena-${matchSessionId}`} />
+      <LocalPlayerShip key={`player-${matchSessionId}`} />
       {remoteShips.map((ship) => (
-        <RemotePlayerShip key={ship.id} player={ship} />
+        <RemotePlayerShip key={`${ship.id}-${matchSessionId}`} player={ship} />
       ))}
-      <LaserProjectiles />
-      <LaserBeam3D />
-      <SolarBeam3D />
-      <LeadReticle3D />
-      {isSolo && <SoloAIBot />}
+      <LaserProjectiles key={`proj-${matchSessionId}`} />
+      <LaserBeam3D key={`laser-${matchSessionId}`} />
+      <SolarBeam3D key={`solar-${matchSessionId}`} />
+      <LeadReticle3D key={`lead-${matchSessionId}`} />
+      {isSolo && <SoloAIBot key={`solo-ai-${matchSessionId}`} />}
 
       {/* Post Processing: only on desktop devices with high settings */}
       {!isMobile && graphicsSettings.postProcessing !== 'off' && <CinematicPostProcessing />}

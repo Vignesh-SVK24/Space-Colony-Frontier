@@ -33,6 +33,7 @@ export const LocalPlayerShip: React.FC = () => {
   const setTargetLock = useMultiplayerStore(state => state.setTargetLock);
   const setLeadIndicator = useMultiplayerStore(state => state.setLeadIndicator);
   const showCombatHitboxes = useMultiplayerStore(state => state.showCombatHitboxes);
+  const matchSessionId = useMultiplayerStore(state => state.matchSessionId);
   
   const keysRef = useRef<Record<string, boolean>>({});
   const [isBoosting, setIsBoosting] = useState(false);
@@ -118,14 +119,45 @@ export const LocalPlayerShip: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    initialPosSet.current = false;
+    velocity.current.set(0, 0, 0);
+    rotationEuler.current.set(0, 0, 0, 'YXZ');
+    soloAmmo.current = COMBAT_CONFIG.BULLET_MAGAZINE_SIZE;
+    soloIsReloading.current = false;
+    soloReloadEndTime.current = 0;
+    lastBulletTime.current = 0;
+    lastLaserTime.current = 0;
+    lastSolarTime.current = 0;
+    isBoostingRef.current = false;
+    setIsBoosting(false);
+    isMouseDownLeft.current = false;
+    isMouseDownRight.current = false;
+    keysRef.current = {};
+    if (group.current && selfState) {
+      group.current.position.set(selfState.position[0], selfState.position[1], selfState.position[2]);
+      rotationEuler.current.set(selfState.rotation[0], selfState.rotation[1], selfState.rotation[2], 'YXZ');
+      group.current.quaternion.setFromEuler(rotationEuler.current);
+    }
+  }, [matchSessionId]);
+
   useFrame((_, delta) => {
     if (!group.current) return;
 
-    // Initialize position on first spawn
+    // Initialize position on first spawn or match reset
     if (selfState && !initialPosSet.current) {
       group.current.position.set(selfState.position[0], selfState.position[1], selfState.position[2]);
       rotationEuler.current.set(selfState.rotation[0], selfState.rotation[1], selfState.rotation[2], 'YXZ');
       group.current.quaternion.setFromEuler(rotationEuler.current);
+      velocity.current.set(0, 0, 0);
+
+      // Snap camera immediately on initial spawn / rematch
+      const initOffset = new THREE.Vector3(0, SHIP_CONFIG.camera.chaseHeight, -SHIP_CONFIG.camera.chaseDistance);
+      initOffset.applyEuler(rotationEuler.current);
+      camera.position.copy(group.current.position).add(initOffset);
+      const initLook = group.current.position.clone().add(new THREE.Vector3(0, 0, 1).applyEuler(rotationEuler.current).multiplyScalar(25));
+      camera.lookAt(initLook);
+
       initialPosSet.current = true;
     }
 

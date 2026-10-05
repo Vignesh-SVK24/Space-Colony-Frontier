@@ -12,6 +12,7 @@ interface RemotePlayerShipProps {
 
 export const RemotePlayerShip: React.FC<RemotePlayerShipProps> = ({ player }) => {
   const showCombatHitboxes = useMultiplayerStore(state => state.showCombatHitboxes);
+  const matchSessionId = useMultiplayerStore(state => state.matchSessionId);
   const group = useRef<THREE.Group>(null);
   
   const currentPos = useRef(new THREE.Vector3());
@@ -21,6 +22,10 @@ export const RemotePlayerShip: React.FC<RemotePlayerShipProps> = ({ player }) =>
   const targetVel = useRef(new THREE.Vector3());
   const lastPacketTime = useRef(performance.now());
   const initialPosSet = useRef(false);
+
+  React.useEffect(() => {
+    initialPosSet.current = false;
+  }, [matchSessionId]);
 
   React.useEffect(() => {
     if (!player) return;

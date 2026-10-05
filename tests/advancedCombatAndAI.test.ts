@@ -139,4 +139,67 @@ describe('Advanced Combat System & Arena Obstacles', () => {
     expect(state.selfState?.hp).toBe(250);
     expect(state.opponentState?.hp).toBe(250);
   });
+
+  it('should cleanly start from the beginning on rematch in solo mode with new matchSessionId and full resets', () => {
+    const store = useMultiplayerStore.getState();
+    store.setPlayerName('Phoenix');
+    store.setPlayerColor('yellow');
+    store.setAIDifficulty('NORMAL');
+
+    // 1. Initial Solo Battle Start
+    store.startSoloGame();
+    const initialSessionId = useMultiplayerStore.getState().matchSessionId;
+    expect(initialSessionId).toBeGreaterThanOrEqual(1);
+
+    // 2. Simulate combat damage and match conclusion
+    store.applyDamageToSoloOpponent(250, 'bullet'); // Destroy bot
+    expect(useMultiplayerStore.getState().opponentState?.hp).toBe(0);
+
+    store.handleMatchEnd({
+      winner: 'solo_player',
+      winnerName: 'Phoenix',
+      loserName: 'TARGET DRONE (NORMAL)',
+      mode: '1v1',
+      damageDealt: 250,
+      shotsHit: 5,
+      shotsFired: 10,
+      accuracy: 50,
+      matchDuration: 45
+    });
+
+    let state = useMultiplayerStore.getState();
+    expect(state.appView).toBe('RESULT');
+    expect(state.roomStatus).toBe('FINISHED');
+    expect(state.matchResult).not.toBeNull();
+
+    // 3. Click Rematch / Play Solo Again
+    store.startSoloGame();
+
+    state = useMultiplayerStore.getState();
+    // Verify whole match started from the beginning
+    expect(state.matchSessionId).toBe(initialSessionId + 1);
+    expect(state.appView).toBe('BATTLE');
+    expect(state.roomStatus).toBe('BATTLE');
+    expect(state.matchResult).toBeNull();
+
+    // Both player and computer are restored to initial spawn positions & 250 HP
+    expect(state.selfState?.hp).toBe(250);
+    expect(state.selfState?.alive).toBe(true);
+    expect(state.selfState?.position).toEqual([0, 0, -80]);
+
+    expect(state.opponentState?.hp).toBe(250);
+    expect(state.opponentState?.alive).toBe(true);
+    expect(state.opponentState?.position).toEqual([0, 15, 80]);
+    expect(state.opponentState?.velocity).toEqual([0, 0, 15]);
+
+    // Weapons, ammunition, and cooldowns are refreshed
+    expect(state.ammo).toBe(COMBAT_CONFIG.BULLET_MAGAZINE_SIZE);
+    expect(state.isReloading).toBe(false);
+    expect(state.reloadTimeRemaining).toBe(0);
+    expect(state.laserCooldownRemaining).toBe(0);
+    expect(state.solarCooldownRemaining).toBe(0);
+    expect(state.bulletCooldownRemaining).toBe(0);
+    expect(state.projectiles).toEqual([]);
+    expect(state.joystickAxis).toEqual({ x: 0, y: 0 });
+  });
 });
