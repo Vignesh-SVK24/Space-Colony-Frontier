@@ -43,7 +43,7 @@ export const BattleScene: React.FC = () => {
         antialias: !isMobile && graphicsSettings.antiAliasing,
         powerPreference: 'high-performance',
         toneMapping: ACESFilmicToneMapping,
-        toneMappingExposure: 1.0,
+        toneMappingExposure: 0.96,
         stencil: false,
         depth: true
       }}
@@ -52,8 +52,17 @@ export const BattleScene: React.FC = () => {
       }}
       className="w-full h-full touch-none select-none"
     >
-      <ambientLight intensity={0.4} />
-      <hemisphereLight args={['#ffffff', '#000000', 0.2]} />
+      {/* Deep Space Navy Ambient Fill */}
+      <ambientLight color="#08182f" intensity={0.32} />
+
+      {/* Atmospheric Space/Basalt Hemisphere Light */}
+      <hemisphereLight args={['#0f284e', '#050b14', 0.25]} />
+
+      {/* Warm Golden Sunlight Key Directional */}
+      <directionalLight position={[120, 180, 140]} color="#fff8e7" intensity={1.5} />
+
+      {/* Deep Space Cool Cyan/Navy Rim Light */}
+      <directionalLight position={[-120, -60, -140]} color="#0c2d54" intensity={0.6} />
       
       {/* Environment */}
       <DeepSpaceSkybox />

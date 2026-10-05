@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { SpaceshipModel } from '../spaceships/SpaceshipModel';
 import { SHIP_CONFIG } from '../../../config/shipConfig';
 import { COMBAT_CONFIG } from '../../../config/combatConfig';
-import { checkObstacleRaycast } from '../../../config/arenaObstacles';
+import { checkObstacleRaycast, resolveShipMovementCollision } from '../../../config/arenaObstacles';
 import { SpaceshipPaintSchemeKey } from '../../../config/visualTheme';
 import { sendInput, sendBullet, sendLaser, sendSolar } from '../../../multiplayer/colyseusClient';
 import { useMultiplayerStore } from '../../../multiplayer/useMultiplayerStore';
@@ -180,15 +180,28 @@ export const LocalPlayerShip: React.FC = () => {
     velocity.current.z = THREE.MathUtils.lerp(velocity.current.z, targetSpeed, dt * 3.5);
     velocity.current.y = THREE.MathUtils.lerp(velocity.current.y, verticalInput * 25, dt * 4.0);
 
-    // Apply translation
+    // Apply translation with continuous collision resolution
+    const prevPos = group.current.position.clone();
     const moveStep = forwardDir.clone().multiplyScalar(velocity.current.z * dt);
     moveStep.add(upDir.clone().multiplyScalar(velocity.current.y * dt));
-    group.current.position.add(moveStep);
+    const desiredPos = prevPos.clone().add(moveStep);
 
-    // Arena boundary clamp
-    const distFromCenter = group.current.position.length();
-    if (distFromCenter > COMBAT_CONFIG.ARENA_RADIUS) {
-      group.current.position.setLength(COMBAT_CONFIG.ARENA_RADIUS);
+    // Continuous collision resolution against all 10 obstacles, planetary terrain, and arena boundary
+    const collisionRes = resolveShipMovementCollision(prevPos, desiredPos, 3.6);
+    group.current.position.set(collisionRes.position.x, collisionRes.position.y, collisionRes.position.z);
+
+    if (collisionRes.collided && collisionRes.normal) {
+      // Deflect velocity along collision surface tangent plane
+      const velVec = forwardDir.clone().multiplyScalar(velocity.current.z).add(upDir.clone().multiplyScalar(velocity.current.y));
+      const normVec = new THREE.Vector3(collisionRes.normal.x, collisionRes.normal.y, collisionRes.normal.z);
+      const normalDot = velVec.dot(normVec);
+      if (normalDot < 0) {
+        velVec.sub(normVec.clone().multiplyScalar(normalDot * 1.15));
+        velocity.current.z = Math.min(velocity.current.z, velVec.length());
+        if (collisionRes.hitTerrain) {
+          velocity.current.y = Math.max(0, velocity.current.y);
+        }
+      }
     }
 
     // Camera chase

@@ -61,11 +61,11 @@ export const CinematicPostProcessing: FC = () => {
     const renderPass = new RenderPass(scene, camera);
     composer.addPass(renderPass);
 
-    // 2. Controlled Selective Bloom
+    // 2. Controlled Selective Bloom (Emphasizes thrusters & weapon cores without washing out hulls/terrain)
     if (graphicsSettings.bloom) {
-      const bloomStrength = graphicsSettings.preset === 'ultra' ? 0.55 : 0.42;
-      const bloomRadius = 0.38;
-      const bloomThreshold = 0.84; // High threshold preserves sharp dark hull edges
+      const bloomStrength = graphicsSettings.preset === 'ultra' ? 0.36 : 0.26;
+      const bloomRadius = 0.28;
+      const bloomThreshold = 0.88; // High threshold preserves sharp dark hull edges and terrain definition
       const bloomPass = new UnrealBloomPass(
         new THREE.Vector2(size.width, size.height),
         bloomStrength,

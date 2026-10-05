@@ -4,6 +4,14 @@ import * as THREE from 'three';
 import { useNexusGameStore } from '../../../state/useNexusGameStore';
 import { getAsteroidFacetNormal } from '../../../utils/pbrTextureGenerator';
 
+function createSeededRng(initialSeed: number) {
+  let s = initialSeed;
+  return () => {
+    s = (s * 9301 + 49297) % 233280;
+    return s / 233280;
+  };
+}
+
 export const ExpandedAsteroidBelts: FC = () => {
   const ironMeshRef = useRef<THREE.InstancedMesh>(null);
   const titaniumMeshRef = useRef<THREE.InstancedMesh>(null);
@@ -13,18 +21,19 @@ export const ExpandedAsteroidBelts: FC = () => {
   const { selectEntity, setHoveredEntity } = useNexusGameStore();
   const facetNormal = useMemo(() => getAsteroidFacetNormal(), []);
 
-  // Sector Alpha: Iron Asteroids (Ring radius 110-140)
+  // Sector Alpha: Iron Asteroids (Deterministic Seed 101)
   const ironCount = 75;
   const ironTransforms = useMemo(() => {
+    const rng = createSeededRng(101);
     const temp = new THREE.Object3D();
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < ironCount; i++) {
       const angle = (i / ironCount) * Math.PI * 2;
-      const r = 110 + (Math.random() - 0.5) * 30;
-      const y = (Math.random() - 0.5) * 22;
+      const r = 110 + (rng() - 0.5) * 30;
+      const y = (rng() - 0.5) * 22;
       temp.position.set(Math.cos(angle) * r, y, Math.sin(angle) * r);
-      temp.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-      const s = 1.2 + Math.random() * 2.8;
+      temp.rotation.set(rng() * Math.PI, rng() * Math.PI, 0);
+      const s = 1.2 + rng() * 2.8;
       temp.scale.set(s, s * 0.8, s * 1.1);
       temp.updateMatrix();
       matrices.push(temp.matrix.clone());
@@ -32,18 +41,19 @@ export const ExpandedAsteroidBelts: FC = () => {
     return matrices;
   }, [ironCount]);
 
-  // Sector Beta: Titanium Asteroids (High altitude cluster at [-140, 45, 120])
+  // Sector Beta: Titanium Asteroids (Deterministic Seed 202)
   const titaniumCount = 45;
   const titaniumTransforms = useMemo(() => {
+    const rng = createSeededRng(202);
     const temp = new THREE.Object3D();
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < titaniumCount; i++) {
-      const x = -140 + (Math.random() - 0.5) * 55;
-      const y = 45 + (Math.random() - 0.5) * 35;
-      const z = 120 + (Math.random() - 0.5) * 55;
+      const x = -140 + (rng() - 0.5) * 55;
+      const y = 45 + (rng() - 0.5) * 35;
+      const z = 120 + (rng() - 0.5) * 55;
       temp.position.set(x, y, z);
-      temp.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-      const s = 1.5 + Math.random() * 3.5;
+      temp.rotation.set(rng() * Math.PI, rng() * Math.PI, 0);
+      const s = 1.5 + rng() * 3.5;
       temp.scale.set(s, s, s);
       temp.updateMatrix();
       matrices.push(temp.matrix.clone());
@@ -51,18 +61,19 @@ export const ExpandedAsteroidBelts: FC = () => {
     return matrices;
   }, [titaniumCount]);
 
-  // Sector Gamma: Glacial Water Ice Cluster at [180, -35, 160]
+  // Sector Gamma: Glacial Water Ice Cluster (Deterministic Seed 303)
   const iceCount = 40;
   const iceTransforms = useMemo(() => {
+    const rng = createSeededRng(303);
     const temp = new THREE.Object3D();
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < iceCount; i++) {
-      const x = 180 + (Math.random() - 0.5) * 50;
-      const y = -35 + (Math.random() - 0.5) * 30;
-      const z = 160 + (Math.random() - 0.5) * 50;
+      const x = 180 + (rng() - 0.5) * 50;
+      const y = -35 + (rng() - 0.5) * 30;
+      const z = 160 + (rng() - 0.5) * 50;
       temp.position.set(x, y, z);
-      temp.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-      const s = 1.0 + Math.random() * 2.4;
+      temp.rotation.set(rng() * Math.PI, rng() * Math.PI, 0);
+      const s = 1.0 + rng() * 2.4;
       temp.scale.set(s, s * 1.3, s);
       temp.updateMatrix();
       matrices.push(temp.matrix.clone());
@@ -70,18 +81,19 @@ export const ExpandedAsteroidBelts: FC = () => {
     return matrices;
   }, [iceCount]);
 
-  // Space Debris (Scattered satellite scrap & panels)
+  // Space Debris: Satellite scrap & panels (Deterministic Seed 404)
   const debrisCount = 35;
   const debrisTransforms = useMemo(() => {
+    const rng = createSeededRng(404);
     const temp = new THREE.Object3D();
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < debrisCount; i++) {
       const angle = (i / debrisCount) * Math.PI * 2;
-      const r = 70 + (Math.random() - 0.5) * 30;
-      const y = 20 + (Math.random() - 0.5) * 25;
+      const r = 70 + (rng() - 0.5) * 30;
+      const y = 20 + (rng() - 0.5) * 25;
       temp.position.set(Math.cos(angle) * r, y, Math.sin(angle) * r);
-      temp.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-      const s = 0.5 + Math.random() * 0.9;
+      temp.rotation.set(rng() * Math.PI, rng() * Math.PI, 0);
+      const s = 0.5 + rng() * 0.9;
       temp.scale.set(s, s * 0.2, s * 1.4);
       temp.updateMatrix();
       matrices.push(temp.matrix.clone());
@@ -151,7 +163,7 @@ export const ExpandedAsteroidBelts: FC = () => {
         onPointerOut={() => setHoveredEntity(null)}
       >
         <dodecahedronGeometry args={[1, 1]} />
-        <meshStandardMaterial color="#475569" roughness={0.7} metalness={0.8} normalMap={facetNormal} />
+        <meshStandardMaterial color="#1e293b" roughness={0.82} metalness={0.35} normalMap={facetNormal} />
       </instancedMesh>
 
       {/* 2. Belt Beta: Titanium / Rare Mineral Belt */}
@@ -188,60 +200,50 @@ export const ExpandedAsteroidBelts: FC = () => {
         onPointerOut={() => setHoveredEntity(null)}
       >
         <octahedronGeometry args={[1, 1]} />
-        <meshStandardMaterial color="#94a3b8" roughness={0.25} metalness={0.95} normalMap={facetNormal} />
+        <meshStandardMaterial color="#253347" roughness={0.78} metalness={0.45} normalMap={facetNormal} />
       </instancedMesh>
 
-      {/* 3. Belt Gamma: Glacial Water Ice Cluster */}
+      {/* 3. Belt Gamma: Water Ice Asteroids */}
       <instancedMesh
         ref={iceMeshRef}
         args={[undefined, undefined, iceCount]}
         onClick={(e) => {
           e.stopPropagation();
           selectEntity({
-            id: 'belt-gamma-ice',
-            name: 'PERMAFROST ASTEROID COMET (ICE FIELD)',
-            type: 'resource' as any,
-            status: 'HIGH VOLATILE PURITY',
+            id: 'cluster-gamma-ice',
+            name: 'GLACIAL ICE CLUSTER (RESOURCE NODE)',
+            type: 'asteroid',
+            status: 'VOLATILE EXTRACTION SITE',
             distanceKm: 210,
             metrics: [
-              { label: 'WATER CONTENT', value: '88', unit: '%' },
-              { label: 'CRYOGENIC TEMP', value: '-190', unit: '°C' },
-              { label: 'LIFE SUPPORT', value: 'SUPPORTS 1,200 COLONISTS' }
+              { label: 'WATER PURITY', value: '99.1', unit: '%' },
+              { label: 'FUEL EXTRACTION', value: 'LIQUID H2 / LOX' },
+              { label: 'TEMPERATURE', value: '38', unit: 'KELVIN' }
             ],
             actions: [
-              { id: 'extract_ice', label: 'DISPATCH ICE EXTRACTION TUG', variant: 'primary' }
+              { id: 'tag_ice', label: 'DEPLOY EXTRACTION DRONE', variant: 'primary' }
             ]
           });
         }}
         onPointerOver={(e) => {
           e.stopPropagation();
           setHoveredEntity({
-            name: 'ICE CLUSTER GAMMA (POTABLE WATER)',
-            type: 'HYDRO-RESERVE CLUSTER',
+            name: 'CLUSTER GAMMA (WATER ICE)',
+            type: 'FUEL VOLATILE SOURCE',
             distanceM: 2100,
-            actionPrompt: 'CLICK TO SURVEY ICE PURITY'
+            actionPrompt: 'CLICK TO ANALYZE VOLATILE YIELD'
           });
         }}
         onPointerOut={() => setHoveredEntity(null)}
       >
         <icosahedronGeometry args={[1, 0]} />
-        <meshStandardMaterial
-          color="#7dd3fc"
-          roughness={0.12}
-          metalness={0.15}
-          transparent
-          opacity={0.88}
-          normalMap={facetNormal}
-        />
+        <meshStandardMaterial color="#8ccdeb" roughness={0.4} metalness={0.15} transparent opacity={0.88} />
       </instancedMesh>
 
-      {/* 4. Orbital Space Debris */}
-      <instancedMesh
-        ref={debrisMeshRef}
-        args={[undefined, undefined, debrisCount]}
-      >
-        <boxGeometry args={[1, 0.2, 1.5]} />
-        <meshStandardMaterial color="#475569" roughness={0.5} metalness={0.8} />
+      {/* 4. Orbital Debris Field */}
+      <instancedMesh ref={debrisMeshRef} args={[undefined, undefined, debrisCount]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#334155" roughness={0.65} metalness={0.75} />
       </instancedMesh>
     </group>
   );

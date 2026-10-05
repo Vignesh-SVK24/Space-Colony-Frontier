@@ -1,37 +1,33 @@
 import { BattleStateSchema, PlayerSchema } from '../schema/BattleState.js';
 import { GAME_CONFIG, Vector3D } from '../shared/gameConfig.js';
+import { resolveShipMovementCollision } from '../arenaObstacles.js';
 
 export class BoundarySystem {
   /**
-   * Enforces 300m spherical battle zone limits
+   * Enforces authoritative physical terrain, obstacle, and 300m spherical battle zone limits
    */
   enforce(state: BattleStateSchema, dt: number) {
-    const maxRadius = GAME_CONFIG.ARENA_RADIUS;
-
     state.players.forEach((player) => {
       if (!player.alive) return;
 
-      const px = player.position.x;
-      const py = player.position.y;
-      const pz = player.position.z;
-      const dist = Math.hypot(px, py, pz);
+      const prevPos = { x: player.position.x, y: player.position.y, z: player.position.z };
+      const res = resolveShipMovementCollision(prevPos, prevPos, 3.8);
 
-      if (dist > maxRadius) {
-        // Clamp to sphere boundary
-        const factor = maxRadius / dist;
-        player.position.set(px * factor, py * factor, pz * factor);
+      if (res.collided) {
+        player.position.set(res.position.x, res.position.y, res.position.z);
 
-        // Cancel outward velocity
-        const vx = player.velocity.x;
-        const vy = player.velocity.y;
-        const vz = player.velocity.z;
-        const dot = (px * vx + py * vy + pz * vz) / dist;
-        if (dot > 0) {
-          player.velocity.set(
-            vx - (px / dist) * dot,
-            vy - (py / dist) * dot,
-            vz - (pz / dist) * dot
-          );
+        if (res.normal) {
+          // Deflect velocity along collision surface normal
+          const dot = player.velocity.x * res.normal.x +
+                      player.velocity.y * res.normal.y +
+                      player.velocity.z * res.normal.z;
+          if (dot < 0) {
+            player.velocity.set(
+              player.velocity.x - res.normal.x * dot,
+              player.velocity.y - res.normal.y * dot,
+              player.velocity.z - res.normal.z * dot
+            );
+          }
         }
       }
     });

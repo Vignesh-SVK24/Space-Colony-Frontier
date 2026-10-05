@@ -5,7 +5,8 @@ import { useMultiplayerStore } from '../../../multiplayer/useMultiplayerStore';
 import { ProjectileState } from '../../../multiplayer/types';
 import { nexusAudio } from '../../../utils/nexusAudio';
 import { COMBAT_CONFIG, AI_DIFFICULTY_SETTINGS } from '../../../config/combatConfig';
-import { ARENA_OBSTACLES, checkObstacleRaycast, getCoverHidingPosition } from '../../../config/arenaObstacles';
+import { ARENA_OBSTACLES, checkObstacleRaycast, getCoverHidingPosition, resolveShipMovementCollision } from '../../../config/arenaObstacles';
+import { raycastTerrain } from '../../../config/terrainPhysics';
 
 export type AIState =
   | 'IDLE'
@@ -365,11 +366,14 @@ export const SoloAIBot: React.FC = () => {
 
       const steerDir = new THREE.Vector3().subVectors(targetMovePos, dronePos.current).normalize();
       droneVel.current.lerp(steerDir.multiplyScalar(desiredSpeed), dt * 2.5);
-      dronePos.current.addScaledVector(droneVel.current, dt);
 
-      if (dronePos.current.length() > COMBAT_CONFIG.ARENA_RADIUS - 10) {
-        dronePos.current.clampLength(0, COMBAT_CONFIG.ARENA_RADIUS - 12);
-        droneVel.current.multiplyScalar(0.5);
+      const desiredDronePos = dronePos.current.clone().addScaledVector(droneVel.current, dt);
+      const droneCollision = resolveShipMovementCollision(dronePos.current, desiredDronePos, 3.8);
+      dronePos.current.set(droneCollision.position.x, droneCollision.position.y, droneCollision.position.z);
+
+      if (droneCollision.collided && droneCollision.normal) {
+        const norm = new THREE.Vector3(droneCollision.normal.x, droneCollision.normal.y, droneCollision.normal.z);
+        droneVel.current.reflect(norm).multiplyScalar(0.4);
       }
 
       let aimTarget = playerPos;
@@ -542,6 +546,11 @@ export const SoloAIBot: React.FC = () => {
           hit = true;
           break;
         }
+      }
+
+      // Check terrain collision
+      if (!hit && raycastTerrain(prevPos.x, prevPos.y, prevPos.z, nextPos.x, nextPos.y, nextPos.z).hit) {
+        hit = true;
       }
 
       if (hit) continue;

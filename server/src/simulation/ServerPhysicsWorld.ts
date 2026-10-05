@@ -1,6 +1,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { ARENA_OBSTACLES, ArenaObstacle } from '../arenaObstacles.js';
 import { GAME_CONFIG, Vector3D } from '../shared/gameConfig.js';
+import { raycastTerrain } from '../shared/terrainPhysics.js';
 
 export interface RaycastHit {
   blocked: boolean;
@@ -31,11 +32,17 @@ export class ServerPhysicsWorld {
       this.world.createCollider(colliderDesc, rigidBody);
     }
 
+    // Create Rapier static terrain foundation colliders
+    const terrainBodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0, -145, 0);
+    const terrainBody = this.world.createRigidBody(terrainBodyDesc);
+    const terrainCollider = RAPIER.ColliderDesc.cuboid(300, 20, 300);
+    this.world.createCollider(terrainCollider, terrainBody);
+
     this.initialized = true;
   }
 
   /**
-   * Raycast through Rapier World to check for obstacle obstruction
+   * Raycast through Rapier World & Planetary Terrain to check for obstacle obstruction
    */
   castRay(start: Vector3D, end: Vector3D): RaycastHit {
     const dx = end.x - start.x;
@@ -50,16 +57,22 @@ export class ServerPhysicsWorld {
     const ray = new RAPIER.Ray(start, dir);
     const hit = this.world.castRay(ray, maxToi, true);
 
+    let closestDist = maxToi;
+    let hitPoint: Vector3D | null = null;
+    let hitObs: ArenaObstacle | null = null;
+    let blocked = false;
+
     if (hit) {
       const toi = hit.timeOfImpact;
-      const hitPoint = {
+      closestDist = toi;
+      hitPoint = {
         x: start.x + dir.x * toi,
         y: start.y + dir.y * toi,
         z: start.z + dir.z * toi
       };
+      blocked = true;
 
       // Match closest obstacle by distance
-      let hitObs: ArenaObstacle | null = null;
       let minObsDist = Infinity;
       for (const obs of ARENA_OBSTACLES) {
         const d = Math.hypot(obs.position[0] - hitPoint.x, obs.position[1] - hitPoint.y, obs.position[2] - hitPoint.z);
@@ -68,11 +81,31 @@ export class ServerPhysicsWorld {
           hitObs = obs;
         }
       }
+    }
 
+    // Check analytical planetary terrain intersection
+    const terrainHit = raycastTerrain(start.x, start.y, start.z, end.x, end.y, end.z);
+    if (terrainHit.hit && terrainHit.distance < closestDist) {
+      closestDist = terrainHit.distance;
+      hitPoint = {
+        x: terrainHit.hitPoint![0],
+        y: terrainHit.hitPoint![1],
+        z: terrainHit.hitPoint![2]
+      };
+      hitObs = {
+        id: 'obs_terrain_bedrock',
+        name: 'Planetary Terrain Bedrock',
+        position: [hitPoint.x, hitPoint.y, hitPoint.z],
+        radius: 12
+      };
+      blocked = true;
+    }
+
+    if (blocked && hitPoint) {
       return {
         blocked: true,
         hitPoint,
-        distance: toi,
+        distance: closestDist,
         obstacle: hitObs
       };
     }
@@ -81,7 +114,7 @@ export class ServerPhysicsWorld {
   }
 
   /**
-   * Continuous swept sphere intersection against an obstacle
+   * Continuous swept sphere intersection against an obstacle and terrain
    */
   checkSweptSphereVsObstacles(p1: Vector3D, p2: Vector3D, radius: number): RaycastHit {
     const rayHit = this.castRay(p1, p2);

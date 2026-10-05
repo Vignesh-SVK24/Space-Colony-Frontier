@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { useMultiplayerStore } from '../../../multiplayer/useMultiplayerStore';
 import { ARENA_OBSTACLES, ArenaObstacle } from '../../../config/arenaObstacles';
 import { COMBAT_CONFIG } from '../../../config/combatConfig';
+import { AlienTerrainSurface } from './AlienTerrainSurface';
 
 /**
  * 3D Mesh Component for a Giant Asteroid / Rock Obstacle
@@ -30,7 +31,7 @@ const AsteroidObstacleMesh: React.FC<{ obstacle: ArenaObstacle }> = ({ obstacle 
     return geo;
   }, [radius, obstacle.id]);
 
-  const rockColor = obstacle.type === 'rock' ? '#474b52' : '#3c3f46';
+  const rockColor = obstacle.type === 'rock' ? '#1c2433' : '#151d2a';
 
   useFrame((_, delta) => {
     if (meshRef.current) {
@@ -44,15 +45,15 @@ const AsteroidObstacleMesh: React.FC<{ obstacle: ArenaObstacle }> = ({ obstacle 
       <mesh ref={meshRef} geometry={geometry}>
         <meshStandardMaterial
           color={rockColor}
-          roughness={0.9}
-          metalness={0.15}
+          roughness={0.86}
+          metalness={0.24}
           flatShading
         />
       </mesh>
       {/* Subtle proximity marker ring */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <ringGeometry args={[radius * 1.05, radius * 1.08, 32]} />
-        <meshBasicMaterial color="#06b6d4" transparent opacity={0.08} side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#8ccdeb" transparent opacity={0.08} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
@@ -254,6 +255,9 @@ export const BattleArena: React.FC = () => {
         <ringGeometry args={[COMBAT_CONFIG.ARENA_RADIUS - 0.5, COMBAT_CONFIG.ARENA_RADIUS, 64]} />
         <meshBasicMaterial color="#06b6d4" transparent opacity={0.15} side={THREE.DoubleSide} />
       </mesh>
+
+      {/* Planetary Alien Battlefield Terrain Boundary Floor */}
+      <AlienTerrainSurface />
 
       {/* Render all Physical 3D Obstacles */}
       {ARENA_OBSTACLES.map(obstacle => {

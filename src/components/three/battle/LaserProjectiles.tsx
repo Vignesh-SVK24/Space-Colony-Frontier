@@ -14,14 +14,14 @@ const COLOR_MAP: Record<string, string> = {
 export const LaserProjectiles: React.FC = () => {
   const projectiles = useMultiplayerStore(state => state.projectiles);
   const group = useRef<THREE.Group>(null);
-  const localProjectiles = useRef(new Map<string, { pos: THREE.Vector3, dir: THREE.Vector3 }>());
+  const localProjectiles = useRef(new Map<string, { pos: THREE.Vector3; dir: THREE.Vector3 }>());
 
   useFrame((_, delta) => {
     if (!group.current) return;
     
     const bulletSpeed = GAME_CONFIG.BULLET_SPEED || 260;
 
-    // Client-side prediction & interpolation with authoritative position
+    // Client-side prediction & interpolation with authoritative snapshot
     projectiles.forEach(p => {
       let loc = localProjectiles.current.get(p.id);
       const incomingPos = new THREE.Vector3().fromArray(p.position);
@@ -31,13 +31,12 @@ export const LaserProjectiles: React.FC = () => {
         loc = { pos: incomingPos.clone(), dir: incomingDir };
         localProjectiles.current.set(p.id, loc);
       } else {
-        // Reconcile toward authoritative snapshot position and advance
         loc.pos.lerp(incomingPos, Math.min(1, delta * 15));
         loc.pos.addScaledVector(loc.dir, bulletSpeed * delta);
       }
     });
 
-    // Cleanup old ones
+    // Cleanup expired projectiles
     const activeIds = new Set(projectiles.map(p => p.id));
     for (const [id] of localProjectiles.current) {
       if (!activeIds.has(id)) {
@@ -45,7 +44,7 @@ export const LaserProjectiles: React.FC = () => {
       }
     }
     
-    // Update mesh positions
+    // Position and align projectile tracer groups
     let i = 0;
     projectiles.forEach(p => {
       const child = group.current?.children[i] as THREE.Group;
@@ -64,20 +63,24 @@ export const LaserProjectiles: React.FC = () => {
   return (
     <group ref={group}>
       {projectiles.map(p => {
-        const color = COLOR_MAP[p.color] || '#38bdf8';
+        const color = COLOR_MAP[p.color] || '#8ccdeb';
         return (
           <group key={p.id}>
-            {/* High-intensity glowing plasma core */}
+            {/* Slim bright needle core (sharp aerodynamic profile) */}
             <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.12, 0.12, 2.8, 8]} />
+              <cylinderGeometry args={[0.065, 0.065, 2.2, 8]} />
               <meshBasicMaterial color="#ffffff" />
             </mesh>
-            {/* Outer radiant plasma envelope */}
+            {/* Soft, controlled radiant plasma sleeve (non-blinding glow) */}
             <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.32, 0.32, 3.4, 8]} />
-              <meshBasicMaterial color={color} transparent opacity={0.85} blending={THREE.AdditiveBlending} />
+              <cylinderGeometry args={[0.16, 0.16, 2.6, 8]} />
+              <meshBasicMaterial color={color} transparent opacity={0.55} blending={THREE.AdditiveBlending} />
             </mesh>
-            <pointLight distance={15} intensity={3} color={color} />
+            {/* Tapered aerodynamic energy wake trail */}
+            <mesh position={[0, 0, -1.2]} rotation={[Math.PI / 2, 0, 0]}>
+              <coneGeometry args={[0.14, 1.4, 6]} />
+              <meshBasicMaterial color={color} transparent opacity={0.35} blending={THREE.AdditiveBlending} />
+            </mesh>
           </group>
         );
       })}

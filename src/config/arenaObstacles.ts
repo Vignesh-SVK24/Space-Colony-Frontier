@@ -8,6 +8,8 @@
  * 5. Full-Screen Tactical Map rendering
  */
 
+import { raycastTerrain, resolveTerrainCollision, getTerrainNormal } from './terrainPhysics';
+
 export interface ArenaObstacle {
   id: string;
   name: string;
@@ -183,6 +185,28 @@ export function checkObstacleRaycast(
     }
   }
 
+  // Check planetary terrain boundary surface intersection
+  const terrainHit = raycastTerrain(startX, startY, startZ, endX, endY, endZ);
+  if (terrainHit.hit && terrainHit.distance < closestHitDist) {
+    closestHitDist = terrainHit.distance;
+    hitObstacle = {
+      id: 'obs_terrain_bedrock',
+      name: 'Planetary Terrain Bedrock',
+      type: 'rock',
+      position: terrainHit.hitPoint!,
+      radius: 12,
+      isCover: true,
+      tacticalLabel: 'TERRAIN',
+      description: 'Solid alien planetary surface. Complete ballistic and laser obstruction.'
+    };
+    return {
+      blocked: true,
+      obstacle: hitObstacle,
+      distance: closestHitDist,
+      hitPoint: terrainHit.hitPoint
+    };
+  }
+
   if (hitObstacle) {
     return {
       blocked: true,
@@ -197,6 +221,103 @@ export function checkObstacleRaycast(
   }
 
   return { blocked: false, obstacle: null, distance: rayLength, hitPoint: null };
+}
+
+/**
+ * Authoritative continuous collision resolver for spaceships against all
+ * obstacles, planetary terrain surface, and outer arena boundary.
+ */
+export function resolveShipMovementCollision(
+  prevPos: { x: number; y: number; z: number },
+  desiredPos: { x: number; y: number; z: number },
+  shipRadius: number = 3.6
+): {
+  position: { x: number; y: number; z: number };
+  collided: boolean;
+  hitObstacle: ArenaObstacle | null;
+  hitTerrain: boolean;
+  normal: { x: number; y: number; z: number } | null;
+} {
+  let resolvedX = desiredPos.x;
+  let resolvedY = desiredPos.y;
+  let resolvedZ = desiredPos.z;
+  let collided = false;
+  let hitObs: ArenaObstacle | null = null;
+  let hitTerr = false;
+  let impactNormal: { x: number; y: number; z: number } | null = null;
+
+  // 1. Check against all physical obstacles
+  for (const obs of ARENA_OBSTACLES) {
+    const ocX = resolvedX - obs.position[0];
+    const ocY = resolvedY - obs.position[1];
+    const ocZ = resolvedZ - obs.position[2];
+    const dist = Math.hypot(ocX, ocY, ocZ);
+    const minDist = obs.radius + shipRadius;
+
+    if (dist < minDist) {
+      collided = true;
+      hitObs = obs;
+      if (dist > 0.001) {
+        const factor = minDist / dist;
+        resolvedX = obs.position[0] + ocX * factor;
+        resolvedY = obs.position[1] + ocY * factor;
+        resolvedZ = obs.position[2] + ocZ * factor;
+        impactNormal = {
+          x: ocX / dist,
+          y: ocY / dist,
+          z: ocZ / dist
+        };
+      } else {
+        const fromPrevX = prevPos.x - obs.position[0];
+        const fromPrevY = prevPos.y - obs.position[1];
+        const fromPrevZ = prevPos.z - obs.position[2];
+        const pDist = Math.hypot(fromPrevX, fromPrevY, fromPrevZ);
+        if (pDist > 0.001) {
+          resolvedX = obs.position[0] + (fromPrevX / pDist) * minDist;
+          resolvedY = obs.position[1] + (fromPrevY / pDist) * minDist;
+          resolvedZ = obs.position[2] + (fromPrevZ / pDist) * minDist;
+          impactNormal = { x: fromPrevX / pDist, y: fromPrevY / pDist, z: fromPrevZ / pDist };
+        } else {
+          resolvedY = obs.position[1] + minDist;
+          impactNormal = { x: 0, y: 1, z: 0 };
+        }
+      }
+      break;
+    }
+  }
+
+  // 2. Check against planetary alien terrain floor
+  const terrainRes = resolveTerrainCollision(resolvedX, resolvedY, resolvedZ, shipRadius);
+  if (terrainRes.collided) {
+    collided = true;
+    hitTerr = true;
+    resolvedY = terrainRes.resolvedY;
+    impactNormal = terrainRes.normal;
+  }
+
+  // 3. Spherical arena forcefield boundary clamp (300m radius)
+  const distFromCenter = Math.hypot(resolvedX, resolvedY, resolvedZ);
+  const maxArenaR = 300 - shipRadius;
+  if (distFromCenter > maxArenaR) {
+    collided = true;
+    const factor = maxArenaR / distFromCenter;
+    resolvedX *= factor;
+    resolvedY *= factor;
+    resolvedZ *= factor;
+    impactNormal = {
+      x: -resolvedX / maxArenaR,
+      y: -resolvedY / maxArenaR,
+      z: -resolvedZ / maxArenaR
+    };
+  }
+
+  return {
+    position: { x: resolvedX, y: resolvedY, z: resolvedZ },
+    collided,
+    hitObstacle: hitObs,
+    hitTerrain: hitTerr,
+    normal: impactNormal
+  };
 }
 
 /**
