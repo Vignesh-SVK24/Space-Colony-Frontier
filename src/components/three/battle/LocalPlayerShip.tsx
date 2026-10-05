@@ -34,6 +34,8 @@ export const LocalPlayerShip: React.FC = () => {
   const setLeadIndicator = useMultiplayerStore(state => state.setLeadIndicator);
   
   const keysRef = useRef<Record<string, boolean>>({});
+  const [isBoosting, setIsBoosting] = useState(false);
+  const isBoostingRef = useRef(false);
   const isMouseDownLeft = useRef(false);
   const isMouseDownRight = useRef(false);
   
@@ -66,10 +68,18 @@ export const LocalPlayerShip: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       keysRef.current[e.code] = true;
       keysRef.current[e.key.toUpperCase()] = true;
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.key.toUpperCase() === 'SHIFT') {
+        isBoostingRef.current = true;
+        setIsBoosting(true);
+      }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       keysRef.current[e.code] = false;
       keysRef.current[e.key.toUpperCase()] = false;
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.key.toUpperCase() === 'SHIFT') {
+        isBoostingRef.current = false;
+        setIsBoosting(false);
+      }
     };
     
     const handleMouseDown = (e: MouseEvent) => {
@@ -557,7 +567,7 @@ export const LocalPlayerShip: React.FC = () => {
       <SpaceshipModel 
         paintScheme={getPaintScheme()} 
         throttle={Math.min(Math.abs(velocity.current.z) / COMBAT_CONFIG.SHIP_MAX_SPEED, 1)}
-        isBoosting={keys['ShiftLeft'] || keys['ShiftRight'] || keys['SHIFT']}
+        isBoosting={isBoosting}
         damaged={selfState?.hp !== undefined && selfState.hp < COMBAT_CONFIG.LOW_HP_THRESHOLD}
       />
       {showCombatHitboxes && (
