@@ -32,6 +32,7 @@ export const LocalPlayerShip: React.FC = () => {
   const setReloadTimeRemaining = useMultiplayerStore(state => state.setReloadTimeRemaining);
   const setTargetLock = useMultiplayerStore(state => state.setTargetLock);
   const setLeadIndicator = useMultiplayerStore(state => state.setLeadIndicator);
+  const showCombatHitboxes = useMultiplayerStore(state => state.showCombatHitboxes);
   
   const keysRef = useRef<Record<string, boolean>>({});
   const [isBoosting, setIsBoosting] = useState(false);
@@ -559,8 +560,6 @@ export const LocalPlayerShip: React.FC = () => {
       }
     }
   });
-
-  const showCombatHitboxes = useMultiplayerStore(state => state.showCombatHitboxes);
 
   return (
     <group ref={group} position={[0, 0, 0]}>

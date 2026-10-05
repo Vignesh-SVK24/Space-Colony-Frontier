@@ -11,6 +11,7 @@ interface RemotePlayerShipProps {
 }
 
 export const RemotePlayerShip: React.FC<RemotePlayerShipProps> = ({ player }) => {
+  const showCombatHitboxes = useMultiplayerStore(state => state.showCombatHitboxes);
   const group = useRef<THREE.Group>(null);
   
   const currentPos = useRef(new THREE.Vector3());
@@ -104,8 +105,6 @@ export const RemotePlayerShip: React.FC<RemotePlayerShipProps> = ({ player }) =>
   const velMag = player.velocity
     ? Math.hypot(player.velocity[0], player.velocity[1], player.velocity[2])
     : 0;
-
-  const showCombatHitboxes = useMultiplayerStore(state => state.showCombatHitboxes);
 
   return (
     <group ref={group}>
