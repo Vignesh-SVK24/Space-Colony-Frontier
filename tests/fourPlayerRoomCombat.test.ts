@@ -16,11 +16,11 @@ describe('Authoritative Multiplayer 4-Player Room & Battle Royale Elimination Te
   let room4: Room<BattleStateSchema>;
 
   beforeAll(async () => {
-    client1 = new Client('ws://127.0.0.1:3001');
-    client2 = new Client('ws://127.0.0.1:3001');
-    client3 = new Client('ws://127.0.0.1:3001');
-    client4 = new Client('ws://127.0.0.1:3001');
-    client5 = new Client('ws://127.0.0.1:3001');
+    client1 = new Client('ws://localhost:3001');
+    client2 = new Client('ws://localhost:3001');
+    client3 = new Client('ws://localhost:3001');
+    client4 = new Client('ws://localhost:3001');
+    client5 = new Client('ws://localhost:3001');
   });
 
   afterAll(() => {

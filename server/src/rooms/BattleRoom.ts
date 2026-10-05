@@ -2,13 +2,33 @@ import { Room, Client } from 'colyseus';
 import { BattleStateSchema, PlayerSchema } from '../schema/BattleState.js';
 import { SimulationLoop } from '../simulation/SimulationLoop.js';
 import { GAME_CONFIG, GameMode, Team, Vector3D } from '../shared/gameConfig.js';
+import {
+  InputMessageSchema,
+  FireWeaponSchema,
+  SetTeamSchema,
+  JoinRoomOptionsSchema
+} from '../security/schemas.js';
+import { sanitizeCallsign, isValidRoomCode, generateSecureRoomCode } from '../security/sanitizer.js';
+import { AuthService, AuthTokenPayload } from '../security/authService.js';
+import { AntiCheatSystem } from '../security/antiCheat.js';
+import { WebSocketRateLimiter, RoomBruteForceProtection } from '../security/rateLimiter.js';
+import { SecurityLogger } from '../security/securityLogger.js';
 
 interface JoinOptions {
   playerName?: string;
-  playerColor?: string;
+  playerColor?: 'yellow' | 'blue' | 'red' | 'green';
   mode?: GameMode;
   roomCode?: string;
   team?: Team;
+  authToken?: string;
+}
+
+interface RoomAuthContext {
+  userId: string;
+  username: string;
+  role: 'pilot' | 'admin' | 'guest';
+  isGuest: boolean;
+  ip: string;
 }
 
 export class BattleRoom extends Room {
@@ -22,8 +42,12 @@ export class BattleRoom extends Room {
     (this.state as BattleStateSchema).gameMode = mode;
     this.maxClients = mode === '1v1' ? 2 : 4;
 
-    // Clean 6-character room code (immutable per room match)
-    const roomCode = (options.roomCode || this.generateRoomCode()).trim().toUpperCase();
+    // Cryptographically secure, sanitized 6-character room code
+    const rawCode = options.roomCode;
+    const roomCode = (rawCode && isValidRoomCode(rawCode))
+      ? rawCode.trim().toUpperCase()
+      : generateSecureRoomCode(6);
+
     (this.state as BattleStateSchema).roomCode = roomCode;
     (this.state as BattleStateSchema).roomStatus = 'LOBBY';
     this.setMetadata({ roomCode });
@@ -49,6 +73,18 @@ export class BattleRoom extends Room {
       }
 
       if (updateResult.matchEnded) {
+        // Record authoritative match outcomes for authenticated players
+        state.players.forEach((p) => {
+          const isWinner = p.id === state.winnerId || (state.winnerTeam && p.team === state.winnerTeam);
+          AuthService.recordMatchStats(
+            p.id,
+            Boolean(isWinner),
+            p.damageDealt,
+            p.shotsFired,
+            p.shotsHit
+          );
+        });
+
         this.broadcast('match_ended', {
           winnerId: state.winnerId,
           winnerName: state.winnerName,
@@ -58,20 +94,81 @@ export class BattleRoom extends Room {
       }
     }, 1000 / GAME_CONFIG.SERVER_TICK_RATE);
 
-    console.log(`[BattleRoom] Created Room ${(this.state as BattleStateSchema).roomCode} (Mode: ${mode})`);
+    console.log(`[BattleRoom] Secure Sector Created: ${roomCode} (Mode: ${mode})`);
   }
 
-  onJoin(client: Client, options?: JoinOptions) {
+  /**
+   * Colyseus Server-side Authentication & Rate-Limit Hook
+   */
+  async onAuth(client: Client, options: unknown, request: any): Promise<RoomAuthContext> {
+    const ip = request?.headers['x-forwarded-for']?.toString() || request?.socket?.remoteAddress || 'unknown';
+
+    // 1. Check Room-Code Brute Force Lockout
+    if (RoomBruteForceProtection.isLocked(ip)) {
+      SecurityLogger.logAccessDenied('Room join lockout in effect due to excessive failures', ip);
+      throw new Error('Sector communications temporarily restricted. Please try again shortly.');
+    }
+
+    // 2. Validate Join Options Schema
+    const parseResult = JoinRoomOptionsSchema.safeParse(options);
+    if (!parseResult.success) {
+      RoomBruteForceProtection.recordFailure(ip);
+      SecurityLogger.logViolation(client.sessionId, 'unknown', 'INVALID_JOIN_OPTIONS', 1, {
+        errors: parseResult.error.format()
+      });
+      throw new Error('Invalid sector connection payload format.');
+    }
+
+    const validated = parseResult.data;
+
+    // 3. Verify Player Capacity
     const state = this.state as BattleStateSchema;
-    console.log(`[BattleRoom] Client ${client.sessionId} joining room ${state.roomCode}`);
+    if (state.players.size >= this.maxClients) {
+      throw new Error('Sector reached maximum pilot capacity.');
+    }
+
+    // 4. Authenticate Token or Assign Verified Guest Identity
+    let authPayload: AuthTokenPayload | null = null;
+    if (validated.authToken) {
+      authPayload = AuthService.verifyToken(validated.authToken);
+    }
+
+    if (authPayload) {
+      return {
+        userId: authPayload.userId,
+        username: authPayload.username,
+        role: authPayload.role,
+        isGuest: authPayload.isGuest,
+        ip
+      };
+    }
+
+    // Fallback: Generate signed guest identity with sanitized callsign
+    const guestCallsign = sanitizeCallsign(validated.playerName);
+    const guestSession = AuthService.generateGuestSession(guestCallsign);
+    return {
+      userId: guestSession.userId,
+      username: guestSession.username,
+      role: 'guest',
+      isGuest: true,
+      ip
+    };
+  }
+
+  onJoin(client: Client, options?: JoinOptions, auth?: RoomAuthContext) {
+    const state = this.state as BattleStateSchema;
+    const ip = auth?.ip || 'unknown';
+    RoomBruteForceProtection.recordSuccess(ip);
+
+    console.log(`[BattleRoom] Pilot ${auth?.username} (${client.sessionId}) joining room ${state.roomCode}`);
 
     const slot = state.players.size + 1;
     const isHost = state.players.size === 0;
 
     const player = new PlayerSchema();
-    player.id = client.sessionId;
+    player.id = auth?.userId || client.sessionId;
     player.sessionId = client.sessionId;
-    player.name = options?.playerName || `Pilot-${slot}`;
+    player.name = auth?.username || `Pilot-${slot}`;
     player.color = options?.playerColor || (slot === 1 ? 'yellow' : slot === 2 ? 'blue' : slot === 3 ? 'red' : 'green');
     player.slot = slot;
     player.isHost = isHost;
@@ -93,6 +190,9 @@ export class BattleRoom extends Room {
 
     state.players.set(client.sessionId, player);
 
+    // Register with Anti-Cheat System
+    AntiCheatSystem.registerPlayer(client.sessionId, spawnPos);
+
     // Notify room of player join
     this.broadcast('player_joined', {
       id: client.sessionId,
@@ -110,6 +210,10 @@ export class BattleRoom extends Room {
 
     player.connected = false;
 
+    // Clean up rate limit and anti-cheat tracking
+    WebSocketRateLimiter.unregisterClient(client.sessionId);
+    AntiCheatSystem.unregisterPlayer(client.sessionId);
+
     try {
       if (code === 1000) {
         throw new Error('Consented disconnect');
@@ -119,6 +223,11 @@ export class BattleRoom extends Room {
       console.log(`[BattleRoom] Player ${player.name} disconnected, allowing 15s reconnect...`);
       await this.allowReconnection(client, GAME_CONFIG.RECONNECT_TIMEOUT_MS / 1000);
       player.connected = true;
+      AntiCheatSystem.registerPlayer(client.sessionId, {
+        x: player.position.x,
+        y: player.position.y,
+        z: player.position.z
+      });
       console.log(`[BattleRoom] Player ${player.name} successfully reconnected!`);
     } catch {
       console.log(`[BattleRoom] Player ${player.name} permanently removed.`);
@@ -141,27 +250,67 @@ export class BattleRoom extends Room {
   }
 
   private registerMessages() {
-    // 1. Flight Input Transmission
-    this.onMessage('input', (client, input: any) => {
+    // 1. Authoritative Flight Movement Validation
+    this.onMessage('input', (client, rawInput: unknown) => {
+      if (!WebSocketRateLimiter.canProcessMessage(client.sessionId)) return;
+
       const state = this.state as BattleStateSchema;
       const player = state.players.get(client.sessionId);
       if (!player || !player.alive || state.roomStatus !== 'BATTLE') return;
 
-      if (input.position && Array.isArray(input.position)) {
-        player.position.set(input.position[0], input.position[1], input.position[2]);
+      // Schema validation
+      const parseResult = InputMessageSchema.safeParse(rawInput);
+      if (!parseResult.success) {
+        SecurityLogger.logViolation(client.sessionId, player.id, 'MALFORMED_INPUT_PACKET', 1);
+        return;
       }
-      if (input.rotation && Array.isArray(input.rotation)) {
+
+      const input = parseResult.data;
+      if (input.position && input.rotation && input.velocity) {
+        const check = AntiCheatSystem.validateMovement(
+          client.sessionId,
+          player,
+          input.position,
+          input.rotation,
+          input.velocity
+        );
+
+        if (check.shouldDisconnect) {
+          SecurityLogger.logViolation(client.sessionId, player.id, 'CRITICAL_SPEED_VIOLATION_EVICT', 10);
+          client.leave(4001);
+          return;
+        }
+
+        // Apply authoritative coordinates
+        player.position.set(check.position.x, check.position.y, check.position.z);
         player.rotation.set(input.rotation[0], input.rotation[1], input.rotation[2]);
-      }
-      if (input.velocity && Array.isArray(input.velocity)) {
         player.velocity.set(input.velocity[0], input.velocity[1], input.velocity[2]);
       }
     });
 
-    // 2. Primary Weapon: Bullet / Plasma Blaster (2 HP, 0.1s rate, 30 magazine)
-    this.onMessage('fire_bullet', (client, data: { origin: Vector3D; direction: Vector3D; attackId?: string }) => {
+    // 2. Primary Weapon: Bullet / Plasma Blaster (2 HP, 0.10s interval, 30 magazine)
+    this.onMessage('fire_bullet', (client, rawData: unknown) => {
+      if (!WebSocketRateLimiter.canProcessMessage(client.sessionId)) return;
+
       const state = this.state as BattleStateSchema;
-      if (state.roomStatus !== 'BATTLE') return;
+      const player = state.players.get(client.sessionId);
+      if (!player || !player.alive || state.roomStatus !== 'BATTLE') return;
+
+      const parseResult = FireWeaponSchema.safeParse(rawData);
+      if (!parseResult.success) return;
+
+      const data = parseResult.data;
+      const combatCheck = AntiCheatSystem.validateWeaponFiring(
+        client.sessionId,
+        player,
+        'BULLET',
+        data.origin,
+        data.direction,
+        data.attackId
+      );
+
+      if (!combatCheck.valid) return;
+
       const proj = this.simulationLoop.projectileSystem.spawnBullet(
         state,
         client.sessionId,
@@ -184,9 +333,28 @@ export class BattleRoom extends Room {
     });
 
     // 3. Secondary Weapon: Laser Beam (12 HP, 3s recharge)
-    this.onMessage('fire_laser', (client, data: { origin: Vector3D; direction: Vector3D; attackId?: string }) => {
+    this.onMessage('fire_laser', (client, rawData: unknown) => {
+      if (!WebSocketRateLimiter.canProcessMessage(client.sessionId)) return;
+
       const state = this.state as BattleStateSchema;
-      if (state.roomStatus !== 'BATTLE') return;
+      const player = state.players.get(client.sessionId);
+      if (!player || !player.alive || state.roomStatus !== 'BATTLE') return;
+
+      const parseResult = FireWeaponSchema.safeParse(rawData);
+      if (!parseResult.success) return;
+
+      const data = parseResult.data;
+      const combatCheck = AntiCheatSystem.validateWeaponFiring(
+        client.sessionId,
+        player,
+        'LASER',
+        data.origin,
+        data.direction,
+        data.attackId
+      );
+
+      if (!combatCheck.valid) return;
+
       const laserRes = this.simulationLoop.laserSystem.fireLaser(
         state,
         client.sessionId,
@@ -222,9 +390,28 @@ export class BattleRoom extends Room {
     });
 
     // 4. Special High-Yield Weapon: Solar Beam (30 HP, 10s recharge)
-    this.onMessage('fire_solar', (client, data: { origin: Vector3D; direction: Vector3D; attackId?: string }) => {
+    this.onMessage('fire_solar', (client, rawData: unknown) => {
+      if (!WebSocketRateLimiter.canProcessMessage(client.sessionId)) return;
+
       const state = this.state as BattleStateSchema;
-      if (state.roomStatus !== 'BATTLE') return;
+      const player = state.players.get(client.sessionId);
+      if (!player || !player.alive || state.roomStatus !== 'BATTLE') return;
+
+      const parseResult = FireWeaponSchema.safeParse(rawData);
+      if (!parseResult.success) return;
+
+      const data = parseResult.data;
+      const combatCheck = AntiCheatSystem.validateWeaponFiring(
+        client.sessionId,
+        player,
+        'SOLAR',
+        data.origin,
+        data.direction,
+        data.attackId
+      );
+
+      if (!combatCheck.valid) return;
+
       const solarRes = this.simulationLoop.solarBeamSystem.fireSolar(
         state,
         client.sessionId,
@@ -259,7 +446,7 @@ export class BattleRoom extends Room {
       }
     });
 
-    // 5. Launch Match (allow when >= 2 players in room)
+    // 5. Launch Match (requires host or >= 2 players)
     this.onMessage('start_match', (client) => {
       const state = this.state as BattleStateSchema;
       const player = state.players.get(client.sessionId);
@@ -285,13 +472,15 @@ export class BattleRoom extends Room {
     });
 
     // 7. Team Switch (for 2v2 lobby)
-    this.onMessage('set_team', (client, data: { team: Team }) => {
+    this.onMessage('set_team', (client, rawData: unknown) => {
       const state = this.state as BattleStateSchema;
       const player = state.players.get(client.sessionId);
       if (!player || state.roomStatus !== 'LOBBY') return;
-      if (data.team === 'A' || data.team === 'B') {
-        player.team = data.team;
-      }
+
+      const parseResult = SetTeamSchema.safeParse(rawData);
+      if (!parseResult.success) return;
+
+      player.team = parseResult.data.team;
     });
 
     // 8. Rematch Request
@@ -315,21 +504,13 @@ export class BattleRoom extends Room {
           p.solarCooldownRemaining = 0;
           const spawn = this.getSpawnPosition(s, state.players.size);
           p.position.set(spawn.x, spawn.y, spawn.z);
+          AntiCheatSystem.registerPlayer(p.sessionId, spawn);
           s++;
         });
 
         this.broadcast('rematch_accepted', {});
       }
     });
-  }
-
-  private generateRoomCode(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
   }
 
   private getSpawnPosition(slot: number, total: number): Vector3D {

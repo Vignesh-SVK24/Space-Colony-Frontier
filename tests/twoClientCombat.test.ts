@@ -11,8 +11,8 @@ describe('Authoritative Colyseus 2-Client Combat Acceptance Tests', () => {
   let room2: Room;
 
   beforeAll(async () => {
-    client1 = new Client('ws://127.0.0.1:3001');
-    client2 = new Client('ws://127.0.0.1:3001');
+    client1 = new Client('ws://localhost:3001');
+    client2 = new Client('ws://localhost:3001');
   });
 
   afterAll(() => {
@@ -87,21 +87,20 @@ describe('Authoritative Colyseus 2-Client Combat Acceptance Tests', () => {
       });
     });
 
-    // P1 positions directly in front of P2 and shoots
+    // P1 aims from own ship position towards P2
+    const p1Pos = room1.state.players.get(room1.sessionId).position;
     const p2Pos = room1.state.players.get(room2.sessionId).position;
-    // Set P1 close to P2 facing P2
-    room1.send('input', {
-      position: [p2Pos.x, p2Pos.y, p2Pos.z - 20],
-      rotation: [0, 0, 0],
-      velocity: [0, 0, 0]
-    });
-
-    await new Promise(r => setTimeout(r, 100));
+    const dx = p2Pos.x - p1Pos.x;
+    const dy = p2Pos.y - p1Pos.y;
+    const dz = p2Pos.z - p1Pos.z;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const dir = { x: dx / dist, y: dy / dist, z: dz / dist };
+    const shotOrigin = { x: p1Pos.x + dir.x * 2, y: p1Pos.y + dir.y * 2, z: p1Pos.z + dir.z * 2 };
 
     // Fire bullet from P1 towards P2
     room1.send('fire_bullet', {
-      origin: { x: p2Pos.x, y: p2Pos.y, z: p2Pos.z - 10 },
-      direction: { x: 0, y: 0, z: 1 },
+      origin: shotOrigin,
+      direction: dir,
       attackId: 'test_bullet_hit_2hp'
     });
 
@@ -113,8 +112,6 @@ describe('Authoritative Colyseus 2-Client Combat Acceptance Tests', () => {
   }, 10000);
 
   it('4. should fire authoritative laser beam (12 HP damage) reducing defender HP from 248 to 236', async () => {
-    const p2Pos = room1.state.players.get(room2.sessionId).position;
-
     const damagePromise = new Promise<any>((resolve) => {
       room2.onMessage('damage_applied', (msg) => {
         if (msg.defenderId === room2.sessionId && msg.damage === 12) {
@@ -123,9 +120,18 @@ describe('Authoritative Colyseus 2-Client Combat Acceptance Tests', () => {
       });
     });
 
+    const p1Pos = room1.state.players.get(room1.sessionId).position;
+    const p2Pos = room1.state.players.get(room2.sessionId).position;
+    const dx = p2Pos.x - p1Pos.x;
+    const dy = p2Pos.y - p1Pos.y;
+    const dz = p2Pos.z - p1Pos.z;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const dir = { x: dx / dist, y: dy / dist, z: dz / dist };
+    const shotOrigin = { x: p1Pos.x + dir.x * 2, y: p1Pos.y + dir.y * 2, z: p1Pos.z + dir.z * 2 };
+
     room1.send('fire_laser', {
-      origin: { x: p2Pos.x, y: p2Pos.y, z: p2Pos.z - 10 },
-      direction: { x: 0, y: 0, z: 1 },
+      origin: shotOrigin,
+      direction: dir,
       attackId: 'test_laser_hit_12hp'
     });
 
@@ -137,8 +143,6 @@ describe('Authoritative Colyseus 2-Client Combat Acceptance Tests', () => {
   }, 10000);
 
   it('5. should fire authoritative solar beam (30 HP damage) reducing defender HP from 236 to 206', async () => {
-    const p2Pos = room1.state.players.get(room2.sessionId).position;
-
     const damagePromise = new Promise<any>((resolve) => {
       room2.onMessage('damage_applied', (msg) => {
         if (msg.defenderId === room2.sessionId && msg.damage === 30) {
@@ -147,9 +151,18 @@ describe('Authoritative Colyseus 2-Client Combat Acceptance Tests', () => {
       });
     });
 
+    const p1Pos = room1.state.players.get(room1.sessionId).position;
+    const p2Pos = room1.state.players.get(room2.sessionId).position;
+    const dx = p2Pos.x - p1Pos.x;
+    const dy = p2Pos.y - p1Pos.y;
+    const dz = p2Pos.z - p1Pos.z;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const dir = { x: dx / dist, y: dy / dist, z: dz / dist };
+    const shotOrigin = { x: p1Pos.x + dir.x * 2, y: p1Pos.y + dir.y * 2, z: p1Pos.z + dir.z * 2 };
+
     room1.send('fire_solar', {
-      origin: { x: p2Pos.x, y: p2Pos.y, z: p2Pos.z - 10 },
-      direction: { x: 0, y: 0, z: 1 },
+      origin: shotOrigin,
+      direction: dir,
       attackId: 'test_solar_hit_30hp'
     });
 

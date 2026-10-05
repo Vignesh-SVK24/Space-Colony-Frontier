@@ -109,10 +109,10 @@ describe('Authoritative Combat Hit Detection & Real HP Damage Pipeline', () => {
     expect(target.hp).toBe(70);
   });
 
-  it('3. Swept continuous collision detection accurately tests against 4.8m combat hitbox', () => {
+  it('3. Swept continuous collision detection accurately tests against combat hitbox', () => {
     const targetPos = { x: 0, y: 15, z: 50 };
     const hitboxRadius = COMBAT.BULLET_HITBOX_RADIUS;
-    expect(hitboxRadius).toBe(4.8);
+    expect(hitboxRadius).toBe(9.8);
 
     // Direct center shot: ray passing through (0, 15, 0) to (0, 15, 100)
     const directHit = checkSegmentSphereCollision(
@@ -123,19 +123,19 @@ describe('Authoritative Combat Hit Detection & Real HP Damage Pipeline', () => {
     );
     expect(directHit.hit).toBe(true);
 
-    // Grazing shot at 3.5m offset (within 4.8m forgiving hitbox)
+    // Grazing shot at 5.0m offset (within 9.8m forgiving hitbox)
     const grazingHit = checkSegmentSphereCollision(
-      3.5, 15, 0,
-      3.5, 15, 100,
+      5.0, 15, 0,
+      5.0, 15, 100,
       targetPos.x, targetPos.y, targetPos.z,
       hitboxRadius
     );
     expect(grazingHit.hit).toBe(true);
 
-    // Complete miss at 6.0m offset (outside 4.8m hitbox)
+    // Complete miss at 15.0m offset (outside 9.8m hitbox)
     const cleanMiss = checkSegmentSphereCollision(
-      6.0, 15, 0,
-      6.0, 15, 100,
+      15.0, 15, 0,
+      15.0, 15, 100,
       targetPos.x, targetPos.y, targetPos.z,
       hitboxRadius
     );

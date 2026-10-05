@@ -132,7 +132,7 @@ export class ProjectileSystem {
         const damageRes = this.damageSystem.applyDamage(state, {
           attackId: proj.attackId,
           attackerId: proj.ownerId,
-          defenderId: closestEnemy.id,
+          defenderId: closestEnemy.sessionId || closestEnemy.id,
           weaponType: 'BULLET',
           damage: GAME_CONFIG.BULLET_DAMAGE
         });
@@ -141,7 +141,7 @@ export class ProjectileSystem {
           hits.push({
             attackId: proj.attackId,
             attackerId: proj.ownerId,
-            defenderId: closestEnemy.id,
+            defenderId: closestEnemy.sessionId || closestEnemy.id,
             damage: damageRes.damage,
             remainingHp: damageRes.remainingHp,
             eliminated: damageRes.eliminated,

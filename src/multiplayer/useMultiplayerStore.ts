@@ -26,6 +26,21 @@ export interface TargetLockInfo {
   hp: number;
 }
 
+export interface PilotUser {
+  id: string;
+  username: string;
+  preferredColor?: BattleColor;
+  role?: string;
+  isGuest?: boolean;
+  stats?: {
+    kills: number;
+    deaths: number;
+    matchesPlayed: number;
+    matchesWon: number;
+    accuracy: number;
+  };
+}
+
 interface MultiplayerState {
   appView: AppView;
   gameModeSelection: 'SELECT' | 'SOLO_CONFIG' | 'ROOM_CONFIG';
@@ -53,6 +68,16 @@ interface MultiplayerState {
   error: string | null;
   isServerOnline: boolean | null;
   checkServerReachability: () => Promise<boolean>;
+
+  // Pilot Authentication & Security Identity
+  authToken: string | null;
+  authUser: PilotUser | null;
+  authModalOpen: boolean;
+  setAuthModalOpen: (open: boolean) => void;
+  loginPilot: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  registerPilot: (username: string, password: string, preferredColor?: BattleColor) => Promise<{ success: boolean; error?: string }>;
+  logoutPilot: () => Promise<void>;
+  initAuth: () => Promise<void>;
 
   // Tactical Map
   isMapOpen: boolean;
@@ -157,6 +182,16 @@ let hitConfirmTimer: any = null;
 
 export const DEFAULT_PRODUCTION_SERVER = 'https://space-colony-frontier.onrender.com';
 
+const getHttpBaseUrl = (serverUrl: string): string => {
+  let clean = (serverUrl || 'http://localhost:3001').trim();
+  clean = clean.replace(/^ws:\/\//, 'http://').replace(/^wss:\/\//, 'https://');
+  if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    clean = `${isHttps ? 'https' : 'http'}://${clean}`;
+  }
+  return clean.replace(/\/+$/, '');
+};
+
 const getDefaultServerUrl = () => {
   if (typeof window === 'undefined') return 'http://localhost:3001';
   try {
@@ -204,18 +239,130 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   error: null,
   isServerOnline: null,
 
+  // Pilot Authentication & Security Identity
+  authToken: (typeof window !== 'undefined' ? sessionStorage.getItem('sfc_auth_token') : null),
+  authUser: null,
+  authModalOpen: false,
+  setAuthModalOpen: (open: boolean) => set({ authModalOpen: open }),
+
+  loginPilot: async (username: string, password: string) => {
+    try {
+      const baseUrl = getHttpBaseUrl(get().serverUrl);
+      const res = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Login failed' };
+      }
+      if (typeof window !== 'undefined' && data.token) {
+        sessionStorage.setItem('sfc_auth_token', data.token);
+      }
+      set({
+        authToken: data.token,
+        authUser: data.user,
+        playerName: data.user.username,
+        playerColor: data.user.preferredColor || get().playerColor,
+        authModalOpen: false,
+        error: null
+      });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Unable to connect to authentication server' };
+    }
+  },
+
+  registerPilot: async (username: string, password: string, preferredColor?: BattleColor) => {
+    try {
+      const baseUrl = getHttpBaseUrl(get().serverUrl);
+      const res = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          password,
+          preferredColor: preferredColor || get().playerColor
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const errDetail = Array.isArray(data.details) ? data.details.join(', ') : data.error;
+        return { success: false, error: errDetail || 'Registration failed' };
+      }
+      if (typeof window !== 'undefined' && data.token) {
+        sessionStorage.setItem('sfc_auth_token', data.token);
+      }
+      set({
+        authToken: data.token,
+        authUser: data.user,
+        playerName: data.user.username,
+        playerColor: data.user.preferredColor || get().playerColor,
+        authModalOpen: false,
+        error: null
+      });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Unable to connect to authentication server' };
+    }
+  },
+
+  logoutPilot: async () => {
+    const token = get().authToken;
+    if (token) {
+      try {
+        const baseUrl = getHttpBaseUrl(get().serverUrl);
+        await fetch(`${baseUrl}/api/auth/logout`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      } catch {}
+    }
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('sfc_auth_token');
+    }
+    set({
+      authToken: null,
+      authUser: null
+    });
+  },
+
+  initAuth: async () => {
+    const token = get().authToken;
+    if (!token) return;
+    try {
+      const baseUrl = getHttpBaseUrl(get().serverUrl);
+      const res = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          set({
+            authUser: data.user,
+            playerName: data.user.username || get().playerName,
+            playerColor: data.user.preferredColor || get().playerColor
+          });
+        }
+      } else {
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('sfc_auth_token');
+        }
+        set({ authToken: null, authUser: null });
+      }
+    } catch {
+      // In unreachable offline mode, retain local state
+    }
+  },
+
   checkServerReachability: async () => {
-    const server = get().serverUrl;
-    if (!server) {
+    const baseUrl = getHttpBaseUrl(get().serverUrl);
+    if (!baseUrl) {
       set({ isServerOnline: false });
       return false;
     }
-    let httpUrl = server.trim().replace(/^ws:\/\//, 'http://').replace(/^wss:\/\//, 'https://');
-    if (!httpUrl.startsWith('http://') && !httpUrl.startsWith('https://')) {
-      const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-      httpUrl = `${isHttps ? 'https' : 'http'}://${httpUrl}`;
-    }
-    httpUrl = `${httpUrl.replace(/\/+$/, '')}/health`;
+    const httpUrl = `${baseUrl}/health`;
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2500);

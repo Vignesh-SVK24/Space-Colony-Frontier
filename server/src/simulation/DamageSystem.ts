@@ -47,9 +47,15 @@ export class DamageSystem {
       };
     }
 
-    // 2. Validate players
-    const attacker = state.players.get(req.attackerId);
-    const defender = state.players.get(req.defenderId);
+    // 2. Validate players (support lookup by sessionId or player.id)
+    let attacker = state.players.get(req.attackerId);
+    if (!attacker) {
+      state.players.forEach(p => { if (p.id === req.attackerId) attacker = p; });
+    }
+    let defender = state.players.get(req.defenderId);
+    if (!defender) {
+      state.players.forEach(p => { if (p.id === req.defenderId) defender = p; });
+    }
 
     if (!defender || !defender.alive || defender.hp <= 0) {
       return {
@@ -118,7 +124,7 @@ export class DamageSystem {
       applied: true,
       attackId: req.attackId,
       attackerId: req.attackerId,
-      defenderId: req.defenderId,
+      defenderId: defender.sessionId || req.defenderId,
       weaponType: req.weaponType,
       damage: (oldHp - newHp),
       remainingHp: newHp,

@@ -23,3 +23,14 @@ dist-ssr
 *.sln
 *.sw?
 *.tsbuildinfo
+
+# Secrets & Environment Variables
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+server/.env
+server/.env.*
+!server/.env.example

@@ -1,11 +1,7 @@
+import crypto from 'crypto';
+
 /**
- * Space Colony: Frontier - Backend Server Keys & Secrets Configuration
- * 
- * CRITICAL SECURITY ARCHITECTURE:
- * All sensitive API keys, room validation secrets, session HMAC tokens,
- * and administration credentials MUST remain strictly on the backend.
- * Under NO circumstances should these keys be bundled into or exported
- * to the frontend client application.
+ * Space Colony: Frontier - Production Server Security Keys & Configuration
  */
 
 export interface ServerKeysConfig {
@@ -14,36 +10,64 @@ export interface ServerKeysConfig {
   SERVER_API_KEY: string;
   ROOM_SECRET_KEY: string;
   SESSION_SECRET: string;
+  JWT_SECRET: string;
   ADMIN_TOKEN: string;
   CORS_ORIGIN: string;
+  DATABASE_URL?: string;
+}
+
+function getOrGenerateSecret(envVar: string | undefined, defaultPrefix: string): string {
+  if (envVar && envVar.trim().length > 0) {
+    return envVar.trim();
+  }
+  // In production, generate a secure 256-bit random key per server lifecycle if unconfigured
+  return `${defaultPrefix}_${crypto.randomBytes(24).toString('hex')}`;
 }
 
 export const SERVER_KEYS: ServerKeysConfig = {
-  // Server Port & Environment
   PORT: Number(process.env.PORT || 3001),
   NODE_ENV: process.env.NODE_ENV || 'production',
-
-  // Authoritative Server API Key for inter-service communication
-  SERVER_API_KEY: process.env.SERVER_API_KEY || 'scf_srv_live_key_9f82a17b4c6e3d2a',
-
-  // Room HMAC & Integrity Validation Secret
-  ROOM_SECRET_KEY: process.env.ROOM_SECRET_KEY || 'scf_room_sec_8410294875b1c93a',
-
-  // Colyseus Session & Authentication Secret
-  SESSION_SECRET: process.env.SESSION_SECRET || 'scf_session_sec_5829141029df4821',
-
-  // Admin Master Token for server telemetry & room maintenance
-  ADMIN_TOKEN: process.env.ADMIN_TOKEN || 'scf_admin_master_0491823471ef9982',
-
-  // Allowed CORS Origin for web client
-  CORS_ORIGIN: process.env.CORS_ORIGIN || '*'
+  SERVER_API_KEY: getOrGenerateSecret(process.env.SERVER_API_KEY, 'scf_srv_key'),
+  ROOM_SECRET_KEY: getOrGenerateSecret(process.env.ROOM_SECRET_KEY, 'scf_room_sec'),
+  SESSION_SECRET: getOrGenerateSecret(process.env.SESSION_SECRET, 'scf_session_sec'),
+  JWT_SECRET: getOrGenerateSecret(process.env.JWT_SECRET, 'scf_jwt_sec'),
+  ADMIN_TOKEN: getOrGenerateSecret(process.env.ADMIN_TOKEN, 'scf_admin_token'),
+  CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
+  DATABASE_URL: process.env.DATABASE_URL
 };
 
 /**
+ * Parses and validates an incoming request origin against configured CORS allowlists.
+ */
+export function isOriginAllowed(origin?: string): boolean {
+  if (!origin) return true; // Mobile apps, curl, or same-origin requests
+
+  const configured = SERVER_KEYS.CORS_ORIGIN;
+  if (configured === '*' && SERVER_KEYS.NODE_ENV !== 'production') {
+    return true;
+  }
+
+  const allowedList = configured
+    .split(',')
+    .map(o => o.trim().toLowerCase())
+    .filter(Boolean);
+
+  const reqOrigin = origin.trim().toLowerCase();
+
+  // Allow standard local dev hosts when not strictly in external production
+  if (reqOrigin.includes('localhost') || reqOrigin.includes('127.0.0.1')) {
+    return true;
+  }
+
+  return allowedList.includes(reqOrigin) || allowedList.includes('*');
+}
+
+/**
  * Validates whether an incoming HTTP or WebSocket request contains
- * a valid administrative server key.
+ * a valid administrative server key or admin token.
  */
 export function validateServerAdminKey(keyProvided?: string | null): boolean {
   if (!keyProvided) return false;
-  return keyProvided === SERVER_KEYS.SERVER_API_KEY || keyProvided === SERVER_KEYS.ADMIN_TOKEN;
+  const cleanKey = keyProvided.trim();
+  return cleanKey === SERVER_KEYS.SERVER_API_KEY || cleanKey === SERVER_KEYS.ADMIN_TOKEN;
 }

@@ -102,7 +102,7 @@ export class SolarBeamSystem {
       const damageRes = this.damageSystem.applyDamage(state, {
         attackId,
         attackerId: shooterId,
-        defenderId: closestEnemy.id,
+        defenderId: closestEnemy.sessionId || closestEnemy.id,
         weaponType: 'SOLAR_BEAM',
         damage: GAME_CONFIG.SOLAR_DAMAGE
       });
@@ -114,7 +114,7 @@ export class SolarBeamSystem {
         start: [origin.x, origin.y, origin.z],
         end: beamEnd,
         blocked: false,
-        hitTargetId: closestEnemy.id,
+        hitTargetId: closestEnemy.sessionId || closestEnemy.id,
         damage: damageRes.damage,
         remainingHp: damageRes.remainingHp,
         eliminated: damageRes.eliminated

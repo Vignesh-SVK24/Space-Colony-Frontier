@@ -31,8 +31,10 @@ import {
   ChevronDown,
   Info,
   Loader2,
-  Play
+  Play,
+  ShieldCheck
 } from 'lucide-react';
+import { PilotAuthModal } from './PilotAuthModal';
 import { enterFullscreen, toggleFullscreen, useFullscreen } from '../../utils/fullscreenHelper';
 import { getOptimalDPR, isMobileDevice } from '../../utils/mobileOptimization';
 
@@ -82,7 +84,10 @@ export const LandingPage: React.FC = () => {
     setServerUrl,
     isServerOnline,
     checkServerReachability,
-    startSoloGame
+    startSoloGame,
+    authUser,
+    setAuthModalOpen,
+    initAuth
   } = useMultiplayerStore();
 
   const [joinModalOpen, setJoinModalOpen] = useState(false);
@@ -102,6 +107,10 @@ export const LandingPage: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [videoError, setVideoError] = useState(false);
+
+  useEffect(() => {
+    initAuth();
+  }, [initAuth]);
 
   useEffect(() => {
     checkServerReachability();
@@ -288,9 +297,22 @@ export const LandingPage: React.FC = () => {
                 <Radio size={13} className="text-[#FFCC00] animate-pulse" />
                 <span>PILOT PROFILE</span>
               </span>
-              <span className="text-[9px] px-2 py-0.5 rounded bg-[#107E57]/30 border border-[#107E57]/60 text-emerald-300 font-black uppercase tracking-wider">
-                ACTIVE
-              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  nexusAudio.playClick(1000);
+                  setAuthModalOpen(true);
+                }}
+                className={`text-[9px] px-2 py-0.5 rounded border font-black uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer ${
+                  authUser && !authUser.isGuest
+                    ? 'bg-[#107E57]/40 border-[#107E57] text-[#34d399] shadow-[0_0_8px_rgba(52,211,153,0.4)]'
+                    : 'bg-[#08264A] border-[#8CCDEB]/40 text-[#8CCDEB] hover:text-[#FFCC00] hover:border-[#FFCC00]/50'
+                }`}
+                title="Pilot Authentication and Security Dossier"
+              >
+                <ShieldCheck size={11} />
+                <span>{authUser && !authUser.isGuest ? 'VERIFIED' : 'AUTH / DOSSIER'}</span>
+              </button>
             </div>
 
             {/* Enter Pilot Name / Callsign - Maximum Contrast & Mobile Legibility */}
@@ -893,6 +915,9 @@ export const LandingPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Pilot Authentication & Security Dossier Modal */}
+      <PilotAuthModal />
 
     </div>
   );

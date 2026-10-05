@@ -110,7 +110,8 @@ export const createRoom = async (playerName: string, playerColor: BattleColor, m
       roomCode,
       playerName,
       playerColor,
-      mode
+      mode,
+      authToken: useMultiplayerStore.getState().authToken || undefined
     }, BattleStateSchema);
 
     const timeoutPromise = new Promise<never>((_, reject) =>
@@ -152,7 +153,8 @@ export const joinRoom = async (roomCode: string, playerName: string, playerColor
     const joinPromise = colyseusClient.join('battle', {
       roomCode: cleanCode,
       playerName,
-      playerColor
+      playerColor,
+      authToken: useMultiplayerStore.getState().authToken || undefined
     }, BattleStateSchema);
 
     const timeoutPromise = new Promise<never>((_, reject) =>
