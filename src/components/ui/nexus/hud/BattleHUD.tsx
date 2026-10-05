@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useMultiplayerStore } from '../../../../multiplayer/useMultiplayerStore';
 import { disconnect, sendReload } from '../../../../multiplayer/colyseusClient';
-import { LogOut, Bot, Wifi, Map as MapIcon, Crosshair, Zap, Maximize, Minimize, Sun, Shield } from 'lucide-react';
+import { LogOut, Bot, Map as MapIcon, Crosshair, Zap, Maximize, Minimize, Sun, Shield } from 'lucide-react';
 import { FullScreenTacticalMap } from './FullScreenTacticalMap';
 import { CombatDebugOverlay } from './CombatDebugOverlay';
 import { nexusAudio } from '../../../../utils/nexusAudio';
@@ -57,15 +57,6 @@ export const BattleHUD: React.FC = () => {
     if (hp > 150) return 'bg-emerald-500';
     if (hp > 75) return 'bg-yellow-500';
     return 'bg-red-500';
-  };
-
-  const getConnectionColor = () => {
-    switch (connectionQuality) {
-      case 'good': return 'text-emerald-400';
-      case 'fair': return 'text-yellow-400';
-      case 'poor': return 'text-red-400';
-      default: return 'text-gray-500';
-    }
   };
 
   const handleExit = () => {
@@ -379,9 +370,9 @@ export const BattleHUD: React.FC = () => {
             </div>
           ) : (
             <div className="flex items-center gap-1.5">
-              <Wifi size={13} className={getConnectionColor()} />
-              <span className={`text-[11px] font-semibold uppercase ${getConnectionColor()}`}>
-                {connectionQuality}
+              <span className={`w-2 h-2 rounded-full ${connectionQuality === 'disconnected' ? 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]' : 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)] animate-pulse'}`} />
+              <span className={`text-[11px] font-semibold uppercase ${connectionQuality === 'disconnected' ? 'text-red-400' : 'text-emerald-400'}`}>
+                {connectionQuality === 'disconnected' ? 'OFFLINE' : 'ONLINE'}
               </span>
             </div>
           )}

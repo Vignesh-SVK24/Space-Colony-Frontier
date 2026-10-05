@@ -15,7 +15,8 @@ export const LobbyView: React.FC = () => {
     otherPlayers,
     countdown,
     gameMode,
-    startSoloGame
+    startSoloGame,
+    isServerOnline
   } = useMultiplayerStore();
 
   const [copied, setCopied] = useState(false);
@@ -127,7 +128,21 @@ export const LobbyView: React.FC = () => {
               </button>
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <div 
+                className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#05070B]/80 border border-[#8CCDEB]/30 text-[9px] text-[#F4F7FA] select-none"
+                title={isServerOnline === false ? 'Multiplayer Server: OFFLINE' : 'Multiplayer Server: ONLINE'}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  isServerOnline === false 
+                    ? 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]' 
+                    : 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)] animate-pulse'
+                }`} />
+                <span className="font-bold text-[8.5px] uppercase tracking-wider">
+                  {isServerOnline === false ? 'OFFLINE' : 'ONLINE'}
+                </span>
+              </div>
+
               <span className="text-[9px] px-2 py-0.5 rounded bg-[#107E57]/30 border border-[#107E57]/60 text-[#22c55e] font-black uppercase tracking-wider">
                 {playerCount}/{maxSlots} PILOTS
               </span>

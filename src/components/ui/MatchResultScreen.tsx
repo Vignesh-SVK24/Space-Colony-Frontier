@@ -5,7 +5,7 @@ import { Crosshair, ShieldAlert, Target, Clock, Trophy, Skull, RotateCcw, Home }
 import { nexusAudio } from '../../utils/nexusAudio';
 
 export const MatchResultScreen: React.FC = () => {
-  const { matchResult, playerId, reset, isSolo, startSoloGame } = useMultiplayerStore();
+  const { matchResult, playerId, reset, isSolo, startSoloGame, isServerOnline } = useMultiplayerStore();
 
   if (!matchResult) return null;
 
@@ -34,7 +34,22 @@ export const MatchResultScreen: React.FC = () => {
       <div className="w-full max-w-xl bg-[#061A35]/90 border border-[#8CCDEB]/40 rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(5,7,11,0.9)] max-h-[92vh] flex flex-col">
         
         {/* Banner */}
-        <div className="p-6 sm:p-8 text-center border-b border-[#8CCDEB]/20 bg-[#05070B]/60 flex flex-col items-center gap-3">
+        <div className="relative p-6 sm:p-8 text-center border-b border-[#8CCDEB]/20 bg-[#05070B]/60 flex flex-col items-center gap-3">
+          {/* Server Status Badge */}
+          <div 
+            className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#05070B]/80 border border-[#8CCDEB]/30 text-[9px] text-[#F4F7FA] select-none"
+            title={isServerOnline === false ? 'Multiplayer Server: OFFLINE' : 'Multiplayer Server: ONLINE'}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              isServerOnline === false 
+                ? 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]' 
+                : 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)] animate-pulse'
+            }`} />
+            <span className="font-bold uppercase tracking-wider text-[8.5px]">
+              {isServerOnline === false ? 'OFFLINE' : 'ONLINE'}
+            </span>
+          </div>
+
           {isWinner ? (
             <Trophy size={44} className="text-[#FFCC00] animate-bounce" />
           ) : (

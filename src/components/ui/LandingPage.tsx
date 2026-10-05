@@ -31,8 +31,7 @@ import {
   ChevronDown,
   Info,
   Loader2,
-  Play,
-  Settings
+  Play
 } from 'lucide-react';
 import { enterFullscreen, toggleFullscreen, useFullscreen } from '../../utils/fullscreenHelper';
 import { getOptimalDPR, isMobileDevice } from '../../utils/mobileOptimization';
@@ -90,8 +89,6 @@ export const LandingPage: React.FC = () => {
   const [soloModalOpen, setSoloModalOpen] = useState(false);
   const [intelDrawerOpen, setIntelDrawerOpen] = useState(false);
   const [showModeInfo, setShowModeInfo] = useState(false);
-  const [showServerConfig, setShowServerConfig] = useState(false);
-  const [customServerUrl, setCustomServerUrl] = useState(serverUrl);
 
   const [joinCode, setJoinCode] = useState('');
   const [createCode, setCreateCode] = useState(() => generateRoomCode());
@@ -108,6 +105,10 @@ export const LandingPage: React.FC = () => {
 
   useEffect(() => {
     checkServerReachability();
+    const interval = setInterval(() => {
+      checkServerReachability();
+    }, 15000);
+    return () => clearInterval(interval);
   }, [checkServerReachability, serverUrl]);
 
   useEffect(() => {
@@ -228,17 +229,22 @@ export const LandingPage: React.FC = () => {
 
         {/* Right Status & Tools */}
         <div className="flex items-center gap-1.5 sm:gap-2.5">
-          <button 
-            onClick={() => setShowServerConfig(!showServerConfig)}
-            className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-[#061A35]/80 hover:bg-[#0B315A] border border-[#8CCDEB]/30 backdrop-blur-md text-[9px] sm:text-[10px] text-[#F4F7FA] transition-colors cursor-pointer"
-            title="Click to check or configure server URL"
+          {/* Server Connectivity Status (ONLINE / OFFLINE) */}
+          <div 
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-[#061A35]/85 border border-[#8CCDEB]/30 backdrop-blur-md text-[9px] sm:text-[10px] text-[#F4F7FA] shadow-sm select-none"
+            title={isServerOnline === false ? 'Multiplayer Server: OFFLINE' : isServerOnline === true ? 'Multiplayer Server: ONLINE' : 'Checking Server Status...'}
           >
-            <span className={`w-2 h-2 rounded-full ${isServerOnline === false ? 'bg-red-500 animate-pulse' : 'bg-[#107E57] animate-pulse'}`} />
-            <span className="hidden sm:inline font-bold">
-              {isServerOnline === false ? 'OFFLINE' : 'SERVER ONLINE'}
+            <span className={`w-2 h-2 rounded-full ${
+              isServerOnline === false 
+                ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]' 
+                : isServerOnline === true
+                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse'
+                  : 'bg-amber-400 animate-pulse'
+            }`} />
+            <span className="font-bold tracking-wider">
+              {isServerOnline === false ? 'OFFLINE' : isServerOnline === true ? 'ONLINE' : 'CONNECTING'}
             </span>
-            <Settings size={11} className="text-[#8CCDEB]/70" />
-          </button>
+          </div>
 
           <button 
             onClick={toggleAudio} 
@@ -257,34 +263,6 @@ export const LandingPage: React.FC = () => {
           </button>
         </div>
       </header>
-
-      {/* Server URL Config Drawer (Collapsible) */}
-      {showServerConfig && (
-        <div className="relative z-30 mb-2 p-2.5 sm:p-3 bg-[#061A35]/95 border border-[#8CCDEB]/40 rounded-xl shadow-xl backdrop-blur-md text-xs pointer-events-auto max-w-lg mx-auto w-full animate-fadeIn">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="font-bold text-[#8CCDEB] uppercase text-[10px] tracking-wider">Multiplayer Server Endpoint</span>
-            <button onClick={() => setShowServerConfig(false)} className="text-slate-400 hover:text-white cursor-pointer">✕</button>
-          </div>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              value={customServerUrl} 
-              onChange={(e) => setCustomServerUrl(e.target.value)}
-              placeholder="https://space-colony-frontier.onrender.com"
-              className="flex-1 bg-[#05070B] border border-[#8CCDEB]/40 rounded-lg px-2.5 py-1 text-xs text-[#F4F7FA] font-mono outline-none"
-            />
-            <button 
-              onClick={() => {
-                setServerUrl(customServerUrl.trim());
-                setShowServerConfig(false);
-              }}
-              className="px-3 py-1 bg-[#0B315A] hover:bg-[#0E3E73] border border-[#8CCDEB] text-white font-bold rounded-lg text-xs uppercase cursor-pointer"
-            >
-              Save
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* =========================================================================
           3. MAIN RESPONSIVE BATTLE ARENA DISPLAY:
