@@ -35,6 +35,7 @@ import {
   Settings
 } from 'lucide-react';
 import { enterFullscreen, toggleFullscreen, useFullscreen } from '../../utils/fullscreenHelper';
+import { getOptimalDPR, isMobileDevice } from '../../utils/mobileOptimization';
 
 const CHASSIS_CONFIG: Record<BattleColor, { hex: string; label: string; scheme: SpaceshipPaintSchemeKey }> = {
   yellow: { hex: '#FFCC00', label: 'Solar Vanguard', scheme: 'battle_yellow' },
@@ -587,10 +588,16 @@ export const LandingPage: React.FC = () => {
           {/* Three.js Interactive 3D Canvas */}
           <div className="w-full h-full max-h-[58vh] aspect-square flex items-center justify-center relative">
             <Canvas 
-              dpr={[1, 2]}
+              dpr={getOptimalDPR()}
               camera={{ position: [0, 1.4, 4.8], fov: 45 }} 
-              gl={{ alpha: true, antialias: true }}
-              className="w-full h-full z-10 relative cursor-grab active:cursor-grabbing"
+              gl={{ 
+                alpha: true, 
+                antialias: !isMobileDevice(),
+                powerPreference: 'high-performance',
+                stencil: false,
+                depth: true
+              }}
+              className="w-full h-full z-10 relative cursor-grab active:cursor-grabbing touch-none select-none"
             >
               <ambientLight intensity={0.9} />
               <directionalLight position={[6, 8, 5]} intensity={2.0} color="#F4F7FA" />

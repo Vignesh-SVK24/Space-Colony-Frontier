@@ -139,3 +139,19 @@ export function getViewDistanceFar(distance: ViewDistanceTier): number {
       return 3500;
   }
 }
+
+import { isMobileDevice } from '../utils/mobileOptimization';
+
+/**
+ * Return default graphics settings dynamically tuned to the platform.
+ * Mobile (iOS / Android) automatically uses optimized settings (no multi-pass bloom,
+ * no shadow map calculation, clamped star count) to ensure locked 60 FPS without thermal throttling.
+ */
+export function getDefaultGraphicsSettings(): GraphicsSettings {
+  if (isMobileDevice()) {
+    return GRAPHICS_PRESETS.low;
+  }
+  return GRAPHICS_PRESETS.high;
+}
+
+

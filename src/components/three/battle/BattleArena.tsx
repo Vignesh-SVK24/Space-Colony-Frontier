@@ -197,6 +197,11 @@ const DebrisClusterMesh: React.FC<{ obstacle: ArenaObstacle }> = ({ obstacle }) 
   );
 };
 
+const _scratchPlayerPos = new THREE.Vector3();
+const _scratchCyanColor = new THREE.Color('#06b6d4');
+const _scratchRedColor = new THREE.Color('#ef4444');
+const _scratchTargetColor = new THREE.Color();
+
 export const BattleArena: React.FC = () => {
   const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.MeshBasicMaterial>(null);
@@ -205,15 +210,15 @@ export const BattleArena: React.FC = () => {
   useFrame((state, delta) => {
     if (!materialRef.current || !selfState) return;
 
-    const playerPos = new THREE.Vector3().fromArray(selfState.position);
-    const dist = playerPos.length();
+    _scratchPlayerPos.fromArray(selfState.position);
+    const dist = _scratchPlayerPos.length();
     
     // 300m boundary radius
     const boundaryRadius = COMBAT_CONFIG.ARENA_RADIUS;
     const margin = 50;
     
     let targetOpacity = 0.025;
-    let targetColor = new THREE.Color('#06b6d4'); // Cyan default
+    _scratchTargetColor.copy(_scratchCyanColor); // Cyan default
     
     if (dist > boundaryRadius - margin) {
       const intensity = Math.min(1, (dist - (boundaryRadius - margin)) / margin);
@@ -222,11 +227,11 @@ export const BattleArena: React.FC = () => {
       const pulse = (Math.sin(state.clock.elapsedTime * 12) + 1) / 2;
       targetOpacity += pulse * 0.08 * intensity;
       
-      targetColor.lerp(new THREE.Color('#ef4444'), intensity); // Lerp to red warning
+      _scratchTargetColor.lerp(_scratchRedColor, intensity); // Lerp to red warning
     }
     
     materialRef.current.opacity = THREE.MathUtils.lerp(materialRef.current.opacity, targetOpacity, delta * 5);
-    materialRef.current.color.lerp(targetColor, delta * 5);
+    materialRef.current.color.lerp(_scratchTargetColor, delta * 5);
   });
 
   return (

@@ -79,6 +79,7 @@ export const SoloAIBot: React.FC = () => {
   // Stats tracking
   const totalShotsFired = useRef(0);
   const totalShotsHit = useRef(0);
+  const lastOpponentSyncTime = useRef(0);
 
   useFrame((state, delta) => {
     const liveOpponent = useMultiplayerStore.getState().opponentState;
@@ -381,14 +382,17 @@ export const SoloAIBot: React.FC = () => {
       droneQuat.current.slerp(targetQuat, dt * 4.0);
       droneEuler.current.setFromQuaternion(droneQuat.current, 'YXZ');
 
-      updateSoloOpponent(
-        [dronePos.current.x, dronePos.current.y, dronePos.current.z],
-        [droneEuler.current.x, droneEuler.current.y, droneEuler.current.z],
-        [droneVel.current.x, droneVel.current.y, droneVel.current.z],
-        liveOpponent.hp,
-        desiredSpeed > 35,
-        desiredSpeed / 48
-      );
+      if (now - lastOpponentSyncTime.current > 0.033) {
+        lastOpponentSyncTime.current = now;
+        updateSoloOpponent(
+          [dronePos.current.x, dronePos.current.y, dronePos.current.z],
+          [droneEuler.current.x, droneEuler.current.y, droneEuler.current.z],
+          [droneVel.current.x, droneVel.current.y, droneVel.current.z],
+          liveOpponent.hp,
+          desiredSpeed > 35,
+          desiredSpeed / 48
+        );
+      }
     }
 
     // =========================================================================

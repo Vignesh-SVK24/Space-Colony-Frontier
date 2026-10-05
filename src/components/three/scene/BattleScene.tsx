@@ -20,33 +20,39 @@ import { getViewDistanceFar } from '../../../config/graphicsConfig';
 import { useNexusGameStore } from '../../../state/useNexusGameStore';
 import { useMultiplayerStore } from '../../../multiplayer/useMultiplayerStore';
 
+import { isMobileDevice, getOptimalDPR } from '../../../utils/mobileOptimization';
+
 export const BattleScene: React.FC = () => {
   const graphicsSettings = useNexusGameStore((state) => state.graphicsSettings);
   const isSolo = useMultiplayerStore((state) => state.isSolo);
   const otherPlayers = useMultiplayerStore((state) => state.otherPlayers);
   const opponentState = useMultiplayerStore((state) => state.opponentState);
   const far = getViewDistanceFar(graphicsSettings.viewDistance);
+  const isMobile = isMobileDevice();
+  const dpr = getOptimalDPR();
 
   // Render up to 3 opponents in 4-player match
   const remoteShips = otherPlayers.length > 0 ? otherPlayers : (opponentState ? [opponentState] : []);
 
   return (
     <Canvas
-      dpr={[1, 2]}
-      shadows={graphicsSettings.shadows ? 'soft' : false}
+      dpr={dpr}
+      shadows={!isMobile && graphicsSettings.shadows ? 'soft' : false}
       camera={{ fov: 55, near: 0.1, far }}
       gl={{
-        antialias: graphicsSettings.antiAliasing,
+        antialias: !isMobile && graphicsSettings.antiAliasing,
         powerPreference: 'high-performance',
         toneMapping: ACESFilmicToneMapping,
         toneMappingExposure: 1.0,
+        stencil: false,
+        depth: true
       }}
       onCreated={({ scene }) => {
         scene.environment = generateSpaceCubeEnvironment();
       }}
-      className="w-full h-full"
+      className="w-full h-full touch-none select-none"
     >
-      <ambientLight intensity={0.3} />
+      <ambientLight intensity={0.4} />
       <hemisphereLight args={['#ffffff', '#000000', 0.2]} />
       
       {/* Environment */}
@@ -68,8 +74,9 @@ export const BattleScene: React.FC = () => {
       <LeadReticle3D />
       {isSolo && <SoloAIBot />}
 
-      {/* Post Processing */}
-      <CinematicPostProcessing />
+      {/* Post Processing: only on desktop devices with high settings */}
+      {!isMobile && graphicsSettings.postProcessing !== 'off' && <CinematicPostProcessing />}
     </Canvas>
   );
 };
+

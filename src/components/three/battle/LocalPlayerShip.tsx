@@ -33,13 +33,15 @@ export const LocalPlayerShip: React.FC = () => {
   const setTargetLock = useMultiplayerStore(state => state.setTargetLock);
   const setLeadIndicator = useMultiplayerStore(state => state.setLeadIndicator);
   
-  const [keys, setKeys] = useState<Record<string, boolean>>({});
-  const [isMouseDownLeft, setIsMouseDownLeft] = useState(false);
-  const [isMouseDownRight, setIsMouseDownRight] = useState(false);
+  const keysRef = useRef<Record<string, boolean>>({});
+  const isMouseDownLeft = useRef(false);
+  const isMouseDownRight = useRef(false);
   
   const velocity = useRef(new THREE.Vector3());
   const rotationEuler = useRef(new THREE.Euler(0, 0, 0, 'YXZ'));
   const lastSendTime = useRef(0);
+  const lastSoloSyncTime = useRef(0);
+  const lastCooldownSyncTime = useRef(0);
   const lastBulletTime = useRef(0);
   const lastLaserTime = useRef(0);
   const lastSolarTime = useRef(0);
@@ -61,22 +63,28 @@ export const LocalPlayerShip: React.FC = () => {
   };
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => setKeys(k => ({ ...k, [e.code]: true, [e.key.toUpperCase()]: true }));
-    const handleKeyUp = (e: KeyboardEvent) => setKeys(k => ({ ...k, [e.code]: false, [e.key.toUpperCase()]: false }));
+    const handleKeyDown = (e: KeyboardEvent) => {
+      keysRef.current[e.code] = true;
+      keysRef.current[e.key.toUpperCase()] = true;
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      keysRef.current[e.code] = false;
+      keysRef.current[e.key.toUpperCase()] = false;
+    };
     
     const handleMouseDown = (e: MouseEvent) => {
-      if (e.button === 0) setIsMouseDownLeft(true);
+      if (e.button === 0) isMouseDownLeft.current = true;
       if (e.button === 2) {
         e.preventDefault();
-        setIsMouseDownRight(true);
+        isMouseDownRight.current = true;
       }
     };
     
     const handleMouseUp = (e: MouseEvent) => {
-      if (e.button === 0) setIsMouseDownLeft(false);
+      if (e.button === 0) isMouseDownLeft.current = false;
       if (e.button === 2) {
         e.preventDefault();
-        setIsMouseDownRight(false);
+        isMouseDownRight.current = false;
       }
     };
 
@@ -111,6 +119,7 @@ export const LocalPlayerShip: React.FC = () => {
     }
 
     const dt = Math.min(delta, 0.1);
+    const keys = keysRef.current;
 
     // ==========================================
     // 1. Flight Controls
@@ -122,6 +131,13 @@ export const LocalPlayerShip: React.FC = () => {
     let yawInput = 0;
     if (keys['KeyA'] || keys['ArrowLeft'] || keys['A']) yawInput += 1;
     if (keys['KeyD'] || keys['ArrowRight'] || keys['D']) yawInput -= 1;
+
+    // Direct proportional analog virtual joystick steering on iOS/Android
+    const joy = useMultiplayerStore.getState().joystickAxis;
+    if (joy) {
+      if (Math.abs(joy.y) > 0.05) forwardInput += joy.y;
+      if (Math.abs(joy.x) > 0.05) yawInput -= joy.x;
+    }
 
     let verticalInput = 0;
     if (keys['Space'] || keys[' ']) verticalInput += 1;
@@ -272,17 +288,20 @@ export const LocalPlayerShip: React.FC = () => {
     }
 
     const bulletCdLeft = Math.max(0, COMBAT_CONFIG.BULLET_FIRE_INTERVAL - (now - lastBulletTime.current) / 1000);
-    setBulletCooldownRemaining(bulletCdLeft);
-
     const laserCdLeft = isSolo
       ? Math.max(0, COMBAT_CONFIG.LASER_COOLDOWN - (now - lastLaserTime.current) / 1000)
       : (selfState?.laserCooldownRemaining ?? 0);
-    setLaserCooldownRemaining(laserCdLeft);
-
     const solarCdLeft = isSolo
       ? Math.max(0, COMBAT_CONFIG.SOLAR_COOLDOWN - (now - lastSolarTime.current) / 1000)
       : (selfState?.solarCooldownRemaining ?? 0);
-    setSolarCooldownRemaining(solarCdLeft);
+
+    // Throttle cooldown updates to HUD to 10Hz or on ready: eliminates 60fps React re-renders!
+    if (now - lastCooldownSyncTime.current > 100 || laserCdLeft <= 0.05 || solarCdLeft <= 0.05) {
+      lastCooldownSyncTime.current = now;
+      setBulletCooldownRemaining(bulletCdLeft);
+      setLaserCooldownRemaining(laserCdLeft);
+      setSolarCooldownRemaining(solarCdLeft);
+    }
 
     // Muzzle position in world space
     const muzzlePos = group.current.position.clone().add(forwardDir.clone().multiplyScalar(2.2));
@@ -312,7 +331,7 @@ export const LocalPlayerShip: React.FC = () => {
     // ==========================================
     // 5. Weapon 1: Rapid Plasma Bullet (2 HP, 0.1s rate, 30 magazine, 2s reload)
     // ==========================================
-    const shootBullet = isMouseDownLeft || keys['KeyJ'];
+    const shootBullet = isMouseDownLeft.current || keys['KeyJ'] || keys['J'];
     const canFireBullet = isSolo
       ? (!soloIsReloading.current && soloAmmo.current > 0)
       : (selfState && !selfState.isReloading && selfState.ammo > 0);
@@ -357,7 +376,7 @@ export const LocalPlayerShip: React.FC = () => {
     // ==========================================
     // 6. Weapon 2: Directed Laser Beam (12 HP, 3.0s RECHARGE)
     // ==========================================
-    const shootLaser = isMouseDownRight || keys['KeyK'];
+    const shootLaser = isMouseDownRight.current || keys['KeyK'] || keys['K'];
     if (shootLaser && laserCdLeft <= 0.05) {
       lastLaserTime.current = now;
       const attackId = `LASER_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -505,17 +524,20 @@ export const LocalPlayerShip: React.FC = () => {
     }
 
     // ==========================================
-    // 8. Flight State Sync / Telemetry
+    // 8. Flight State Sync / Telemetry (Throttled to 30Hz)
     // ==========================================
     if (isSolo) {
-      updateSoloSelf(
-        [group.current.position.x, group.current.position.y, group.current.position.z],
-        [rotationEuler.current.x, rotationEuler.current.y, rotationEuler.current.z],
-        [forwardDir.x * velocity.current.z, forwardDir.y * velocity.current.z, forwardDir.z * velocity.current.z],
-        useMultiplayerStore.getState().selfState?.hp ?? COMBAT_CONFIG.MAX_HP,
-        isBoosting,
-        Math.min(Math.abs(velocity.current.z) / COMBAT_CONFIG.SHIP_MAX_SPEED, 1)
-      );
+      if (now - lastSoloSyncTime.current > 33) {
+        lastSoloSyncTime.current = now;
+        updateSoloSelf(
+          [group.current.position.x, group.current.position.y, group.current.position.z],
+          [rotationEuler.current.x, rotationEuler.current.y, rotationEuler.current.z],
+          [forwardDir.x * velocity.current.z, forwardDir.y * velocity.current.z, forwardDir.z * velocity.current.z],
+          useMultiplayerStore.getState().selfState?.hp ?? COMBAT_CONFIG.MAX_HP,
+          isBoosting,
+          Math.min(Math.abs(velocity.current.z) / COMBAT_CONFIG.SHIP_MAX_SPEED, 1)
+        );
+      }
     } else {
       if (now - lastSendTime.current > 33) {
         sendInput(

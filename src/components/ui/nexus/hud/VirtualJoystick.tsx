@@ -18,13 +18,12 @@ export const VirtualJoystick: FC = () => {
   const [isTouchDevice, setIsTouchDevice] = useState<boolean>(false);
   const [activeKeys, setActiveKeys] = useState<Record<string, boolean>>({});
 
-  // 360-Degree Joystick State
-  const [knobPos, setKnobPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isActive, setIsActive] = useState<boolean>(false);
-  const [angleDeg, setAngleDeg] = useState<number>(0);
-  const [magnitude, setMagnitude] = useState<number>(0);
 
   const joystickBaseRef = useRef<HTMLDivElement>(null);
+  const knobRef = useRef<HTMLDivElement>(null);
+  const knobArrowRef = useRef<HTMLDivElement>(null);
+  const telemetryTextRef = useRef<HTMLSpanElement>(null);
   const touchIdRef = useRef<number | null>(null);
 
   const setJoystickAxis = useMultiplayerStore(state => state.setJoystickAxis);
@@ -50,12 +49,18 @@ export const VirtualJoystick: FC = () => {
   }, []);
 
   const pressKey = (code: string, keyName: string) => {
-    setActiveKeys(prev => ({ ...prev, [code]: true }));
+    setActiveKeys(prev => {
+      if (prev[code]) return prev;
+      return { ...prev, [code]: true };
+    });
     window.dispatchEvent(new KeyboardEvent('keydown', { code, key: keyName, bubbles: true }));
   };
 
   const releaseKey = (code: string, keyName: string) => {
-    setActiveKeys(prev => ({ ...prev, [code]: false }));
+    setActiveKeys(prev => {
+      if (!prev[code]) return prev;
+      return { ...prev, [code]: false };
+    });
     window.dispatchEvent(new KeyboardEvent('keyup', { code, key: keyName, bubbles: true }));
   };
 
@@ -81,9 +86,16 @@ export const VirtualJoystick: FC = () => {
     const normX = clampedX / MAX_RADIUS;
     const normY = -clampedY / MAX_RADIUS;
 
-    setKnobPos({ x: clampedX, y: clampedY });
-    setAngleDeg(Math.round(degrees));
-    setMagnitude(Math.round(magNorm * 100));
+    // Direct GPU-accelerated CSS transform: 0 React re-renders during drag!
+    if (knobRef.current) {
+      knobRef.current.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0)`;
+    }
+    if (knobArrowRef.current) {
+      knobArrowRef.current.style.transform = `rotate(${Math.round(degrees)}deg)`;
+    }
+    if (telemetryTextRef.current) {
+      telemetryTextRef.current.textContent = `${Math.round(degrees)}° | ${Math.round(magNorm * 100)}%`;
+    }
 
     setJoystickAxis({ x: normX, y: normY });
 
@@ -130,8 +142,12 @@ export const VirtualJoystick: FC = () => {
       if (touch.identifier === touchIdRef.current) {
         touchIdRef.current = null;
         setIsActive(false);
-        setKnobPos({ x: 0, y: 0 });
-        setMagnitude(0);
+        if (knobRef.current) {
+          knobRef.current.style.transform = 'translate3d(0px, 0px, 0)';
+        }
+        if (telemetryTextRef.current) {
+          telemetryTextRef.current.textContent = '360° STICK | 0%';
+        }
         setJoystickAxis({ x: 0, y: 0 });
         releaseKey('KeyW', 'W');
         releaseKey('KeyS', 'S');
@@ -227,9 +243,7 @@ export const VirtualJoystick: FC = () => {
           <div className="flex flex-col items-center">
             <div className="text-[9px] text-cyan-400 font-bold mb-1 px-2 py-0.5 rounded-full bg-black/60 border border-cyan-800/60 backdrop-blur-sm flex items-center gap-1.5 shadow-md">
               <Compass size={11} className={isActive ? 'text-cyan-300 animate-spin-slow' : 'text-gray-500'} />
-              <span>{isActive ? `${angleDeg}°` : '360° STICK'}</span>
-              <span className="text-gray-500">|</span>
-              <span className={magnitude > 60 ? 'text-amber-300' : 'text-cyan-300'}>{magnitude}%</span>
+              <span ref={telemetryTextRef}>360° STICK | 0%</span>
             </div>
 
             <div
@@ -251,8 +265,9 @@ export const VirtualJoystick: FC = () => {
               </svg>
 
               <div
+                ref={knobRef}
                 style={{
-                  transform: `translate(${knobPos.x}px, ${knobPos.y}px)`,
+                  transform: 'translate3d(0px, 0px, 0)',
                   transition: isActive ? 'none' : 'transform 0.18s cubic-bezier(0.18, 0.89, 0.32, 1.28)'
                 }}
                 className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full border-2 flex items-center justify-center shadow-xl cursor-grab active:cursor-grabbing ${
@@ -262,8 +277,9 @@ export const VirtualJoystick: FC = () => {
                 }`}
               >
                 <div
+                  ref={knobArrowRef}
                   style={{
-                    transform: `rotate(${angleDeg}deg)`,
+                    transform: 'rotate(0deg)',
                     transition: isActive ? 'none' : 'transform 0.18s ease-out'
                   }}
                   className="flex flex-col items-center pointer-events-none"

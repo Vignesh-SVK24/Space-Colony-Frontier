@@ -6,6 +6,8 @@ import { loadGLBAsset } from '../../../assets/AssetLoader';
 import { EngineExhaust } from './EngineExhaust';
 import { getBrushedMetalNormal, getRoughnessNoiseMap } from '../../../utils/pbrTextureGenerator';
 
+import { isMobileDevice } from '../../../utils/mobileOptimization';
+
 export interface SpaceshipModelProps {
   paintScheme?: SpaceshipPaintSchemeKey;
   throttle?: number; // 0 to 1
@@ -22,6 +24,7 @@ export const SpaceshipModel: FC<SpaceshipModelProps> = ({
   const [externalModel, setExternalModel] = useState<THREE.Group | null>(null);
   const strobeRef = useRef<THREE.MeshBasicMaterial>(null);
   const theme = VISUAL_THEME.spaceshipPaintSchemes[paintScheme] || VISUAL_THEME.spaceshipPaintSchemes.default;
+  const isMobile = useMemo(() => isMobileDevice(), []);
 
   const brushedNormal = useMemo(() => getBrushedMetalNormal(), []);
   const roughnessMap = useMemo(() => getRoughnessNoiseMap(), []);
@@ -79,21 +82,30 @@ export const SpaceshipModel: FC<SpaceshipModelProps> = ({
             />
           </mesh>
 
-          {/* Cockpit Canopy Glass: Physically believable transmissive aerospace canopy */}
-          <mesh position={[0, 0.42, 0.6]} rotation={[Math.PI / 4, 0, 0]} castShadow>
-            <capsuleGeometry args={[0.3, 0.7, 12, 24]} />
-            <meshPhysicalMaterial
-              color={theme.cockpitGlass}
-              roughness={0.06}
-              metalness={0.15}
-              transmission={0.65}
-              transparent
-              opacity={0.85}
-              ior={1.52}
-              clearcoat={1.0}
-              clearcoatRoughness={0.05}
-              reflectivity={0.9}
-            />
+          <mesh position={[0, 0.42, 0.6]} rotation={[Math.PI / 4, 0, 0]} castShadow={!isMobile}>
+            <capsuleGeometry args={[0.3, 0.7, 10, isMobile ? 12 : 20]} />
+            {isMobile ? (
+              <meshStandardMaterial
+                color={theme.cockpitGlass}
+                roughness={0.1}
+                metalness={0.4}
+                transparent
+                opacity={0.8}
+              />
+            ) : (
+              <meshPhysicalMaterial
+                color={theme.cockpitGlass}
+                roughness={0.06}
+                metalness={0.15}
+                transmission={0.65}
+                transparent
+                opacity={0.85}
+                ior={1.52}
+                clearcoat={1.0}
+                clearcoatRoughness={0.05}
+                reflectivity={0.9}
+              />
+            )}
           </mesh>
 
           {/* Left Swept Delta Wing */}

@@ -9,27 +9,25 @@ import { COMBAT_CONFIG } from '../../../../config/combatConfig';
 import { enterFullscreen, toggleFullscreen, useFullscreen } from '../../../../utils/fullscreenHelper';
 
 export const BattleHUD: React.FC = () => {
-  const {
-    roomCode,
-    selfState,
-    opponentState,
-    otherPlayers,
-    connectionQuality,
-    isSolo,
-    gameMode,
-    reset,
-    isMapOpen,
-    setMapOpen,
-    ammo,
-    isReloading,
-    reloadTimeRemaining,
-    laserCooldownRemaining,
-    solarCooldownRemaining,
-    targetLock,
-    hitConfirmActive,
-    countdown,
-    roomStatus
-  } = useMultiplayerStore();
+  const roomCode = useMultiplayerStore(state => state.roomCode);
+  const selfState = useMultiplayerStore(state => state.selfState);
+  const opponentState = useMultiplayerStore(state => state.opponentState);
+  const otherPlayers = useMultiplayerStore(state => state.otherPlayers);
+  const connectionQuality = useMultiplayerStore(state => state.connectionQuality);
+  const isSolo = useMultiplayerStore(state => state.isSolo);
+  const gameMode = useMultiplayerStore(state => state.gameMode);
+  const reset = useMultiplayerStore(state => state.reset);
+  const isMapOpen = useMultiplayerStore(state => state.isMapOpen);
+  const setMapOpen = useMultiplayerStore(state => state.setMapOpen);
+  const ammo = useMultiplayerStore(state => state.ammo);
+  const isReloading = useMultiplayerStore(state => state.isReloading);
+  const reloadTimeRemaining = useMultiplayerStore(state => state.reloadTimeRemaining);
+  const laserCooldownRemaining = useMultiplayerStore(state => state.laserCooldownRemaining);
+  const solarCooldownRemaining = useMultiplayerStore(state => state.solarCooldownRemaining);
+  const targetLock = useMultiplayerStore(state => state.targetLock);
+  const hitConfirmActive = useMultiplayerStore(state => state.hitConfirmActive);
+  const countdown = useMultiplayerStore(state => state.countdown);
+  const roomStatus = useMultiplayerStore(state => state.roomStatus);
 
   const opponentList = otherPlayers.length > 0 ? otherPlayers : (opponentState ? [opponentState] : []);
   const { isFullscreen } = useFullscreen();

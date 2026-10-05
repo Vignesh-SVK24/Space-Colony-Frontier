@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { ResourceId } from '../config/resourceConfig';
 import { nexusAudio } from '../utils/nexusAudio';
-import { GraphicsSettings, QualityPreset, GRAPHICS_PRESETS } from '../config/graphicsConfig';
+import { GraphicsSettings, QualityPreset, GRAPHICS_PRESETS, getDefaultGraphicsSettings } from '../config/graphicsConfig';
 
 export interface ResourceTelemetry {
   id: ResourceId;
@@ -476,7 +476,7 @@ export const useNexusGameStore = create<NexusGameState>((set, get) => ({
   radarContacts: [],
   mapScale: 'orbit',
   discoveredLocations: ['colony-alpha', 'selene-prime', 'apex-station'],
-  graphicsSettings: GRAPHICS_PRESETS.high,
+  graphicsSettings: getDefaultGraphicsSettings(),
 
   setWaypoint: (waypoint) => {
     if (waypoint) {
