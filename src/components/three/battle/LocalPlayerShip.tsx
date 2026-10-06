@@ -168,8 +168,12 @@ export const LocalPlayerShip: React.FC = () => {
     // 1. Flight Controls
     // ==========================================
     let forwardInput = 0;
-    if (keys['KeyW'] || keys['ArrowUp'] || keys['W']) forwardInput += 1;
-    if (keys['KeyS'] || keys['ArrowDown'] || keys['S']) forwardInput -= 1;
+    if (keys['KeyW'] || keys['W']) forwardInput += 1;
+    if (keys['KeyS'] || keys['S']) forwardInput -= 1;
+    // Arrow keys: Up provides forward thrust
+    if (keys['ArrowUp'] && !keys['KeyW'] && !keys['W']) forwardInput += 1;
+    // Down Arrow: if S is not pressed, provides reverse throttle for arrow key navigation
+    if (keys['ArrowDown'] && !keys['KeyS'] && !keys['S']) forwardInput -= 0.6;
 
     let yawInput = 0;
     if (keys['KeyA'] || keys['ArrowLeft'] || keys['A']) yawInput += 1;
@@ -183,8 +187,18 @@ export const LocalPlayerShip: React.FC = () => {
     }
 
     let verticalInput = 0;
-    if (keys['Space'] || keys[' ']) verticalInput += 1;
-    if (keys['KeyC'] || keys['C']) verticalInput -= 1;
+    // Ascend: Space or PageUp
+    if (keys['Space'] || keys[' '] || keys['PageUp']) verticalInput += 1;
+    // Descend: Down Arrow, C, Ctrl, Z, PageDown
+    if (
+      keys['KeyC'] || keys['C'] ||
+      keys['ControlLeft'] || keys['ControlRight'] || keys['Control'] || keys['CONTROL'] ||
+      keys['KeyZ'] || keys['Z'] ||
+      keys['PageDown'] ||
+      keys['ArrowDown'] || keys['ARROWDOWN']
+    ) {
+      verticalInput -= 1;
+    }
 
     const isBoosting = !!(keys['ShiftLeft'] || keys['ShiftRight'] || keys['SHIFT']);
     const isBraking = !!(keys['KeyX'] || keys['X']);

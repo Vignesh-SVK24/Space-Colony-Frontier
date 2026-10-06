@@ -100,8 +100,8 @@ export const BattleHUD: React.FC = () => {
 
           {/* Flight & Combat Keys */}
           <div className="hidden lg:flex flex-col gap-1 p-2 bg-black/60 border border-gray-800/80 rounded-lg text-[10px] text-gray-400 backdrop-blur-md">
-            <div><span className="text-cyan-400 font-bold">W/S/A/D:</span> Thrust & Yaw</div>
-            <div><span className="text-cyan-400 font-bold">SPACE/C:</span> Ascend/Descend</div>
+            <div><span className="text-cyan-400 font-bold">W/S/A/D / ARROWS:</span> Thrust & Yaw</div>
+            <div><span className="text-cyan-400 font-bold">SPACE / C (or CTRL / DOWN):</span> Ascend / Descend</div>
             <div><span className="text-cyan-400 font-bold">L-CLICK / J:</span> Bullet (2 HP · 30 Mag)</div>
             <div><span className="text-amber-400 font-bold">R-CLICK / K:</span> Laser Beam (12 HP · 3s)</div>
             <div><span className="text-orange-400 font-bold">L:</span> Solar Beam (30 HP · 10s)</div>

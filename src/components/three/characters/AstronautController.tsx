@@ -129,8 +129,8 @@ export const AstronautController: FC = () => {
     const k = keys.current;
 
     // Movement inputs
-    const forward = (k['W'] || k['KeyW']) ? 1 : (k['S'] || k['KeyS']) ? -1 : 0;
-    const strafe = (k['D'] || k['KeyD']) ? 1 : (k['A'] || k['KeyA']) ? -1 : 0;
+    const forward = (k['W'] || k['KeyW'] || k['ArrowUp']) ? 1 : (k['S'] || k['KeyS'] || k['ArrowDown']) ? -1 : 0;
+    const strafe = (k['D'] || k['KeyD'] || k['ArrowRight']) ? 1 : (k['A'] || k['KeyA'] || k['ArrowLeft']) ? -1 : 0;
     const isRunning = (k['ShiftLeft'] || k['ShiftRight'] || k['Shift']) && forward > 0;
 
     const moveInput = new THREE.Vector3(strafe, 0, -forward);

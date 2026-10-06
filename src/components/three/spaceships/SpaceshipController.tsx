@@ -173,14 +173,20 @@ export const SpaceshipController: FC<SpaceshipControllerProps> = ({
     // 3. FULL 6-DOF 3-AXIS SPACESHIP FLIGHT
     // ==========================================
     const k = keys.current;
-    const forwardInput = (k['W'] || k['KeyW']) ? 1 : (k['S'] || k['KeyS']) ? -0.8 : 0;
-    const yawInput = (k['A'] || k['KeyA']) ? 1 : (k['D'] || k['KeyD']) ? -1 : 0;
+    const forwardInput = (k['W'] || k['KeyW'] || k['ArrowUp']) ? 1 : (k['S'] || k['KeyS'] || k['ArrowDown']) ? -0.8 : 0;
+    const yawInput = (k['A'] || k['KeyA'] || k['ArrowLeft']) ? 1 : (k['D'] || k['KeyD'] || k['ArrowRight']) ? -1 : 0;
     const rollInput = (k['Q'] || k['KeyQ']) ? 1 : (k['E'] || k['KeyE']) ? -1 : 0;
     const pitchInput = (k['R'] || k['KeyR']) ? 1 : (k['F'] || k['KeyF']) ? -1 : 0;
 
-    // Controlled Vertical Thrust: Space = Ascend, Z/Ctrl = Descend
-    const ascendInput = (k['Space'] || k[' ']) ? 1 : 0;
-    const descendInput = (k['KeyZ'] || k['Z'] || k['ControlLeft'] || k['ControlRight'] || k['Control']) ? 1 : 0;
+    // Controlled Vertical Thrust: Space/PageUp = Ascend, C/Z/Ctrl/PageDown/ArrowDown = Descend
+    const ascendInput = (k['Space'] || k[' '] || k['PageUp']) ? 1 : 0;
+    const descendInput = (
+      k['KeyZ'] || k['Z'] ||
+      k['ControlLeft'] || k['ControlRight'] || k['Control'] ||
+      k['KeyC'] || k['C'] ||
+      k['PageDown'] ||
+      k['ArrowDown']
+    ) ? 1 : 0;
     const verticalInput = ascendInput - descendInput;
 
     const boostInput = (k['ShiftLeft'] || k['ShiftRight'] || k['Shift']) && forwardInput > 0;

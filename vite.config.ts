@@ -9,6 +9,7 @@ export default defineConfig({
   assetsInclude: ['**/*.glb', '**/*.gltf', '**/*.wasm'],
   build: {
     outDir: 'docs',
+    emptyOutDir: false,
   },
   server: {
     port: 5173,

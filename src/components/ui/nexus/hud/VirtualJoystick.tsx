@@ -112,6 +112,51 @@ export const VirtualJoystick: FC = () => {
     else releaseKey('KeyD', 'D');
   };
 
+  const pointerIdRef = useRef<number | null>(null);
+
+  const resetJoystickKnob = () => {
+    touchIdRef.current = null;
+    pointerIdRef.current = null;
+    setIsActive(false);
+    if (knobRef.current) {
+      knobRef.current.style.transform = 'translate3d(0px, 0px, 0)';
+    }
+    if (telemetryTextRef.current) {
+      telemetryTextRef.current.textContent = '360° STICK | 0%';
+    }
+    setJoystickAxis({ x: 0, y: 0 });
+    releaseKey('KeyW', 'W');
+    releaseKey('KeyS', 'S');
+    releaseKey('KeyA', 'A');
+    releaseKey('KeyD', 'D');
+  };
+
+  const handleJoystickPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    if (pointerIdRef.current === null) {
+      pointerIdRef.current = e.pointerId;
+      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch (_) {}
+      setIsActive(true);
+      updateJoystickFromPoint(e.clientX, e.clientY);
+    }
+  };
+
+  const handleJoystickPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (pointerIdRef.current === e.pointerId) {
+      e.preventDefault();
+      updateJoystickFromPoint(e.clientX, e.clientY);
+    }
+  };
+
+  const handleJoystickPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (pointerIdRef.current === e.pointerId) {
+      e.preventDefault();
+      try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch (_) {}
+      resetJoystickKnob();
+    }
+  };
+
   const handleJoystickTouchStart = (e: React.TouchEvent) => {
     e.preventDefault();
     const touch = e.changedTouches[0];
@@ -140,19 +185,7 @@ export const VirtualJoystick: FC = () => {
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
       if (touch.identifier === touchIdRef.current) {
-        touchIdRef.current = null;
-        setIsActive(false);
-        if (knobRef.current) {
-          knobRef.current.style.transform = 'translate3d(0px, 0px, 0)';
-        }
-        if (telemetryTextRef.current) {
-          telemetryTextRef.current.textContent = '360° STICK | 0%';
-        }
-        setJoystickAxis({ x: 0, y: 0 });
-        releaseKey('KeyW', 'W');
-        releaseKey('KeyS', 'S');
-        releaseKey('KeyA', 'A');
-        releaseKey('KeyD', 'D');
+        resetJoystickKnob();
         break;
       }
     }
@@ -248,6 +281,10 @@ export const VirtualJoystick: FC = () => {
 
             <div
               ref={joystickBaseRef}
+              onPointerDown={handleJoystickPointerDown}
+              onPointerMove={handleJoystickPointerMove}
+              onPointerUp={handleJoystickPointerUp}
+              onPointerCancel={handleJoystickPointerUp}
               onTouchStart={handleJoystickTouchStart}
               onTouchMove={handleJoystickTouchMove}
               onTouchEnd={handleJoystickTouchEnd}
@@ -296,12 +333,18 @@ export const VirtualJoystick: FC = () => {
           {/* Vertical Elevation Buttons */}
           <div className="flex flex-col gap-2">
             <button
+              onPointerDown={(e) => { e.stopPropagation(); try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch (_) {} pressKey('Space', ' '); }}
+              onPointerUp={(e) => { e.stopPropagation(); try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch (_) {} releaseKey('Space', ' '); }}
+              onPointerCancel={(e) => { e.stopPropagation(); releaseKey('Space', ' '); }}
+              onPointerLeave={(e) => { e.stopPropagation(); releaseKey('Space', ' '); }}
               onTouchStart={(e) => { e.stopPropagation(); pressKey('Space', ' '); }}
               onTouchEnd={(e) => { e.stopPropagation(); releaseKey('Space', ' '); }}
-              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl border flex flex-col items-center justify-center text-[8px] font-bold shadow-lg transition-all ${
+              onMouseDown={(e) => { e.stopPropagation(); pressKey('Space', ' '); }}
+              onMouseUp={(e) => { e.stopPropagation(); releaseKey('Space', ' '); }}
+              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl border flex flex-col items-center justify-center text-[8px] font-bold shadow-lg transition-all cursor-pointer select-none ${
                 activeKeys['Space']
                   ? 'bg-cyan-500 text-white border-white scale-95 shadow-[0_0_15px_rgba(6,182,212,0.8)]'
-                  : 'bg-black/85 border-cyan-500/60 text-cyan-300'
+                  : 'bg-black/85 border-cyan-500/60 text-cyan-300 active:scale-95'
               }`}
             >
               <ChevronUp size={20} />
@@ -309,12 +352,18 @@ export const VirtualJoystick: FC = () => {
             </button>
 
             <button
+              onPointerDown={(e) => { e.stopPropagation(); try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch (_) {} pressKey('KeyC', 'c'); }}
+              onPointerUp={(e) => { e.stopPropagation(); try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch (_) {} releaseKey('KeyC', 'c'); }}
+              onPointerCancel={(e) => { e.stopPropagation(); releaseKey('KeyC', 'c'); }}
+              onPointerLeave={(e) => { e.stopPropagation(); releaseKey('KeyC', 'c'); }}
               onTouchStart={(e) => { e.stopPropagation(); pressKey('KeyC', 'c'); }}
               onTouchEnd={(e) => { e.stopPropagation(); releaseKey('KeyC', 'c'); }}
-              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl border flex flex-col items-center justify-center text-[8px] font-bold shadow-lg transition-all ${
+              onMouseDown={(e) => { e.stopPropagation(); pressKey('KeyC', 'c'); }}
+              onMouseUp={(e) => { e.stopPropagation(); releaseKey('KeyC', 'c'); }}
+              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl border flex flex-col items-center justify-center text-[8px] font-bold shadow-lg transition-all cursor-pointer select-none ${
                 activeKeys['KeyC']
                   ? 'bg-cyan-500 text-white border-white scale-95 shadow-[0_0_15px_rgba(6,182,212,0.8)]'
-                  : 'bg-black/85 border-cyan-500/60 text-cyan-300'
+                  : 'bg-black/85 border-cyan-500/60 text-cyan-300 active:scale-95'
               }`}
             >
               <ChevronDown size={20} />
@@ -329,12 +378,18 @@ export const VirtualJoystick: FC = () => {
           {/* Tactical Strip */}
           <div className="flex items-center gap-2 sm:gap-2.5 bg-black/60 p-1 rounded-2xl border border-gray-800/80 backdrop-blur-md shadow-xl">
             <button
+              onPointerDown={(e) => { e.stopPropagation(); try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch (_) {} pressKey('ShiftLeft', 'Shift'); }}
+              onPointerUp={(e) => { e.stopPropagation(); try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch (_) {} releaseKey('ShiftLeft', 'Shift'); }}
+              onPointerCancel={(e) => { e.stopPropagation(); releaseKey('ShiftLeft', 'Shift'); }}
+              onPointerLeave={(e) => { e.stopPropagation(); releaseKey('ShiftLeft', 'Shift'); }}
               onTouchStart={(e) => { e.stopPropagation(); pressKey('ShiftLeft', 'Shift'); }}
               onTouchEnd={(e) => { e.stopPropagation(); releaseKey('ShiftLeft', 'Shift'); }}
-              className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex flex-col items-center justify-center text-[8px] font-bold shadow-md transition-all ${
+              onMouseDown={(e) => { e.stopPropagation(); pressKey('ShiftLeft', 'Shift'); }}
+              onMouseUp={(e) => { e.stopPropagation(); releaseKey('ShiftLeft', 'Shift'); }}
+              className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex flex-col items-center justify-center text-[8px] font-bold shadow-md transition-all cursor-pointer select-none ${
                 activeKeys['ShiftLeft']
                   ? 'bg-amber-500 text-white border-white shadow-[0_0_15px_rgba(245,158,11,0.8)] scale-95'
-                  : 'bg-black/80 border-amber-500/60 text-amber-300'
+                  : 'bg-black/80 border-amber-500/60 text-amber-300 active:scale-95'
               }`}
             >
               <Flame size={15} />
@@ -342,12 +397,18 @@ export const VirtualJoystick: FC = () => {
             </button>
 
             <button
+              onPointerDown={(e) => { e.stopPropagation(); try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch (_) {} pressKey('KeyX', 'x'); }}
+              onPointerUp={(e) => { e.stopPropagation(); try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch (_) {} releaseKey('KeyX', 'x'); }}
+              onPointerCancel={(e) => { e.stopPropagation(); releaseKey('KeyX', 'x'); }}
+              onPointerLeave={(e) => { e.stopPropagation(); releaseKey('KeyX', 'x'); }}
               onTouchStart={(e) => { e.stopPropagation(); pressKey('KeyX', 'x'); }}
               onTouchEnd={(e) => { e.stopPropagation(); releaseKey('KeyX', 'x'); }}
-              className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex flex-col items-center justify-center text-[8px] font-bold shadow-md transition-all ${
+              onMouseDown={(e) => { e.stopPropagation(); pressKey('KeyX', 'x'); }}
+              onMouseUp={(e) => { e.stopPropagation(); releaseKey('KeyX', 'x'); }}
+              className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex flex-col items-center justify-center text-[8px] font-bold shadow-md transition-all cursor-pointer select-none ${
                 activeKeys['KeyX']
                   ? 'bg-rose-500 text-white border-white shadow-[0_0_15px_rgba(244,63,94,0.8)] scale-95'
-                  : 'bg-black/80 border-rose-500/60 text-rose-300'
+                  : 'bg-black/80 border-rose-500/60 text-rose-300 active:scale-95'
               }`}
             >
               <Shield size={15} />
@@ -355,16 +416,18 @@ export const VirtualJoystick: FC = () => {
             </button>
 
             <button
+              onClick={(e) => { e.stopPropagation(); handleReload(); }}
               onTouchStart={(e) => { e.stopPropagation(); handleReload(); }}
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-sky-400/60 bg-black/80 text-sky-300 flex flex-col items-center justify-center text-[8px] font-bold shadow-md active:scale-95"
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-sky-400/60 bg-black/80 text-sky-300 flex flex-col items-center justify-center text-[8px] font-bold shadow-md active:scale-95 cursor-pointer select-none"
             >
               <RotateCcw size={15} />
               <span>RELOAD</span>
             </button>
 
             <button
+              onClick={(e) => { e.stopPropagation(); setMapOpen(!isMapOpen); nexusAudio.playClick(); }}
               onTouchStart={(e) => { e.stopPropagation(); setMapOpen(!isMapOpen); nexusAudio.playClick(); }}
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-sky-400/60 bg-black/80 text-sky-300 flex flex-col items-center justify-center text-[8px] font-bold shadow-md active:scale-95"
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-sky-400/60 bg-black/80 text-sky-300 flex flex-col items-center justify-center text-[8px] font-bold shadow-md active:scale-95 cursor-pointer select-none"
             >
               <MapIcon size={15} />
               <span>MAP</span>
@@ -377,10 +440,16 @@ export const VirtualJoystick: FC = () => {
             {/* Weapon 3: Solar Beam (30 HP, 10s cooldown) */}
             <div className="flex flex-col items-center">
               <button
+                onPointerDown={(e) => { e.stopPropagation(); handleSolarStart(); }}
+                onPointerUp={(e) => { e.stopPropagation(); handleSolarEnd(); }}
+                onPointerCancel={(e) => { e.stopPropagation(); handleSolarEnd(); }}
+                onPointerLeave={(e) => { e.stopPropagation(); handleSolarEnd(); }}
                 onTouchStart={(e) => { e.stopPropagation(); handleSolarStart(); }}
                 onTouchEnd={(e) => { e.stopPropagation(); handleSolarEnd(); }}
+                onMouseDown={(e) => { e.stopPropagation(); handleSolarStart(); }}
+                onMouseUp={(e) => { e.stopPropagation(); handleSolarEnd(); }}
                 disabled={!solarReady}
-                className={`relative w-13 h-13 sm:w-15 sm:h-15 rounded-full border-2 flex flex-col items-center justify-center font-bold shadow-xl transition-all ${
+                className={`relative w-13 h-13 sm:w-15 sm:h-15 rounded-full border-2 flex flex-col items-center justify-center font-bold shadow-xl transition-all cursor-pointer select-none ${
                   solarReady
                     ? 'bg-gradient-to-tr from-orange-600 via-amber-500 to-yellow-300 border-white text-white shadow-[0_0_20px_rgba(249,115,22,0.8)] active:scale-95'
                     : 'bg-black/85 border-gray-700/80 text-gray-500 opacity-60'
@@ -403,10 +472,16 @@ export const VirtualJoystick: FC = () => {
             {/* Weapon 2: Laser Beam (12 HP, 3s cooldown) */}
             <div className="flex flex-col items-center">
               <button
+                onPointerDown={(e) => { e.stopPropagation(); handleLaserStart(); }}
+                onPointerUp={(e) => { e.stopPropagation(); handleLaserEnd(); }}
+                onPointerCancel={(e) => { e.stopPropagation(); handleLaserEnd(); }}
+                onPointerLeave={(e) => { e.stopPropagation(); handleLaserEnd(); }}
                 onTouchStart={(e) => { e.stopPropagation(); handleLaserStart(); }}
                 onTouchEnd={(e) => { e.stopPropagation(); handleLaserEnd(); }}
+                onMouseDown={(e) => { e.stopPropagation(); handleLaserStart(); }}
+                onMouseUp={(e) => { e.stopPropagation(); handleLaserEnd(); }}
                 disabled={!laserReady}
-                className={`relative w-13 h-13 sm:w-15 sm:h-15 rounded-full border-2 flex flex-col items-center justify-center font-bold shadow-xl transition-all ${
+                className={`relative w-13 h-13 sm:w-15 sm:h-15 rounded-full border-2 flex flex-col items-center justify-center font-bold shadow-xl transition-all cursor-pointer select-none ${
                   laserReady
                     ? 'bg-gradient-to-tr from-amber-600 via-yellow-500 to-amber-300 border-white text-white shadow-[0_0_20px_rgba(245,158,11,0.7)] active:scale-95'
                     : 'bg-black/85 border-gray-700/80 text-gray-500 opacity-60'
@@ -429,9 +504,15 @@ export const VirtualJoystick: FC = () => {
             {/* Weapon 1: Rapid Plasma Bullet (2 HP, 30 ammo, 2s reload) */}
             <div className="flex flex-col items-center">
               <button
+                onPointerDown={(e) => { e.stopPropagation(); handleShootStart(); }}
+                onPointerUp={(e) => { e.stopPropagation(); handleShootEnd(); }}
+                onPointerCancel={(e) => { e.stopPropagation(); handleShootEnd(); }}
+                onPointerLeave={(e) => { e.stopPropagation(); handleShootEnd(); }}
                 onTouchStart={(e) => { e.stopPropagation(); handleShootStart(); }}
                 onTouchEnd={(e) => { e.stopPropagation(); handleShootEnd(); }}
-                className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full border-2 border-white text-white flex flex-col items-center justify-center font-black shadow-[0_0_25px_rgba(239,68,68,0.7)] active:scale-95 transition-transform cursor-pointer ${
+                onMouseDown={(e) => { e.stopPropagation(); handleShootStart(); }}
+                onMouseUp={(e) => { e.stopPropagation(); handleShootEnd(); }}
+                className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full border-2 border-white text-white flex flex-col items-center justify-center font-black shadow-[0_0_25px_rgba(239,68,68,0.7)] active:scale-95 transition-transform cursor-pointer select-none ${
                   isReloading
                     ? 'bg-gradient-to-tr from-gray-700 to-gray-900 border-red-500'
                     : 'bg-gradient-to-tr from-red-600 via-rose-500 to-amber-500'
