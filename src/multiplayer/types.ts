@@ -124,8 +124,11 @@ export interface RoomInfo {
 export interface MatchStats {
   winner: string;
   winnerName: string;
+  winnerId?: string;
+  winnerSessionId?: string;
   winnerTeam?: Team;
   loserName: string;
+  isWinner?: boolean;
   mode: GameMode;
   damageDealt: number;
   shotsHit: number;

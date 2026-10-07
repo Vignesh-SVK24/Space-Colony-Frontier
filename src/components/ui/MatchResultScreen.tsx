@@ -5,11 +5,21 @@ import { Crosshair, ShieldAlert, Target, Clock, Trophy, Skull, RotateCcw, Home }
 import { nexusAudio } from '../../utils/nexusAudio';
 
 export const MatchResultScreen: React.FC = () => {
-  const { matchResult, playerId, reset, isSolo, startSoloGame, isServerOnline } = useMultiplayerStore();
+  const { matchResult, playerId, reset, isSolo, startSoloGame, isServerOnline, selfState, playerTeam } = useMultiplayerStore();
 
   if (!matchResult) return null;
 
-  const isWinner = matchResult.winner === playerId;
+  // Authoritative victory determination: true if player eliminated the opponent or won team battle
+  const isWinner = matchResult.isWinner !== undefined
+    ? matchResult.isWinner
+    : Boolean(
+        matchResult.winner === playerId ||
+        matchResult.winner === selfState?.id ||
+        (matchResult.winnerSessionId && matchResult.winnerSessionId === playerId) ||
+        (matchResult.winnerId && (matchResult.winnerId === playerId || matchResult.winnerId === selfState?.id)) ||
+        (matchResult.winnerTeam && matchResult.winnerTeam !== 'NONE' && (matchResult.winnerTeam === selfState?.team || matchResult.winnerTeam === playerTeam))
+      );
+
   const mainColor = isWinner ? 'text-[#FFCC00]' : 'text-red-500';
   const glowColor = isWinner ? 'drop-shadow-[0_0_25px_rgba(255,204,0,0.6)]' : 'drop-shadow-[0_0_25px_rgba(239,68,68,0.6)]';
 

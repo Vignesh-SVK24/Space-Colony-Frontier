@@ -73,9 +73,28 @@ export class BattleRoom extends Room {
       }
 
       if (updateResult.matchEnded) {
+        let winnerPlayer: PlayerSchema | undefined;
+        let loserPlayer: PlayerSchema | undefined;
+
+        if (state.gameMode === '2v2') {
+          winnerPlayer = Array.from(state.players.values()).find(p => p.team === state.winnerTeam);
+          loserPlayer = Array.from(state.players.values()).find(p => p.team !== state.winnerTeam && p.team !== 'NONE');
+        } else {
+          winnerPlayer = Array.from(state.players.values()).find(
+            p => p.sessionId === state.winnerId || p.id === state.winnerId
+          );
+          loserPlayer = Array.from(state.players.values()).find(
+            p => p !== winnerPlayer
+          );
+        }
+
         // Record authoritative match outcomes for authenticated players
         state.players.forEach((p) => {
-          const isWinner = p.id === state.winnerId || (state.winnerTeam && p.team === state.winnerTeam);
+          const isWinner = (
+            p.sessionId === state.winnerId ||
+            p.id === state.winnerId ||
+            Boolean(state.winnerTeam && state.winnerTeam !== 'NONE' && p.team === state.winnerTeam)
+          );
           AuthService.recordMatchStats(
             p.id,
             Boolean(isWinner),
@@ -86,9 +105,13 @@ export class BattleRoom extends Room {
         });
 
         this.broadcast('match_ended', {
-          winnerId: state.winnerId,
-          winnerName: state.winnerName,
+          winnerId: winnerPlayer ? winnerPlayer.id : state.winnerId,
+          winnerSessionId: winnerPlayer ? winnerPlayer.sessionId : state.winnerId,
+          winnerName: state.winnerName || (winnerPlayer ? winnerPlayer.name : 'Unknown Pilot'),
           winnerTeam: state.winnerTeam,
+          loserId: loserPlayer ? loserPlayer.id : '',
+          loserSessionId: loserPlayer ? loserPlayer.sessionId : '',
+          loserName: loserPlayer ? loserPlayer.name : '',
           gameMode: state.gameMode
         });
       }

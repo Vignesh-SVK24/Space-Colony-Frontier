@@ -103,9 +103,13 @@ export class SimulationLoop {
       if (players.length >= 2) {
         const alivePlayers = players.filter(p => p.alive && p.hp > 0);
         if (alivePlayers.length <= 1) {
-          const winner = alivePlayers[0] || players[0];
+          // If 1 player survived, that player is the authoritative winner
+          // If both perished simultaneously, player with more damage dealt wins tiebreak
+          const winner = alivePlayers.length === 1 
+            ? alivePlayers[0] 
+            : [...players].sort((a, b) => b.damageDealt - a.damageDealt)[0] || players[0];
           state.roomStatus = 'FINISHED';
-          state.winnerId = winner.id;
+          state.winnerId = winner.sessionId || winner.id;
           state.winnerName = winner.name;
           return true;
         }
@@ -114,9 +118,11 @@ export class SimulationLoop {
       const players = Array.from(state.players.values());
       const alivePlayers = players.filter(p => p.alive && p.hp > 0);
       if (players.length >= 2 && alivePlayers.length <= 1) {
-        const winner = alivePlayers[0] || players[0];
+        const winner = alivePlayers.length === 1 
+          ? alivePlayers[0] 
+          : [...players].sort((a, b) => b.damageDealt - a.damageDealt)[0] || players[0];
         state.roomStatus = 'FINISHED';
-        state.winnerId = winner.id;
+        state.winnerId = winner.sessionId || winner.id;
         state.winnerName = winner.name;
         return true;
       }
@@ -130,12 +136,14 @@ export class SimulationLoop {
         state.winnerTeam = 'B';
         const teamBPlayers = players.filter(p => p.team === 'B');
         state.winnerName = teamBPlayers.map(p => p.name).join(' & ');
+        state.winnerId = teamBPlayers.find(p => p.alive && p.hp > 0)?.sessionId || teamBPlayers[0]?.sessionId || '';
         return true;
       } else if (!teamBAlive && teamAAlive) {
         state.roomStatus = 'FINISHED';
         state.winnerTeam = 'A';
         const teamAPlayers = players.filter(p => p.team === 'A');
         state.winnerName = teamAPlayers.map(p => p.name).join(' & ');
+        state.winnerId = teamAPlayers.find(p => p.alive && p.hp > 0)?.sessionId || teamAPlayers[0]?.sessionId || '';
         return true;
       }
     }

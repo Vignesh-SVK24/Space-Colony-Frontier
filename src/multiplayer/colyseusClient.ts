@@ -256,6 +256,43 @@ const bindRoomEvents = (room: Room) => {
     if (state.roomStatus === 'BATTLE' && store.appView !== 'BATTLE') {
       store.setAppView('BATTLE');
     }
+
+    if (state.roomStatus === 'FINISHED' && store.appView !== 'RESULT') {
+      const mySessionId = room.sessionId;
+      const myPlayerId = store.playerId;
+      const myUserId = store.authUser?.id || store.selfState?.id;
+      const myTeam = store.selfState?.team || store.playerTeam;
+
+      const isWinner = Boolean(
+        (state.winnerId && (state.winnerId === mySessionId || state.winnerId === myPlayerId || state.winnerId === myUserId)) ||
+        (state.winnerTeam && state.winnerTeam !== 'NONE' && state.winnerTeam === myTeam)
+      );
+
+      const winnerName = state.winnerName || (isWinner ? (store.selfState?.name || store.playerName) : (store.opponentName || 'Enemy Pilot'));
+      const loserName = isWinner
+        ? (store.opponentName || 'Enemy Pilot')
+        : (store.selfState?.name || store.playerName || 'Ace Pilot');
+
+      store.handleMatchEnd({
+        winner: isWinner ? myPlayerId : (state.winnerId || 'opponent'),
+        winnerId: state.winnerId,
+        winnerSessionId: state.winnerId,
+        winnerName: winnerName,
+        winnerTeam: state.winnerTeam,
+        loserName: loserName,
+        isWinner,
+        mode: store.gameMode,
+        damageDealt: store.selfState ? Math.max(0, 250 - (store.opponentState?.hp ?? 250)) : 0,
+        shotsHit: 0,
+        shotsFired: 0,
+        accuracy: 0,
+        matchDuration: 60
+      });
+
+      if (isWinner) {
+        nexusAudio.playVictory();
+      }
+    }
   });
 
   // Authoritative damage event
@@ -338,18 +375,41 @@ const bindRoomEvents = (room: Room) => {
   // Match ended
   room.onMessage('match_ended', (data: any) => {
     const store = useMultiplayerStore.getState();
+    const mySessionId = room.sessionId;
+    const myPlayerId = store.playerId;
+    const myUserId = store.authUser?.id || store.selfState?.id;
+    const myTeam = store.selfState?.team || store.playerTeam;
+
+    const isWinner = Boolean(
+      (data.winnerSessionId && (data.winnerSessionId === mySessionId || data.winnerSessionId === myPlayerId)) ||
+      (data.winnerId && (data.winnerId === mySessionId || data.winnerId === myPlayerId || data.winnerId === myUserId)) ||
+      (data.winnerTeam && data.winnerTeam !== 'NONE' && data.winnerTeam === myTeam)
+    );
+
+    const winnerName = data.winnerName || (isWinner ? (store.selfState?.name || store.playerName) : (store.opponentName || 'Enemy Pilot'));
+    const loserName = isWinner
+      ? (data.loserName || store.opponentName || 'Enemy Pilot')
+      : (data.loserName || store.selfState?.name || store.playerName || 'Ace Pilot');
+
     store.handleMatchEnd({
-      winner: data.winnerId,
-      winnerName: data.winnerName,
+      winner: isWinner ? myPlayerId : (data.winnerSessionId || data.winnerId || 'opponent'),
+      winnerId: data.winnerId,
+      winnerSessionId: data.winnerSessionId,
+      winnerName: winnerName,
       winnerTeam: data.winnerTeam,
-      loserName: store.opponentName || 'Enemy',
+      loserName: loserName,
+      isWinner,
       mode: store.gameMode,
-      damageDealt: store.selfState ? (250 - (store.opponentState?.hp ?? 250)) : 0,
+      damageDealt: store.selfState ? Math.max(0, 250 - (store.opponentState?.hp ?? 250)) : 0,
       shotsHit: 0,
       shotsFired: 0,
       accuracy: 0,
       matchDuration: 60
     });
+
+    if (isWinner) {
+      nexusAudio.playVictory();
+    }
   });
 
   room.onMessage('rematch_accepted', () => {
