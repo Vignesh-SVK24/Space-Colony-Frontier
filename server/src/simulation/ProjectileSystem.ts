@@ -8,6 +8,9 @@ export class ProjectileSystem {
   private physicsWorld: ServerPhysicsWorld;
   private damageSystem: DamageSystem;
 
+  private prevPosScratch: Vector3D = { x: 0, y: 0, z: 0 };
+  private nextPosScratch: Vector3D = { x: 0, y: 0, z: 0 };
+
   constructor(physicsWorld: ServerPhysicsWorld, damageSystem: DamageSystem) {
     this.physicsWorld = physicsWorld;
     this.damageSystem = damageSystem;
@@ -76,12 +79,16 @@ export class ProjectileSystem {
 
       // Compute step movement
       const stepDistance = proj.speed * dt;
-      const prevPos: Vector3D = { x: proj.position.x, y: proj.position.y, z: proj.position.z };
-      const nextPos: Vector3D = {
-        x: prevPos.x + proj.direction.x * stepDistance,
-        y: prevPos.y + proj.direction.y * stepDistance,
-        z: prevPos.z + proj.direction.z * stepDistance
-      };
+      this.prevPosScratch.x = proj.position.x;
+      this.prevPosScratch.y = proj.position.y;
+      this.prevPosScratch.z = proj.position.z;
+
+      this.nextPosScratch.x = this.prevPosScratch.x + proj.direction.x * stepDistance;
+      this.nextPosScratch.y = this.prevPosScratch.y + proj.direction.y * stepDistance;
+      this.nextPosScratch.z = this.prevPosScratch.z + proj.direction.z * stepDistance;
+
+      const prevPos = this.prevPosScratch;
+      const nextPos = this.nextPosScratch;
 
       // 1. Swept collision against static arena obstacles FIRST
       const sweptObs = this.physicsWorld.checkSweptSphereVsObstacles(prevPos, nextPos, 0.4);

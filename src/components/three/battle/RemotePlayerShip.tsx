@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { SpaceshipModel } from '../spaceships/SpaceshipModel';
@@ -9,6 +9,10 @@ import { PlayerState } from '../../../multiplayer/types';
 interface RemotePlayerShipProps {
   player: PlayerState;
 }
+
+// Module-scoped scratch objects to avoid GC allocation during render loop
+const _scratchExtrapolatedPos = new THREE.Vector3();
+const _scratchEuler = new THREE.Euler(0, 0, 0, 'YXZ');
 
 export const RemotePlayerShip: React.FC<RemotePlayerShipProps> = ({ player }) => {
   const showCombatHitboxes = useMultiplayerStore(state => state.showCombatHitboxes);
@@ -23,18 +27,69 @@ export const RemotePlayerShip: React.FC<RemotePlayerShipProps> = ({ player }) =>
   const lastPacketTime = useRef(performance.now());
   const initialPosSet = useRef(false);
 
-  React.useEffect(() => {
+  // Reusable Canvas & Texture to prevent GPU memory leak
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const textureRef = useRef<THREE.CanvasTexture | null>(null);
+  const spriteMatRef = useRef<THREE.SpriteMaterial | null>(null);
+
+  useEffect(() => {
     initialPosSet.current = false;
   }, [matchSessionId]);
 
-  React.useEffect(() => {
+  // Setup single canvas & texture on mount, dispose cleanly on unmount
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    canvasRef.current = canvas;
+
+    const tex = new THREE.CanvasTexture(canvas);
+    textureRef.current = tex;
+
+    return () => {
+      tex.dispose();
+      textureRef.current = null;
+      canvasRef.current = null;
+    };
+  }, []);
+
+  // Update canvas texture without leaking GPU memory
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const tex = textureRef.current;
+    if (!canvas || !tex || !player) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, 512, 128);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.fillRect(0, 0, 512, 128);
+    ctx.font = 'bold 44px monospace';
+    ctx.fillStyle = player.alive ? 'white' : '#ef4444';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(player.alive ? (player.name || 'Pilot') : `${player.name || 'Pilot'} [ELIMINATED]`, 256, 38);
+    
+    // HP Bar
+    const hpPercent = Math.max(0, player.hp / 250);
+    ctx.fillStyle = '#450a0a';
+    ctx.fillRect(56, 74, 400, 22);
+    ctx.fillStyle = hpPercent > 0.6 ? '#22c55e' : hpPercent > 0.3 ? '#eab308' : '#ef4444';
+    ctx.fillRect(56, 74, 400 * hpPercent, 22);
+
+    tex.needsUpdate = true;
+  }, [player?.name, player?.hp, player?.alive]);
+
+  useEffect(() => {
     if (!player) return;
     targetPos.current.set(player.position[0], player.position[1], player.position[2]);
     if (player.velocity) {
       targetVel.current.set(player.velocity[0], player.velocity[1], player.velocity[2]);
     }
-    const euler = new THREE.Euler(player.rotation[0], player.rotation[1], player.rotation[2], 'YXZ');
-    targetQuat.current.setFromEuler(euler);
+    _scratchEuler.set(player.rotation[0], player.rotation[1], player.rotation[2], 'YXZ');
+    targetQuat.current.setFromEuler(_scratchEuler);
     lastPacketTime.current = performance.now();
 
     if (!initialPosSet.current) {
@@ -58,45 +113,17 @@ export const RemotePlayerShip: React.FC<RemotePlayerShipProps> = ({ player }) =>
     }
   };
 
-  const nameTexture = useMemo(() => {
-    if (!player) return null;
-    if (typeof document === 'undefined') return null;
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-      ctx.fillRect(0, 0, 512, 128);
-      ctx.font = 'bold 44px monospace';
-      ctx.fillStyle = player.alive ? 'white' : '#ef4444';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(player.alive ? (player.name || 'Pilot') : `${player.name || 'Pilot'} [ELIMINATED]`, 256, 38);
-      
-      // HP Bar
-      const hpPercent = Math.max(0, player.hp / 250);
-      ctx.fillStyle = '#450a0a';
-      ctx.fillRect(56, 74, 400, 22);
-      ctx.fillStyle = hpPercent > 0.6 ? '#22c55e' : hpPercent > 0.3 ? '#eab308' : '#ef4444';
-      ctx.fillRect(56, 74, 400 * hpPercent, 22);
-    }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.needsUpdate = true;
-    return tex;
-  }, [player?.name, player?.hp, player?.alive]);
-
   useFrame((_, delta) => {
     if (!group.current || !player) return;
     
     const now = performance.now();
     const timeSincePacket = Math.min((now - lastPacketTime.current) / 1000, 0.20);
 
-    // Dead Reckoning: Extrapolate position forward along velocity vector between network ticks
-    const extrapolatedPos = targetPos.current.clone().addScaledVector(targetVel.current, timeSincePacket);
+    // Dead Reckoning: Extrapolate position forward using module scratch vector
+    _scratchExtrapolatedPos.copy(targetPos.current).addScaledVector(targetVel.current, timeSincePacket);
 
     // Smooth convergence without stuttering
-    currentPos.current.lerp(extrapolatedPos, Math.min(1, delta * 15));
+    currentPos.current.lerp(_scratchExtrapolatedPos, Math.min(1, delta * 15));
     currentQuat.current.slerp(targetQuat.current, Math.min(1, delta * 14));
 
     group.current.position.copy(currentPos.current);
@@ -119,9 +146,9 @@ export const RemotePlayerShip: React.FC<RemotePlayerShipProps> = ({ player }) =>
         isBoosting={player.isBoosting}
         damaged={player.hp < 40}
       />
-      {nameTexture && (
+      {textureRef.current && (
         <sprite position={[0, 4.5, 0]} scale={[8, 2, 1]}>
-          <spriteMaterial map={nameTexture} sizeAttenuation={true} depthTest={false} />
+          <spriteMaterial ref={spriteMatRef} map={textureRef.current} sizeAttenuation={true} depthTest={false} />
         </sprite>
       )}
       {showCombatHitboxes && (

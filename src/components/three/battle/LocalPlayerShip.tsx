@@ -10,6 +10,36 @@ import { sendInput, sendBullet, sendLaser, sendSolar } from '../../../multiplaye
 import { useMultiplayerStore } from '../../../multiplayer/useMultiplayerStore';
 import { nexusAudio } from '../../../utils/nexusAudio';
 
+// Module-scoped scratch objects to eliminate Garbage Collection pauses in 60fps render loop
+const _forwardZ = new THREE.Vector3(0, 0, 1);
+const _forwardDir = new THREE.Vector3();
+const _upDir = new THREE.Vector3(0, 1, 0);
+const _prevPos = new THREE.Vector3();
+const _moveStep = new THREE.Vector3();
+const _desiredPos = new THREE.Vector3();
+const _velVec = new THREE.Vector3();
+const _normVec = new THREE.Vector3();
+const _cameraOffset = new THREE.Vector3();
+const _targetCamPos = new THREE.Vector3();
+const _lookTarget = new THREE.Vector3();
+const _serverPos = new THREE.Vector3();
+const _candPos = new THREE.Vector3();
+const _toCand = new THREE.Vector3();
+const _candDir = new THREE.Vector3();
+const _oppPos = new THREE.Vector3();
+const _oppVel = new THREE.Vector3();
+const _leadWorld = new THREE.Vector3();
+const _muzzlePos = new THREE.Vector3();
+const _camDir = new THREE.Vector3();
+const _aimTargetPoint = new THREE.Vector3();
+const _aimFireDir = new THREE.Vector3();
+const _finalBulletDir = new THREE.Vector3();
+const _targetIntercept = new THREE.Vector3();
+const _toTargetDir = new THREE.Vector3();
+const _beamEnd = new THREE.Vector3();
+const _toOpp = new THREE.Vector3();
+const _oppDir = new THREE.Vector3();
+
 export const LocalPlayerShip: React.FC = () => {
   const group = useRef<THREE.Group>(null);
   const { camera } = useThree();
@@ -152,11 +182,12 @@ export const LocalPlayerShip: React.FC = () => {
       velocity.current.set(0, 0, 0);
 
       // Snap camera immediately on initial spawn / rematch
-      const initOffset = new THREE.Vector3(0, SHIP_CONFIG.camera.chaseHeight, -SHIP_CONFIG.camera.chaseDistance);
-      initOffset.applyEuler(rotationEuler.current);
-      camera.position.copy(group.current.position).add(initOffset);
-      const initLook = group.current.position.clone().add(new THREE.Vector3(0, 0, 1).applyEuler(rotationEuler.current).multiplyScalar(25));
-      camera.lookAt(initLook);
+      _cameraOffset.set(0, SHIP_CONFIG.camera.chaseHeight, -SHIP_CONFIG.camera.chaseDistance);
+      _cameraOffset.applyEuler(rotationEuler.current);
+      camera.position.copy(group.current.position).add(_cameraOffset);
+      _forwardDir.copy(_forwardZ).applyEuler(rotationEuler.current);
+      _lookTarget.copy(group.current.position).addScaledVector(_forwardDir, 25);
+      camera.lookAt(_lookTarget);
 
       initialPosSet.current = true;
     }
@@ -170,9 +201,7 @@ export const LocalPlayerShip: React.FC = () => {
     let forwardInput = 0;
     if (keys['KeyW'] || keys['W']) forwardInput += 1;
     if (keys['KeyS'] || keys['S']) forwardInput -= 1;
-    // Arrow keys: Up provides forward thrust
     if (keys['ArrowUp'] && !keys['KeyW'] && !keys['W']) forwardInput += 1;
-    // Down Arrow: if S is not pressed, provides reverse throttle for arrow key navigation
     if (keys['ArrowDown'] && !keys['KeyS'] && !keys['S']) forwardInput -= 0.6;
 
     let yawInput = 0;
@@ -187,9 +216,7 @@ export const LocalPlayerShip: React.FC = () => {
     }
 
     let verticalInput = 0;
-    // Ascend: Space or PageUp
     if (keys['Space'] || keys[' '] || keys['PageUp']) verticalInput += 1;
-    // Descend: Down Arrow, C, Ctrl, Z, PageDown
     if (
       keys['KeyC'] || keys['C'] ||
       keys['ControlLeft'] || keys['ControlRight'] || keys['Control'] || keys['CONTROL'] ||
@@ -207,9 +234,8 @@ export const LocalPlayerShip: React.FC = () => {
     rotationEuler.current.y += yawInput * SHIP_CONFIG.yawSpeed * dt;
     group.current.quaternion.setFromEuler(rotationEuler.current);
 
-    // Forward Direction
-    const forwardDir = new THREE.Vector3(0, 0, 1).applyEuler(rotationEuler.current);
-    const upDir = new THREE.Vector3(0, 1, 0);
+    // Forward & Up Directions using scratch vectors
+    _forwardDir.copy(_forwardZ).applyEuler(rotationEuler.current);
 
     // Target Speed
     let targetSpeed = 0;
@@ -227,23 +253,22 @@ export const LocalPlayerShip: React.FC = () => {
     velocity.current.y = THREE.MathUtils.lerp(velocity.current.y, verticalInput * 25, dt * 4.0);
 
     // Apply translation with continuous collision resolution
-    const prevPos = group.current.position.clone();
-    const moveStep = forwardDir.clone().multiplyScalar(velocity.current.z * dt);
-    moveStep.add(upDir.clone().multiplyScalar(velocity.current.y * dt));
-    const desiredPos = prevPos.clone().add(moveStep);
+    _prevPos.copy(group.current.position);
+    _moveStep.copy(_forwardDir).multiplyScalar(velocity.current.z * dt);
+    _moveStep.addScaledVector(_upDir, velocity.current.y * dt);
+    _desiredPos.copy(_prevPos).add(_moveStep);
 
     // Continuous collision resolution against all 10 obstacles, planetary terrain, and arena boundary
-    const collisionRes = resolveShipMovementCollision(prevPos, desiredPos, 3.6);
+    const collisionRes = resolveShipMovementCollision(_prevPos, _desiredPos, 3.6);
     group.current.position.set(collisionRes.position.x, collisionRes.position.y, collisionRes.position.z);
 
     if (collisionRes.collided && collisionRes.normal) {
-      // Deflect velocity along collision surface tangent plane
-      const velVec = forwardDir.clone().multiplyScalar(velocity.current.z).add(upDir.clone().multiplyScalar(velocity.current.y));
-      const normVec = new THREE.Vector3(collisionRes.normal.x, collisionRes.normal.y, collisionRes.normal.z);
-      const normalDot = velVec.dot(normVec);
+      _velVec.copy(_forwardDir).multiplyScalar(velocity.current.z).addScaledVector(_upDir, velocity.current.y);
+      _normVec.set(collisionRes.normal.x, collisionRes.normal.y, collisionRes.normal.z);
+      const normalDot = _velVec.dot(_normVec);
       if (normalDot < 0) {
-        velVec.sub(normVec.clone().multiplyScalar(normalDot * 1.15));
-        velocity.current.z = Math.min(velocity.current.z, velVec.length());
+        _velVec.subScaledVector(_normVec, normalDot * 1.15);
+        velocity.current.z = Math.min(velocity.current.z, _velVec.length());
         if (collisionRes.hitTerrain) {
           velocity.current.y = Math.max(0, velocity.current.y);
         }
@@ -251,33 +276,26 @@ export const LocalPlayerShip: React.FC = () => {
     }
 
     // Camera chase
-    const cameraOffset = new THREE.Vector3(
-      0,
-      SHIP_CONFIG.camera.chaseHeight,
-      -SHIP_CONFIG.camera.chaseDistance
-    );
-    if (isBoosting) cameraOffset.z -= 2.0;
-    cameraOffset.applyEuler(rotationEuler.current);
+    _cameraOffset.set(0, SHIP_CONFIG.camera.chaseHeight, -SHIP_CONFIG.camera.chaseDistance);
+    if (isBoosting) _cameraOffset.z -= 2.0;
+    _cameraOffset.applyEuler(rotationEuler.current);
 
-    const targetCamPos = group.current.position.clone().add(cameraOffset);
-    camera.position.lerp(targetCamPos, SHIP_CONFIG.camera.chaseLag * (dt * 60));
+    _targetCamPos.copy(group.current.position).add(_cameraOffset);
+    camera.position.lerp(_targetCamPos, SHIP_CONFIG.camera.chaseLag * (dt * 60));
 
-    const lookTarget = group.current.position.clone().add(forwardDir.clone().multiplyScalar(25));
-    camera.lookAt(lookTarget);
+    _lookTarget.copy(group.current.position).addScaledVector(_forwardDir, 25);
+    camera.lookAt(_lookTarget);
 
     const now = performance.now();
 
     // ==========================================
     // 2. Server Reconciliation (Multiplayer)
     // ==========================================
-    // Do NOT pull local ship back towards delayed network echoes (eliminates forward/backward dragging)
-    // Only snap on severe respawn/teleport discrepancies
     if (!isSolo && selfState) {
-      const serverPos = new THREE.Vector3(...selfState.position);
-      const posError = group.current.position.distanceTo(serverPos);
-
+      _serverPos.set(selfState.position[0], selfState.position[1], selfState.position[2]);
+      const posError = group.current.position.distanceTo(_serverPos);
       if (posError > 60.0) {
-        group.current.position.copy(serverPos);
+        group.current.position.copy(_serverPos);
       }
     }
 
@@ -291,12 +309,14 @@ export const LocalPlayerShip: React.FC = () => {
     let minAngle = 0.55;
     let bestDist = Infinity;
 
-    for (const cand of candidates) {
-      const pos = new THREE.Vector3(...cand.position);
-      const toCand = new THREE.Vector3().subVectors(pos, group.current.position);
-      const dist = toCand.length();
+    for (let c = 0; c < candidates.length; c++) {
+      const cand = candidates[c];
+      _candPos.set(cand.position[0], cand.position[1], cand.position[2]);
+      _toCand.subVectors(_candPos, group.current.position);
+      const dist = _toCand.length();
       if (dist < 280) {
-        const angle = forwardDir.angleTo(toCand.clone().normalize());
+        _candDir.copy(_toCand).normalize();
+        const angle = _forwardDir.angleTo(_candDir);
         if (angle < minAngle) {
           minAngle = angle;
           bestTarget = cand;
@@ -307,8 +327,8 @@ export const LocalPlayerShip: React.FC = () => {
 
     let aimDist = 140;
     if (bestTarget) {
-      const oppPos = new THREE.Vector3(...bestTarget.position);
-      const oppVel = new THREE.Vector3(...bestTarget.velocity);
+      _oppPos.set(bestTarget.position[0], bestTarget.position[1], bestTarget.position[2]);
+      _oppVel.set(bestTarget.velocity[0], bestTarget.velocity[1], bestTarget.velocity[2]);
       const range = Math.floor(bestDist);
 
       setTargetLock({
@@ -320,9 +340,9 @@ export const LocalPlayerShip: React.FC = () => {
 
       if (range < 260) {
         const timeToHit = range / COMBAT_CONFIG.BULLET_SPEED;
-        const leadWorld = oppPos.clone().add(oppVel.clone().multiplyScalar(timeToHit));
+        _leadWorld.copy(_oppPos).addScaledVector(_oppVel, timeToHit);
         setLeadIndicator({
-          worldPos: [leadWorld.x, leadWorld.y, leadWorld.z],
+          worldPos: [_leadWorld.x, _leadWorld.y, _leadWorld.z],
           distance: range,
           visible: true
         });
@@ -340,7 +360,6 @@ export const LocalPlayerShip: React.FC = () => {
     // 4. Weapon Cooldown Timers & Crosshair Ray Convergence
     // ==========================================
     if (isSolo) {
-      // Handle solo reloading
       if (soloIsReloading.current) {
         const remaining = Math.max(0, (soloReloadEndTime.current - now) / 1000);
         setReloadTimeRemaining(remaining);
@@ -374,27 +393,25 @@ export const LocalPlayerShip: React.FC = () => {
     }
 
     // Muzzle position in world space
-    const muzzlePos = group.current.position.clone().add(forwardDir.clone().multiplyScalar(2.2));
+    _muzzlePos.copy(group.current.position).addScaledVector(_forwardDir, 2.2);
 
     // Camera aim ray & 3D crosshair convergence
-    const camDir = new THREE.Vector3();
-    camera.getWorldDirection(camDir);
+    camera.getWorldDirection(_camDir);
+    _aimTargetPoint.copy(camera.position).addScaledVector(_camDir, aimDist);
+    _aimFireDir.subVectors(_aimTargetPoint, _muzzlePos).normalize();
 
-    const aimTargetPoint = camera.position.clone().addScaledVector(camDir, aimDist);
-    const aimFireDir = new THREE.Vector3().subVectors(aimTargetPoint, muzzlePos).normalize();
-
-    // Intelligent Aim Magnetism: Magnetically curve plasma stream towards enemy lead spot when aiming near target!
-    let finalBulletDir = aimFireDir.clone();
+    // Intelligent Aim Magnetism: Curve plasma stream towards enemy lead spot when aiming near target
+    _finalBulletDir.copy(_aimFireDir);
     if (bestTarget && bestDist < COMBAT_CONFIG.AIM_ASSIST_MAX_DIST) {
-      const oppPos = new THREE.Vector3(...bestTarget.position);
-      const oppVel = new THREE.Vector3(...bestTarget.velocity);
+      _oppPos.set(bestTarget.position[0], bestTarget.position[1], bestTarget.position[2]);
+      _oppVel.set(bestTarget.velocity[0], bestTarget.velocity[1], bestTarget.velocity[2]);
       const timeToHit = bestDist / COMBAT_CONFIG.BULLET_SPEED;
-      const targetIntercept = oppPos.clone().add(oppVel.clone().multiplyScalar(timeToHit));
-      const toTargetDir = new THREE.Vector3().subVectors(targetIntercept, muzzlePos).normalize();
+      _targetIntercept.copy(_oppPos).addScaledVector(_oppVel, timeToHit);
+      _toTargetDir.subVectors(_targetIntercept, _muzzlePos).normalize();
 
-      const angleToTarget = aimFireDir.angleTo(toTargetDir);
+      const angleToTarget = _aimFireDir.angleTo(_toTargetDir);
       if (angleToTarget < COMBAT_CONFIG.AIM_ASSIST_ANGLE) {
-        finalBulletDir.lerp(toTargetDir, 0.70).normalize();
+        _finalBulletDir.lerp(_toTargetDir, 0.70).normalize();
       }
     }
 
@@ -424,8 +441,8 @@ export const LocalPlayerShip: React.FC = () => {
           attackId,
           ownerId: 'solo_player',
           weaponType: 'BULLET',
-          position: [muzzlePos.x, muzzlePos.y, muzzlePos.z],
-          direction: [finalBulletDir.x, finalBulletDir.y, finalBulletDir.z],
+          position: [_muzzlePos.x, _muzzlePos.y, _muzzlePos.z],
+          direction: [_finalBulletDir.x, _finalBulletDir.y, _finalBulletDir.z],
           color: playerColor,
           team: 'NONE',
           speed: COMBAT_CONFIG.BULLET_SPEED,
@@ -435,8 +452,8 @@ export const LocalPlayerShip: React.FC = () => {
         nexusAudio.playLaser();
       } else {
         sendBullet(
-          [muzzlePos.x, muzzlePos.y, muzzlePos.z],
-          [finalBulletDir.x, finalBulletDir.y, finalBulletDir.z],
+          [_muzzlePos.x, _muzzlePos.y, _muzzlePos.z],
+          [_finalBulletDir.x, _finalBulletDir.y, _finalBulletDir.z],
           attackId
         );
         nexusAudio.playLaser();
@@ -454,12 +471,11 @@ export const LocalPlayerShip: React.FC = () => {
       if (isSolo) {
         nexusAudio.playLaser();
 
-        const emitterPos = muzzlePos.clone();
-        const maxBeamEnd = emitterPos.clone().add(aimFireDir.clone().multiplyScalar(COMBAT_CONFIG.LASER_RANGE));
+        _beamEnd.copy(_muzzlePos).addScaledVector(_aimFireDir, COMBAT_CONFIG.LASER_RANGE);
 
         const raycast = checkObstacleRaycast(
-          emitterPos.x, emitterPos.y, emitterPos.z,
-          maxBeamEnd.x, maxBeamEnd.y, maxBeamEnd.z
+          _muzzlePos.x, _muzzlePos.y, _muzzlePos.z,
+          _beamEnd.x, _beamEnd.y, _beamEnd.z
         );
 
         let actualEnd: [number, number, number];
@@ -469,24 +485,24 @@ export const LocalPlayerShip: React.FC = () => {
           actualEnd = raycast.hitPoint;
           blockedByObstacle = true;
         } else {
-          actualEnd = [maxBeamEnd.x, maxBeamEnd.y, maxBeamEnd.z];
+          actualEnd = [_beamEnd.x, _beamEnd.y, _beamEnd.z];
         }
 
         let hitEnemy = false;
         const liveOpp = useMultiplayerStore.getState().opponentState;
         if (liveOpp && liveOpp.alive && liveOpp.hp > 0) {
-          const oppPos = new THREE.Vector3(...liveOpp.position);
-          const toOpp = new THREE.Vector3().subVectors(oppPos, emitterPos);
-          const oppDist = toOpp.length();
+          _oppPos.set(liveOpp.position[0], liveOpp.position[1], liveOpp.position[2]);
+          _toOpp.subVectors(_oppPos, _muzzlePos);
+          const oppDist = _toOpp.length();
 
           if (oppDist <= COMBAT_CONFIG.LASER_RANGE) {
-            const oppDir = toOpp.clone().normalize();
-            const angle = aimFireDir.angleTo(oppDir);
+            _oppDir.copy(_toOpp).normalize();
+            const angle = _aimFireDir.angleTo(_oppDir);
             const perpDist = oppDist * Math.sin(angle);
 
             if (angle < COMBAT_CONFIG.LASER_AIM_CONE || perpDist <= COMBAT_CONFIG.BULLET_HITBOX_RADIUS) {
               if (!blockedByObstacle || (raycast.distance > oppDist)) {
-                actualEnd = [oppPos.x, oppPos.y, oppPos.z];
+                actualEnd = [_oppPos.x, _oppPos.y, _oppPos.z];
                 hitEnemy = true;
                 blockedByObstacle = false;
               }
@@ -497,7 +513,7 @@ export const LocalPlayerShip: React.FC = () => {
         setActiveLaserBeam({
           attackId,
           shooterId: 'solo_player',
-          start: [emitterPos.x, emitterPos.y, emitterPos.z],
+          start: [_muzzlePos.x, _muzzlePos.y, _muzzlePos.z],
           end: actualEnd,
           blocked: blockedByObstacle,
           color: playerColor,
@@ -506,13 +522,13 @@ export const LocalPlayerShip: React.FC = () => {
         });
 
         if (hitEnemy) {
-          applyDamageToSoloOpponent(COMBAT_CONFIG.LASER_DAMAGE); // Exactly 12 HP
+          applyDamageToSoloOpponent(COMBAT_CONFIG.LASER_DAMAGE);
           nexusAudio.playHit();
         }
       } else {
         sendLaser(
-          [muzzlePos.x, muzzlePos.y, muzzlePos.z],
-          [aimFireDir.x, aimFireDir.y, aimFireDir.z],
+          [_muzzlePos.x, _muzzlePos.y, _muzzlePos.z],
+          [_aimFireDir.x, _aimFireDir.y, _aimFireDir.z],
           attackId
         );
       }
@@ -529,12 +545,11 @@ export const LocalPlayerShip: React.FC = () => {
       if (isSolo) {
         nexusAudio.playLaser();
 
-        const emitterPos = muzzlePos.clone();
-        const maxBeamEnd = emitterPos.clone().add(aimFireDir.clone().multiplyScalar(COMBAT_CONFIG.SOLAR_RANGE));
+        _beamEnd.copy(_muzzlePos).addScaledVector(_aimFireDir, COMBAT_CONFIG.SOLAR_RANGE);
 
         const raycast = checkObstacleRaycast(
-          emitterPos.x, emitterPos.y, emitterPos.z,
-          maxBeamEnd.x, maxBeamEnd.y, maxBeamEnd.z
+          _muzzlePos.x, _muzzlePos.y, _muzzlePos.z,
+          _beamEnd.x, _beamEnd.y, _beamEnd.z
         );
 
         let actualEnd: [number, number, number];
@@ -544,24 +559,24 @@ export const LocalPlayerShip: React.FC = () => {
           actualEnd = raycast.hitPoint;
           blockedByObstacle = true;
         } else {
-          actualEnd = [maxBeamEnd.x, maxBeamEnd.y, maxBeamEnd.z];
+          actualEnd = [_beamEnd.x, _beamEnd.y, _beamEnd.z];
         }
 
         let hitEnemy = false;
         const liveOpp = useMultiplayerStore.getState().opponentState;
         if (liveOpp && liveOpp.alive && liveOpp.hp > 0) {
-          const oppPos = new THREE.Vector3(...liveOpp.position);
-          const toOpp = new THREE.Vector3().subVectors(oppPos, emitterPos);
-          const oppDist = toOpp.length();
+          _oppPos.set(liveOpp.position[0], liveOpp.position[1], liveOpp.position[2]);
+          _toOpp.subVectors(_oppPos, _muzzlePos);
+          const oppDist = _toOpp.length();
 
           if (oppDist <= COMBAT_CONFIG.SOLAR_RANGE) {
-            const oppDir = toOpp.clone().normalize();
-            const angle = aimFireDir.angleTo(oppDir);
+            _oppDir.copy(_toOpp).normalize();
+            const angle = _aimFireDir.angleTo(_oppDir);
             const perpDist = oppDist * Math.sin(angle);
 
             if (angle < COMBAT_CONFIG.SOLAR_AIM_CONE || perpDist <= COMBAT_CONFIG.BULLET_HITBOX_RADIUS) {
               if (!blockedByObstacle || (raycast.distance > oppDist)) {
-                actualEnd = [oppPos.x, oppPos.y, oppPos.z];
+                actualEnd = [_oppPos.x, _oppPos.y, _oppPos.z];
                 hitEnemy = true;
                 blockedByObstacle = false;
               }
@@ -572,7 +587,7 @@ export const LocalPlayerShip: React.FC = () => {
         setActiveSolarBeam({
           attackId,
           shooterId: 'solo_player',
-          start: [emitterPos.x, emitterPos.y, emitterPos.z],
+          start: [_muzzlePos.x, _muzzlePos.y, _muzzlePos.z],
           end: actualEnd,
           blocked: blockedByObstacle,
           color: playerColor,
@@ -581,13 +596,13 @@ export const LocalPlayerShip: React.FC = () => {
         });
 
         if (hitEnemy) {
-          applyDamageToSoloOpponent(COMBAT_CONFIG.SOLAR_DAMAGE); // Exactly 30 HP
+          applyDamageToSoloOpponent(COMBAT_CONFIG.SOLAR_DAMAGE);
           nexusAudio.playHit();
         }
       } else {
         sendSolar(
-          [muzzlePos.x, muzzlePos.y, muzzlePos.z],
-          [aimFireDir.x, aimFireDir.y, aimFireDir.z],
+          [_muzzlePos.x, _muzzlePos.y, _muzzlePos.z],
+          [_aimFireDir.x, _aimFireDir.y, _aimFireDir.z],
           attackId
         );
       }
@@ -602,7 +617,7 @@ export const LocalPlayerShip: React.FC = () => {
         updateSoloSelf(
           [group.current.position.x, group.current.position.y, group.current.position.z],
           [rotationEuler.current.x, rotationEuler.current.y, rotationEuler.current.z],
-          [forwardDir.x * velocity.current.z, forwardDir.y * velocity.current.z, forwardDir.z * velocity.current.z],
+          [_forwardDir.x * velocity.current.z, _forwardDir.y * velocity.current.z, _forwardDir.z * velocity.current.z],
           useMultiplayerStore.getState().selfState?.hp ?? COMBAT_CONFIG.MAX_HP,
           isBoosting,
           Math.min(Math.abs(velocity.current.z) / COMBAT_CONFIG.SHIP_MAX_SPEED, 1)
@@ -613,7 +628,7 @@ export const LocalPlayerShip: React.FC = () => {
         sendInput(
           [group.current.position.x, group.current.position.y, group.current.position.z],
           [rotationEuler.current.x, rotationEuler.current.y, rotationEuler.current.z],
-          [forwardDir.x * velocity.current.z, forwardDir.y * velocity.current.z, forwardDir.z * velocity.current.z]
+          [_forwardDir.x * velocity.current.z, _forwardDir.y * velocity.current.z, _forwardDir.z * velocity.current.z]
         );
         lastSendTime.current = now;
       }

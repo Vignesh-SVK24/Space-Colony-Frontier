@@ -83,22 +83,24 @@ export class ServerPhysicsWorld {
       }
     }
 
-    // Check analytical planetary terrain intersection
-    const terrainHit = raycastTerrain(start.x, start.y, start.z, end.x, end.y, end.z);
-    if (terrainHit.hit && terrainHit.distance < closestDist) {
-      closestDist = terrainHit.distance;
-      hitPoint = {
-        x: terrainHit.hitPoint![0],
-        y: terrainHit.hitPoint![1],
-        z: terrainHit.hitPoint![2]
-      };
-      hitObs = {
-        id: 'obs_terrain_bedrock',
-        name: 'Planetary Terrain Bedrock',
-        position: [hitPoint.x, hitPoint.y, hitPoint.z],
-        radius: 12
-      };
-      blocked = true;
+    // Check analytical planetary terrain intersection only if ray descends near or below terrain max elevation (-70)
+    if (Math.min(start.y, end.y) <= -70) {
+      const terrainHit = raycastTerrain(start.x, start.y, start.z, end.x, end.y, end.z);
+      if (terrainHit.hit && terrainHit.distance < closestDist) {
+        closestDist = terrainHit.distance;
+        hitPoint = {
+          x: terrainHit.hitPoint![0],
+          y: terrainHit.hitPoint![1],
+          z: terrainHit.hitPoint![2]
+        };
+        hitObs = {
+          id: 'obs_terrain_bedrock',
+          name: 'Planetary Terrain Bedrock',
+          position: [hitPoint.x, hitPoint.y, hitPoint.z],
+          radius: 12
+        };
+        blocked = true;
+      }
     }
 
     if (blocked && hitPoint) {

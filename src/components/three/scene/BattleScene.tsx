@@ -53,17 +53,17 @@ export const BattleScene: React.FC = () => {
       }}
       className="w-full h-full touch-none select-none"
     >
-      {/* Deep Space Navy Ambient Fill */}
-      <ambientLight color="#08182f" intensity={0.32} />
+      {/* Deep Space Navy Ambient Fill - Enhanced 15-20% for clear combat visibility */}
+      <ambientLight color="#0a1c38" intensity={0.42} />
 
       {/* Atmospheric Space/Basalt Hemisphere Light */}
-      <hemisphereLight args={['#0f284e', '#050b14', 0.25]} />
+      <hemisphereLight args={['#0e2a52', '#050a12', 0.32]} />
 
       {/* Warm Golden Sunlight Key Directional */}
-      <directionalLight position={[120, 180, 140]} color="#fff8e7" intensity={1.5} />
+      <directionalLight position={[120, 180, 140]} color="#fff2db" intensity={1.65} />
 
       {/* Deep Space Cool Cyan/Navy Rim Light */}
-      <directionalLight position={[-120, -60, -140]} color="#0c2d54" intensity={0.6} />
+      <directionalLight position={[-120, -60, -140]} color="#0d3563" intensity={0.7} />
       
       {/* Environment */}
       <DeepSpaceSkybox />

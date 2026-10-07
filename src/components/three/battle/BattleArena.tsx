@@ -152,28 +152,36 @@ const CruiserWreckObstacleMesh: React.FC<{ obstacle: ArenaObstacle }> = ({ obsta
 };
 
 /**
- * 3D Mesh for Debris Field Corridors
+ * 3D Mesh for Debris Field Corridors (Optimized with InstancedMesh)
  */
 const DebrisClusterMesh: React.FC<{ obstacle: ArenaObstacle }> = ({ obstacle }) => {
+  const instancedRef = useRef<THREE.InstancedMesh>(null);
   const groupRef = useRef<THREE.Group>(null);
   const { position, radius } = obstacle;
+  const count = 12;
 
-  // Deterministic cluster of miniature rocks
-  const fragments = useMemo(() => {
-    const items = [];
-    const count = 12;
+  useEffect(() => {
+    if (!instancedRef.current) return;
+    const mesh = instancedRef.current;
+    const matrix = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    const rot = new THREE.Euler();
+    const quat = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2;
       const dist = (radius * 0.4) + (i % 3) * (radius * 0.25);
       const y = ((i % 5) - 2) * (radius * 0.25);
-      const size = 1.8 + (i % 4) * 1.2;
-      items.push({
-        pos: [Math.cos(angle) * dist, y, Math.sin(angle) * dist] as [number, number, number],
-        size,
-        rot: [i * 0.5, i * 0.8, i * 0.3] as [number, number, number]
-      });
+      const s = 1.8 + (i % 4) * 1.2;
+      pos.set(Math.cos(angle) * dist, y, Math.sin(angle) * dist);
+      rot.set(i * 0.5, i * 0.8, i * 0.3);
+      quat.setFromEuler(rot);
+      scale.set(s, s, s);
+      matrix.compose(pos, quat, scale);
+      mesh.setMatrixAt(i, matrix);
     }
-    return items;
+    mesh.instanceMatrix.needsUpdate = true;
   }, [radius]);
 
   useFrame((_, delta) => {
@@ -184,12 +192,10 @@ const DebrisClusterMesh: React.FC<{ obstacle: ArenaObstacle }> = ({ obstacle }) 
 
   return (
     <group ref={groupRef} position={position}>
-      {fragments.map((frag, idx) => (
-        <mesh key={idx} position={frag.pos} rotation={frag.rot}>
-          <dodecahedronGeometry args={[frag.size, 1]} />
-          <meshStandardMaterial color="#475569" roughness={0.9} metalness={0.2} flatShading />
-        </mesh>
-      ))}
+      <instancedMesh ref={instancedRef} args={[undefined, undefined, count]}>
+        <dodecahedronGeometry args={[1, 1]} />
+        <meshStandardMaterial color="#475569" roughness={0.9} metalness={0.2} flatShading />
+      </instancedMesh>
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <ringGeometry args={[radius * 0.95, radius, 24]} />
         <meshBasicMaterial color="#f59e0b" transparent opacity={0.06} side={THREE.DoubleSide} />
