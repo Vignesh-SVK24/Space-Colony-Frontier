@@ -230,14 +230,18 @@ export const LocalPlayerShip: React.FC = () => {
     const isBoosting = !!(keys['ShiftLeft'] || keys['ShiftRight'] || keys['SHIFT']);
     const isBraking = !!(keys['KeyX'] || keys['X']);
 
-    // Rotation
+    // Rotation with Aeronautical Banking Roll and Pitch Tilt
+    const targetRoll = -yawInput * 0.42; // Up to ~24 degrees responsive bank into turns
+    const targetPitch = (forwardInput > 0 ? -0.04 : forwardInput < 0 ? 0.05 : 0) + (verticalInput * 0.08);
+    rotationEuler.current.z = THREE.MathUtils.lerp(rotationEuler.current.z, targetRoll, dt * 6.0);
+    rotationEuler.current.x = THREE.MathUtils.lerp(rotationEuler.current.x, targetPitch, dt * 5.0);
     rotationEuler.current.y += yawInput * SHIP_CONFIG.yawSpeed * dt;
     group.current.quaternion.setFromEuler(rotationEuler.current);
 
     // Forward & Up Directions using scratch vectors
     _forwardDir.copy(_forwardZ).applyEuler(rotationEuler.current);
 
-    // Target Speed
+    // Target Speed with snappy responsive acceleration curves
     let targetSpeed = 0;
     if (forwardInput > 0) {
       targetSpeed = isBoosting ? COMBAT_CONFIG.SHIP_BOOST_SPEED : COMBAT_CONFIG.SHIP_MAX_SPEED;
@@ -249,8 +253,8 @@ export const LocalPlayerShip: React.FC = () => {
       targetSpeed = 0;
     }
 
-    velocity.current.z = THREE.MathUtils.lerp(velocity.current.z, targetSpeed, dt * 3.5);
-    velocity.current.y = THREE.MathUtils.lerp(velocity.current.y, verticalInput * 25, dt * 4.0);
+    velocity.current.z = THREE.MathUtils.lerp(velocity.current.z, targetSpeed, dt * (isBoosting ? 5.0 : 3.8));
+    velocity.current.y = THREE.MathUtils.lerp(velocity.current.y, verticalInput * 25, dt * 4.5);
 
     // Apply translation with continuous collision resolution
     _prevPos.copy(group.current.position);
@@ -275,9 +279,24 @@ export const LocalPlayerShip: React.FC = () => {
       }
     }
 
-    // Camera chase
+    // Dynamic FOV for speed sensation (55° cruise -> 63° hyper-boost)
+    if (camera instanceof THREE.PerspectiveCamera) {
+      const targetFov = isBoosting ? 63 : 55;
+      if (Math.abs(camera.fov - targetFov) > 0.05) {
+        camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, dt * 4.0);
+        camera.updateProjectionMatrix();
+      }
+    }
+
+    // Camera chase with subtle acceleration lag and boost vibration
     _cameraOffset.set(0, SHIP_CONFIG.camera.chaseHeight, -SHIP_CONFIG.camera.chaseDistance);
-    if (isBoosting) _cameraOffset.z -= 2.0;
+    if (isBoosting) {
+      _cameraOffset.z -= 2.2;
+      const shakeX = (Math.random() - 0.5) * 0.06;
+      const shakeY = (Math.random() - 0.5) * 0.04;
+      _cameraOffset.x += shakeX;
+      _cameraOffset.y += shakeY;
+    }
     _cameraOffset.applyEuler(rotationEuler.current);
 
     _targetCamPos.copy(group.current.position).add(_cameraOffset);
@@ -434,6 +453,7 @@ export const LocalPlayerShip: React.FC = () => {
           soloIsReloading.current = true;
           soloReloadEndTime.current = now + COMBAT_CONFIG.BULLET_RELOAD_TIME * 1000;
           setIsReloading(true);
+          nexusAudio.playReloadMechanical();
         }
 
         addSoloProjectile({
@@ -449,14 +469,14 @@ export const LocalPlayerShip: React.FC = () => {
           damage: COMBAT_CONFIG.BULLET_DAMAGE,
           createdAt: Date.now()
         });
-        nexusAudio.playLaser();
+        nexusAudio.playBulletFire();
       } else {
         sendBullet(
           [_muzzlePos.x, _muzzlePos.y, _muzzlePos.z],
           [_finalBulletDir.x, _finalBulletDir.y, _finalBulletDir.z],
           attackId
         );
-        nexusAudio.playLaser();
+        nexusAudio.playBulletFire();
       }
     }
 
@@ -469,7 +489,7 @@ export const LocalPlayerShip: React.FC = () => {
       const attackId = `LASER_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
       if (isSolo) {
-        nexusAudio.playLaser();
+        nexusAudio.playLaserBeamChargeAndFire();
 
         _beamEnd.copy(_muzzlePos).addScaledVector(_aimFireDir, COMBAT_CONFIG.LASER_RANGE);
 
@@ -523,7 +543,7 @@ export const LocalPlayerShip: React.FC = () => {
 
         if (hitEnemy) {
           applyDamageToSoloOpponent(COMBAT_CONFIG.LASER_DAMAGE);
-          nexusAudio.playHit();
+          nexusAudio.playShieldOrHullHit(COMBAT_CONFIG.LASER_DAMAGE);
         }
       } else {
         sendLaser(
@@ -543,7 +563,7 @@ export const LocalPlayerShip: React.FC = () => {
       const attackId = `SOLAR_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
       if (isSolo) {
-        nexusAudio.playLaser();
+        nexusAudio.playSolarBeamFire();
 
         _beamEnd.copy(_muzzlePos).addScaledVector(_aimFireDir, COMBAT_CONFIG.SOLAR_RANGE);
 
@@ -597,7 +617,7 @@ export const LocalPlayerShip: React.FC = () => {
 
         if (hitEnemy) {
           applyDamageToSoloOpponent(COMBAT_CONFIG.SOLAR_DAMAGE);
-          nexusAudio.playHit();
+          nexusAudio.playShieldOrHullHit(COMBAT_CONFIG.SOLAR_DAMAGE);
         }
       } else {
         sendSolar(

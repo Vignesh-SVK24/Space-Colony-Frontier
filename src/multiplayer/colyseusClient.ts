@@ -311,8 +311,18 @@ const bindRoomEvents = (room: Room) => {
       timestamp: Date.now()
     });
 
-    if (data.attackerId === room.sessionId) {
-      nexusAudio.playHit();
+    if (data.attackerId === room.sessionId || data.defenderId === room.sessionId) {
+      nexusAudio.playShieldOrHullHit(data.damage);
+      // Trigger haptic vibration on mobile devices if supported
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          if (data.defenderId === room.sessionId) {
+            navigator.vibrate([40, 20, 60]); // Damage received haptic
+          } else {
+            navigator.vibrate(30); // Hit confirmed haptic
+          }
+        } catch {}
+      }
     }
   });
 
@@ -332,6 +342,9 @@ const bindRoomEvents = (room: Room) => {
       damage: GAME_CONFIG.BULLET_DAMAGE,
       createdAt: Date.now()
     });
+    if (data.ownerId === room.sessionId) {
+      nexusAudio.playBulletFire();
+    }
   });
 
   // Authoritative laser fired
@@ -350,7 +363,7 @@ const bindRoomEvents = (room: Room) => {
       weaponType: 'LASER',
       timestamp: Date.now()
     });
-    nexusAudio.playLaser();
+    nexusAudio.playLaserBeamChargeAndFire();
   });
 
   // Authoritative solar beam fired
@@ -369,8 +382,23 @@ const bindRoomEvents = (room: Room) => {
       weaponType: 'SOLAR_BEAM',
       timestamp: Date.now()
     });
-    nexusAudio.playLaser();
+    nexusAudio.playSolarBeamFire();
   });
+
+  // Real-time Ping Telemetry
+  room.onMessage('pong', (data: { clientTime?: number }) => {
+    if (data && data.clientTime) {
+      const rtt = Math.max(1, Date.now() - data.clientTime);
+      useMultiplayerStore.getState().setPingMs(rtt);
+    }
+  });
+
+  // Start ping heartbeat
+  const pingTimer = setInterval(() => {
+    if (activeRoom && activeRoom.connection?.isOpen) {
+      activeRoom.send('ping', { clientTime: Date.now() });
+    }
+  }, 2500);
 
   // Match ended
   room.onMessage('match_ended', (data: any) => {

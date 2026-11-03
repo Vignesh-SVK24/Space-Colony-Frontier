@@ -534,6 +534,11 @@ export class BattleRoom extends Room {
         this.broadcast('rematch_accepted', {});
       }
     });
+
+    // 9. Lightweight Ping/Pong Telemetry Heartbeat
+    this.onMessage('ping', (client, data: { clientTime?: number }) => {
+      client.send('pong', { clientTime: data?.clientTime || 0 });
+    });
   }
 
   private getSpawnPosition(slot: number, total: number): Vector3D {

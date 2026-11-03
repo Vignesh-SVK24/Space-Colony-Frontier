@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
 import { useMultiplayerStore } from '../../../../multiplayer/useMultiplayerStore';
 import { disconnect, sendReload } from '../../../../multiplayer/colyseusClient';
-import { LogOut, Bot, Map as MapIcon, Crosshair, Zap, Maximize, Minimize, Sun, Shield } from 'lucide-react';
+import { LogOut, Bot, Map as MapIcon, Crosshair, Zap, Maximize, Minimize, Sun, Shield, Trophy } from 'lucide-react';
 import { FullScreenTacticalMap } from './FullScreenTacticalMap';
 import { CombatDebugOverlay } from './CombatDebugOverlay';
+import { KillFeed } from './KillFeed';
+import { MatchScoreboard } from './MatchScoreboard';
 import { nexusAudio } from '../../../../utils/nexusAudio';
 import { COMBAT_CONFIG } from '../../../../config/combatConfig';
 import { enterFullscreen, toggleFullscreen, useFullscreen } from '../../../../utils/fullscreenHelper';
@@ -28,15 +30,21 @@ export const BattleHUD: React.FC = () => {
   const hitConfirmActive = useMultiplayerStore(state => state.hitConfirmActive);
   const countdown = useMultiplayerStore(state => state.countdown);
   const roomStatus = useMultiplayerStore(state => state.roomStatus);
+  const toggleScoreboard = useMultiplayerStore(state => state.toggleScoreboard);
 
   const opponentList = otherPlayers.length > 0 ? otherPlayers : (opponentState ? [opponentState] : []);
   const { isFullscreen } = useFullscreen();
 
   // Fullscreen is user-controlled via HUD toggle to avoid repetitive browser pop-up alerts
 
-  // 'M' Key shortcut for map, 'R' key for reload
+  // 'M' Key shortcut for map, 'R' key for reload, 'Tab' for scoreboard
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Tab' && !e.repeat) {
+        e.preventDefault();
+        toggleScoreboard();
+        nexusAudio.playClick();
+      }
       if (e.code === 'KeyM' && !e.repeat) {
         e.preventDefault();
         setMapOpen(!isMapOpen);
@@ -44,6 +52,7 @@ export const BattleHUD: React.FC = () => {
       }
       if (e.code === 'KeyR' && !e.repeat) {
         e.preventDefault();
+        nexusAudio.playReloadMechanical();
         if (!isSolo) {
           sendReload();
         }
@@ -51,7 +60,7 @@ export const BattleHUD: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMapOpen, setMapOpen, isSolo]);
+  }, [isMapOpen, setMapOpen, isSolo, toggleScoreboard]);
 
   const getHpColor = (hp: number) => {
     if (hp > 150) return 'bg-emerald-500';
@@ -95,6 +104,18 @@ export const BattleHUD: React.FC = () => {
               <span className="hidden sm:inline uppercase tracking-wider font-semibold">
                 {isFullscreen ? 'Window' : 'Fullscreen'}
               </span>
+            </button>
+
+            <button
+              onClick={() => {
+                toggleScoreboard();
+                nexusAudio.playClick();
+              }}
+              className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/70 hover:bg-amber-950/80 border border-gray-700/60 hover:border-amber-500/50 text-[11px] text-gray-300 hover:text-amber-300 transition-colors cursor-pointer backdrop-blur-md shadow-lg"
+              title="Tactical Scoreboard (TAB)"
+            >
+              <Trophy size={13} className="text-[#FFCC00]" />
+              <span className="hidden sm:inline uppercase tracking-wider font-semibold">Dossier</span>
             </button>
           </div>
 
@@ -378,10 +399,19 @@ export const BattleHUD: React.FC = () => {
           )}
         </div>
 
+        {/* Real-time Combat Kill Feed */}
+        <KillFeed />
+
       </div>
+
+      {/* Critical Low Hull Warning Vignette (< 60 HP) */}
+      {selfState && selfState.alive && selfState.hp < 60 && (
+        <div className="fixed inset-0 pointer-events-none border-4 border-red-600/70 shadow-[inset_0_0_60px_rgba(239,68,68,0.5)] animate-pulse z-40" />
+      )}
 
       <CombatDebugOverlay />
       <FullScreenTacticalMap />
+      <MatchScoreboard />
     </>
   );
 };

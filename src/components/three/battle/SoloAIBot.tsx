@@ -460,7 +460,7 @@ export const SoloAIBot: React.FC = () => {
         distToPlayer < COMBAT_CONFIG.SOLAR_RANGE
       ) {
         lastSolarTime.current = now;
-        nexusAudio.playLaser();
+        nexusAudio.playSolarBeamFire();
 
         const emitterPos = dronePos.current.clone().add(droneForward.clone().multiplyScalar(2.0));
         const solarRay = checkObstacleRaycast(
@@ -498,7 +498,7 @@ export const SoloAIBot: React.FC = () => {
         distToPlayer < COMBAT_CONFIG.LASER_RANGE
       ) {
         lastLaserTime.current = now;
-        nexusAudio.playLaser();
+        nexusAudio.playLaserBeamChargeAndFire();
 
         const emitterPos = dronePos.current.clone().add(droneForward.clone().multiplyScalar(2.0));
         const laserRay = checkObstacleRaycast(
@@ -558,7 +558,7 @@ export const SoloAIBot: React.FC = () => {
           damage: COMBAT_CONFIG.BULLET_DAMAGE,
           createdAt: Date.now()
         });
-        nexusAudio.playLaser();
+        nexusAudio.playBulletFire();
       }
     }
 

@@ -54,6 +54,9 @@ export const VirtualJoystick: FC = () => {
       return { ...prev, [code]: true };
     });
     window.dispatchEvent(new KeyboardEvent('keydown', { code, key: keyName, bubbles: true }));
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try { navigator.vibrate(18); } catch {}
+    }
   };
 
   const releaseKey = (code: string, keyName: string) => {
@@ -269,7 +272,14 @@ export const VirtualJoystick: FC = () => {
         onTouchEnd={handleTouchEndCamera}
       />
 
-      <div className="fixed inset-x-0 bottom-3 z-30 pointer-events-none px-3 sm:px-6 flex justify-between items-end font-mono select-none">
+      <div
+        className="fixed inset-x-0 bottom-0 z-30 pointer-events-none flex justify-between items-end font-mono select-none"
+        style={{
+          paddingBottom: 'max(12px, env(safe-area-inset-bottom, 12px))',
+          paddingLeft: 'max(14px, env(safe-area-inset-left, 14px))',
+          paddingRight: 'max(14px, env(safe-area-inset-right, 14px))'
+        }}
+      >
         
         {/* Left Side: 360° Joystick + Elevation Flight */}
         <div className="pointer-events-auto flex items-end gap-2.5">

@@ -19,6 +19,16 @@ import { CombatDifficulty, COMBAT_CONFIG } from '../config/combatConfig';
 
 export type { LaserEvent, LeadIndicatorInfo, DamageEvent, CombatTelemetryEntry, RoomPlayerInfo };
 
+export interface KillFeedEntry {
+  id: string;
+  attackerName: string;
+  victimName: string;
+  weapon: string;
+  timestamp: number;
+}
+
+export type EnvironmentSector = 'NEBULA' | 'ASTEROID_BELT' | 'ORBITAL_SUNRISE' | 'VOLCANIC';
+
 export interface TargetLockInfo {
   id: string;
   name: string;
@@ -81,6 +91,24 @@ interface MultiplayerState {
 
   // Tactical Map
   isMapOpen: boolean;
+
+  // Environment Sector
+  environmentSector: EnvironmentSector;
+  setEnvironmentSector: (sector: EnvironmentSector) => void;
+
+  // Combat Kill Feed
+  killFeed: KillFeedEntry[];
+  addKillFeedEntry: (entry: Omit<KillFeedEntry, 'id' | 'timestamp'>) => void;
+  pruneKillFeed: () => void;
+
+  // Live Ping/Latency Telemetry
+  pingMs: number;
+  setPingMs: (ping: number) => void;
+
+  // Match Scoreboard
+  isScoreboardOpen: boolean;
+  setScoreboardOpen: (open: boolean) => void;
+  toggleScoreboard: () => void;
 
   // Weapon Cooldowns, Ammo & Visual FX
   ammo: number;
@@ -379,6 +407,32 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
 
   isMapOpen: false,
 
+  environmentSector: 'NEBULA',
+  setEnvironmentSector: (sector) => set({ environmentSector: sector }),
+
+  killFeed: [],
+  addKillFeedEntry: (entry) => set(state => ({
+    killFeed: [
+      {
+        ...entry,
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp: Date.now()
+      },
+      ...state.killFeed
+    ].slice(0, 5)
+  })),
+  pruneKillFeed: () => set(state => {
+    const now = Date.now();
+    return { killFeed: state.killFeed.filter(k => now - k.timestamp < 5000) };
+  }),
+
+  pingMs: 0,
+  setPingMs: (pingMs) => set({ pingMs }),
+
+  isScoreboardOpen: false,
+  setScoreboardOpen: (open) => set({ isScoreboardOpen: open }),
+  toggleScoreboard: () => set(state => ({ isScoreboardOpen: !state.isScoreboardOpen })),
+
   ammo: COMBAT_CONFIG.BULLET_MAGAZINE_SIZE,
   isReloading: false,
   reloadTimeRemaining: 0,
@@ -453,6 +507,20 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     }
     if (isAttackerMe) {
       get().triggerHitConfirm();
+    }
+
+    if (event.newHp <= 0) {
+      const state = get();
+      const allPlayers = [state.selfState, state.opponentState, ...state.otherPlayers].filter(Boolean);
+      const attacker = allPlayers.find(p => p?.id === event.attackerId);
+      const target = allPlayers.find(p => p?.id === event.targetId);
+      const attackerName = attacker ? attacker.name : (isAttackerMe ? (state.selfState?.name || 'Pilot') : 'Hostile Drone');
+      const targetName = target ? target.name : (isTargetMe ? (state.selfState?.name || 'You') : 'Enemy Vessel');
+      state.addKillFeedEntry({
+        attackerName,
+        victimName: targetName,
+        weapon: (event.weapon || event.weaponType || 'BULLET').toUpperCase()
+      });
     }
   },
 
@@ -550,6 +618,32 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
     countdown: null,
     error: null,
     isMapOpen: false,
+
+  environmentSector: 'NEBULA',
+  setEnvironmentSector: (sector) => set({ environmentSector: sector }),
+
+  killFeed: [],
+  addKillFeedEntry: (entry) => set(state => ({
+    killFeed: [
+      {
+        ...entry,
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp: Date.now()
+      },
+      ...state.killFeed
+    ].slice(0, 5)
+  })),
+  pruneKillFeed: () => set(state => {
+    const now = Date.now();
+    return { killFeed: state.killFeed.filter(k => now - k.timestamp < 5000) };
+  }),
+
+  pingMs: 0,
+  setPingMs: (pingMs) => set({ pingMs }),
+
+  isScoreboardOpen: false,
+  setScoreboardOpen: (open) => set({ isScoreboardOpen: open }),
+  toggleScoreboard: () => set(state => ({ isScoreboardOpen: !state.isScoreboardOpen })),
     ammo: COMBAT_CONFIG.BULLET_MAGAZINE_SIZE,
     isReloading: false,
     reloadTimeRemaining: 0,
@@ -676,6 +770,32 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
       countdown: null,
       error: null,
       isMapOpen: false,
+
+  environmentSector: 'NEBULA',
+  setEnvironmentSector: (sector) => set({ environmentSector: sector }),
+
+  killFeed: [],
+  addKillFeedEntry: (entry) => set(state => ({
+    killFeed: [
+      {
+        ...entry,
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp: Date.now()
+      },
+      ...state.killFeed
+    ].slice(0, 5)
+  })),
+  pruneKillFeed: () => set(state => {
+    const now = Date.now();
+    return { killFeed: state.killFeed.filter(k => now - k.timestamp < 5000) };
+  }),
+
+  pingMs: 0,
+  setPingMs: (pingMs) => set({ pingMs }),
+
+  isScoreboardOpen: false,
+  setScoreboardOpen: (open) => set({ isScoreboardOpen: open }),
+  toggleScoreboard: () => set(state => ({ isScoreboardOpen: !state.isScoreboardOpen })),
       joystickAxis: { x: 0, y: 0 },
       ammo: COMBAT_CONFIG.BULLET_MAGAZINE_SIZE,
       isReloading: false,

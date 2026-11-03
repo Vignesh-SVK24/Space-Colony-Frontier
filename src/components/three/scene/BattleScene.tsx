@@ -14,6 +14,7 @@ import { LaserBeam3D } from '../battle/LaserBeam3D';
 import { SolarBeam3D } from '../battle/SolarBeam3D';
 import { LeadReticle3D } from '../battle/LeadReticle3D';
 import { BattleArena } from '../battle/BattleArena';
+import { DestructibleDebrisField } from '../battle/DestructibleDebrisField';
 import { SoloAIBot } from '../battle/SoloAIBot';
 import { generateSpaceCubeEnvironment } from '../../../utils/pbrTextureGenerator';
 import { getViewDistanceFar } from '../../../config/graphicsConfig';
@@ -74,6 +75,7 @@ export const BattleScene: React.FC = () => {
       
       {/* Battle Components - Keyed by matchSessionId to cleanly re-mount and reset on rematch */}
       <BattleArena key={`arena-${matchSessionId}`} />
+      <DestructibleDebrisField key={`destructible-debris-${matchSessionId}`} />
       <LocalPlayerShip key={`player-${matchSessionId}`} />
       {remoteShips.map((ship) => (
         <RemotePlayerShip key={`${ship.id}-${matchSessionId}`} player={ship} />
