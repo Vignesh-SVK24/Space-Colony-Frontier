@@ -73,12 +73,6 @@ export const MoonSystem: FC = () => {
           normalMap={moonNormal}
         />
       </mesh>
-
-      {/* Subtle Moon Orbital Beacon Ring */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[15.5, 15.8, 32]} />
-        <meshBasicMaterial color="#64748b" transparent opacity={0.3} side={THREE.DoubleSide} />
-      </mesh>
     </group>
   );
 };

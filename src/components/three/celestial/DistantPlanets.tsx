@@ -1,27 +1,43 @@
-import { useRef, type FC } from 'react';
+import { useMemo, useRef, type FC } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useNexusGameStore } from '../../../state/useNexusGameStore';
+import {
+  getGasGiantTexture,
+  getGasGiantRingsTexture,
+  getColonyPlanetTexture,
+  getVolcanicPlanetTexture,
+  getTerrainRegolithNormal
+} from '../../../utils/pbrTextureGenerator';
 
 export const DistantPlanets: FC = () => {
   const gorgonRef = useRef<THREE.Group>(null);
   const boreasRef = useRef<THREE.Group>(null);
   const pyrosRef = useRef<THREE.Group>(null);
+  const colonyPlanetRef = useRef<THREE.Group>(null);
 
   const { selectEntity, setHoveredEntity } = useNexusGameStore();
 
+  // Procedural planetary textures
+  const gasGiantTex = useMemo(() => getGasGiantTexture(), []);
+  const gasGiantRingsTex = useMemo(() => getGasGiantRingsTexture(), []);
+  const colonyPlanetTex = useMemo(() => getColonyPlanetTexture(), []);
+  const volcanicTex = useMemo(() => getVolcanicPlanetTexture(), []);
+  const iceNormal = useMemo(() => getTerrainRegolithNormal(), []);
+
   useFrame((_, delta) => {
-    if (gorgonRef.current) gorgonRef.current.rotation.y += delta * 0.02;
+    if (gorgonRef.current) gorgonRef.current.rotation.y += delta * 0.012;
     if (boreasRef.current) boreasRef.current.rotation.y += delta * 0.015;
-    if (pyrosRef.current) pyrosRef.current.rotation.y += delta * 0.025;
+    if (pyrosRef.current) pyrosRef.current.rotation.y += delta * 0.02;
+    if (colonyPlanetRef.current) colonyPlanetRef.current.rotation.y += delta * 0.003;
   });
 
   return (
     <group>
-      {/* 1. Gorgon: Ringed Gas Giant */}
+      {/* 1. Gorgon: Jovian Class-IV Ringed Gas Giant */}
       <group
         ref={gorgonRef}
-        position={[-360, 120, -280]}
+        position={[-360, 130, -320]}
         onClick={(e) => {
           e.stopPropagation();
           selectEntity({
@@ -52,32 +68,46 @@ export const DistantPlanets: FC = () => {
         }}
         onPointerOut={() => setHoveredEntity(null)}
       >
+        {/* Core Gas Giant Sphere with Banded Cloud Texture */}
         <mesh>
-          <sphereGeometry args={[18, 32, 32]} />
+          <sphereGeometry args={[26, 64, 64]} />
           <meshStandardMaterial
-            color="#b45309"
-            roughness={0.7}
-            metalness={0.1}
+            map={gasGiantTex}
+            roughness={0.75}
+            metalness={0.05}
           />
         </mesh>
-        {/* Concentric Planetary Rings */}
-        <mesh rotation={[-Math.PI / 2.5, 0, 0]}>
-          <ringGeometry args={[23, 34, 48]} />
+
+        {/* Soft Atmospheric Limb Glow Shell */}
+        <mesh>
+          <sphereGeometry args={[26.9, 32, 32]} />
+          <meshBasicMaterial
+            color="#fbbf24"
+            transparent
+            opacity={0.16}
+            side={THREE.BackSide}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
+
+        {/* Multi-Tiered Planetary Rings with Cassini Gap */}
+        <mesh rotation={[-Math.PI / 2.3, 0.3, 0]}>
+          <ringGeometry args={[32, 54, 64]} />
           <meshStandardMaterial
-            color="#d97706"
-            roughness={0.8}
-            metalness={0.2}
+            map={gasGiantRingsTex}
+            roughness={0.85}
+            metalness={0.1}
             side={THREE.DoubleSide}
             transparent
-            opacity={0.85}
+            opacity={0.88}
           />
         </mesh>
       </group>
 
-      {/* 2. Boreas: Glacial Ice World */}
+      {/* 2. Boreas: Glacial Cryo-Terrestrial World */}
       <group
         ref={boreasRef}
-        position={[320, -110, -260]}
+        position={[340, -100, -290]}
         onClick={(e) => {
           e.stopPropagation();
           selectEntity({
@@ -109,19 +139,31 @@ export const DistantPlanets: FC = () => {
         onPointerOut={() => setHoveredEntity(null)}
       >
         <mesh>
-          <sphereGeometry args={[11, 32, 32]} />
+          <sphereGeometry args={[15, 48, 48]} />
           <meshStandardMaterial
             color="#38bdf8"
-            roughness={0.3}
-            metalness={0.4}
+            roughness={0.28}
+            metalness={0.42}
+            normalMap={iceNormal}
+          />
+        </mesh>
+        {/* Frosty Cyan Cryo-Atmosphere Halo */}
+        <mesh>
+          <sphereGeometry args={[15.6, 32, 32]} />
+          <meshBasicMaterial
+            color="#67e8f9"
+            transparent
+            opacity={0.2}
+            side={THREE.BackSide}
+            blending={THREE.AdditiveBlending}
           />
         </mesh>
       </group>
 
-      {/* 3. Pyros: Volcanic Planet with Basalt Rifts */}
+      {/* 3. Pyros: Volcanic Proto-Planet with Basalt Tectonics */}
       <group
         ref={pyrosRef}
-        position={[-280, -140, 320]}
+        position={[-300, -140, 340]}
         onClick={(e) => {
           e.stopPropagation();
           selectEntity({
@@ -153,13 +195,49 @@ export const DistantPlanets: FC = () => {
         onPointerOut={() => setHoveredEntity(null)}
       >
         <mesh>
-          <sphereGeometry args={[8.5, 32, 32]} />
+          <sphereGeometry args={[12, 48, 48]} />
           <meshStandardMaterial
-            color="#18181b"
+            map={volcanicTex}
+            color="#1c1917"
             emissive="#ea580c"
-            emissiveIntensity={0.6}
-            roughness={0.9}
-            metalness={0.1}
+            emissiveIntensity={0.8}
+            roughness={0.88}
+            metalness={0.2}
+          />
+        </mesh>
+        {/* Thermal Magma Heat Haze Shell */}
+        <mesh>
+          <sphereGeometry args={[12.6, 32, 32]} />
+          <meshBasicMaterial
+            color="#f97316"
+            transparent
+            opacity={0.18}
+            side={THREE.BackSide}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
+      </group>
+
+      {/* 4. Gaia Nova: Distant Frontier Colony Planet Limb (Curved Horizon Below) */}
+      <group ref={colonyPlanetRef} position={[0, -680, 0]}>
+        {/* Colossal Planetary Sphere */}
+        <mesh>
+          <sphereGeometry args={[480, 64, 64]} />
+          <meshStandardMaterial
+            map={colonyPlanetTex}
+            roughness={0.82}
+            metalness={0.12}
+          />
+        </mesh>
+        {/* Rayleigh Atmospheric Cyan Limb Glow */}
+        <mesh>
+          <sphereGeometry args={[488, 48, 48]} />
+          <meshBasicMaterial
+            color="#38bdf8"
+            transparent
+            opacity={0.18}
+            side={THREE.BackSide}
+            blending={THREE.AdditiveBlending}
           />
         </mesh>
       </group>

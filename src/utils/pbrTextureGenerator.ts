@@ -250,3 +250,323 @@ export function generateSpaceCubeEnvironment(): THREE.CubeTexture {
   cachedSpaceEnv = cubeTexture;
   return cubeTexture;
 }
+
+/**
+ * Procedural Organic Nebula Gas Cloud Texture
+ * Generates an organic cloud puff with radial Gaussian alpha falloff to 0 at perimeter,
+ * ensuring zero hard edges or boxy outlines.
+ */
+export function getNebulaCloudTexture(variant: 'violet' | 'cyan' | 'amber' | 'galaxy' = 'violet'): THREE.Texture {
+  const key = `nebula_cloud_${variant}`;
+  if (textureCache.has(key)) return textureCache.get(key)!;
+
+  const size = 256;
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      const cx = size / 2;
+      const cy = size / 2;
+
+      // Color scheme based on variant
+      const colors = {
+        violet: { core: 'rgba(168, 85, 247, 0.85)', mid: 'rgba(126, 34, 206, 0.45)', outer: 'rgba(59, 7, 100, 0.15)' },
+        cyan: { core: 'rgba(56, 189, 248, 0.85)', mid: 'rgba(14, 116, 144, 0.45)', outer: 'rgba(8, 51, 68, 0.15)' },
+        amber: { core: 'rgba(251, 191, 36, 0.85)', mid: 'rgba(217, 119, 6, 0.45)', outer: 'rgba(120, 53, 15, 0.15)' },
+        galaxy: { core: 'rgba(255, 255, 255, 0.95)', mid: 'rgba(192, 132, 252, 0.55)', outer: 'rgba(30, 58, 138, 0.12)' }
+      }[variant];
+
+      const radGrad = ctx.createRadialGradient(cx, cy, 4, cx, cy, cx * 0.92);
+      radGrad.addColorStop(0, colors.core);
+      radGrad.addColorStop(0.35, colors.mid);
+      radGrad.addColorStop(0.7, colors.outer);
+      radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      ctx.fillStyle = radGrad;
+      ctx.fillRect(0, 0, size, size);
+
+      // Add organic density filaments
+      for (let i = 0; i < 28; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * (cx * 0.65);
+        const px = cx + Math.cos(angle) * dist;
+        const py = cy + Math.sin(angle) * dist;
+        const r = 18 + Math.random() * 32;
+
+        const puffGrad = ctx.createRadialGradient(px, py, 2, px, py, r);
+        puffGrad.addColorStop(0, colors.mid);
+        puffGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = puffGrad;
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    textureCache.set(key, tex);
+    return tex;
+  }
+
+  // Node.js fallback
+  const dummy = new THREE.DataTexture(new Uint8Array(size * size * 4), size, size, THREE.RGBAFormat);
+  textureCache.set(key, dummy);
+  return dummy;
+}
+
+/**
+ * Procedural Jovian Gas Giant Atmospheric Banding Texture
+ */
+export function getGasGiantTexture(): THREE.Texture {
+  const key = 'planet_gas_giant';
+  if (textureCache.has(key)) return textureCache.get(key)!;
+
+  const width = 512;
+  const height = 256;
+
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    if (ctx) {
+      // Base atmospheric bands
+      const bands = [
+        '#78350f', '#92400e', '#b45309', '#d97706', '#f59e0b',
+        '#fef3c7', '#d97706', '#92400e', '#78350f', '#451a03'
+      ];
+
+      for (let y = 0; y < height; y++) {
+        const t = y / height;
+        const bandIdx = Math.floor(t * bands.length);
+        const baseColor = bands[Math.min(bandIdx, bands.length - 1)];
+        ctx.fillStyle = baseColor;
+        ctx.fillRect(0, y, width, 1);
+
+        // Micro turbulent noise
+        const noise = Math.sin(y * 0.18) * 15;
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.abs(Math.sin(y * 0.08)) * 0.12})`;
+        ctx.fillRect(0, y, width, 1);
+      }
+
+      // Atmospheric Great Storm Vortex (Great Red/Amber Spot)
+      const stormX = width * 0.62;
+      const stormY = height * 0.64;
+      const stormGrad = ctx.createRadialGradient(stormX, stormY, 4, stormX, stormY, 32);
+      stormGrad.addColorStop(0, '#dc2626');
+      stormGrad.addColorStop(0.5, '#ea580c');
+      stormGrad.addColorStop(0.85, '#b45309');
+      stormGrad.addColorStop(1, 'rgba(180, 83, 9, 0)');
+
+      ctx.fillStyle = stormGrad;
+      ctx.beginPath();
+      ctx.ellipse(stormX, stormY, 32, 18, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.needsUpdate = true;
+    textureCache.set(key, tex);
+    return tex;
+  }
+
+  const dummy = new THREE.DataTexture(new Uint8Array(width * height * 4), width, height, THREE.RGBAFormat);
+  textureCache.set(key, dummy);
+  return dummy;
+}
+
+/**
+ * Procedural Gas Giant Rings Texture with Cassini divisions
+ */
+export function getGasGiantRingsTexture(): THREE.Texture {
+  const key = 'planet_gas_giant_rings';
+  if (textureCache.has(key)) return textureCache.get(key)!;
+
+  const size = 256;
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+
+    if (ctx) {
+      for (let x = 0; x < size; x++) {
+        const u = x / size;
+        // Inner transparency
+        if (u < 0.15 || u > 0.95) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+        } else if (u > 0.58 && u < 0.64) {
+          // Cassini Division dark gap
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+        } else {
+          const density = Math.sin(u * Math.PI * 18) * 0.25 + 0.65;
+          const alpha = density * (u < 0.3 ? (u - 0.15) / 0.15 : (0.95 - u) / 0.3);
+          ctx.fillStyle = `rgba(245, 158, 11, ${Math.max(0, Math.min(0.9, alpha))})`;
+        }
+        ctx.fillRect(x, 0, 1, 1);
+      }
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.needsUpdate = true;
+    textureCache.set(key, tex);
+    return tex;
+  }
+
+  const dummy = new THREE.DataTexture(new Uint8Array(size * 4), size, 1, THREE.RGBAFormat);
+  textureCache.set(key, dummy);
+  return dummy;
+}
+
+/**
+ * Procedural Colony World Planetary Texture (Gaia Nova)
+ * Displays azure oceans, green/brown continents, swirling cloud weather systems,
+ * and night-side glowing colony city clusters.
+ */
+export function getColonyPlanetTexture(): THREE.Texture {
+  const key = 'planet_colony_world';
+  if (textureCache.has(key)) return textureCache.get(key)!;
+
+  const width = 512;
+  const height = 256;
+
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    if (ctx) {
+      // Ocean base
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, width, height);
+
+      // Deep ocean variations
+      const oceanGrad = ctx.createLinearGradient(0, 0, 0, height);
+      oceanGrad.addColorStop(0, '#0c4a6e');
+      oceanGrad.addColorStop(0.5, '#0284c7');
+      oceanGrad.addColorStop(1, '#0c4a6e');
+      ctx.fillStyle = oceanGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Continents (organic blobs)
+      ctx.fillStyle = '#15803d'; // Forest/biome green
+      for (let i = 0; i < 18; i++) {
+        const cx = (i * 37) % width;
+        const cy = 40 + ((i * 29) % (height - 80));
+        const rx = 35 + (i % 5) * 12;
+        const ry = 22 + (i % 4) * 8;
+
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, (i * 0.3), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Swirling white cloud formations
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      for (let c = 0; c < 14; c++) {
+        const y = 30 + c * 16;
+        ctx.beginPath();
+        ctx.ellipse(width * (c / 14), y, 60, 6, 0.15, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Night-side glowing colony city grids (emissive dots)
+      ctx.fillStyle = 'rgba(254, 240, 138, 0.85)'; // Warm golden metropolis lights
+      for (let s = 0; s < 45; s++) {
+        const sx = (s * 41 + 15) % width;
+        const sy = 55 + ((s * 31) % (height - 110));
+        ctx.fillRect(sx, sy, 2, 2);
+        ctx.fillRect(sx + 3, sy + 1, 1, 1);
+        ctx.fillRect(sx - 2, sy + 2, 1, 1);
+      }
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.needsUpdate = true;
+    textureCache.set(key, tex);
+    return tex;
+  }
+
+  const dummy = new THREE.DataTexture(new Uint8Array(width * height * 4), width, height, THREE.RGBAFormat);
+  textureCache.set(key, dummy);
+  return dummy;
+}
+
+/**
+ * Procedural Volcanic World Texture (Pyros)
+ * Dark basalt tectonic plates with incandescent magma fissures.
+ */
+export function getVolcanicPlanetTexture(): THREE.Texture {
+  const key = 'planet_volcanic_pyros';
+  if (textureCache.has(key)) return textureCache.get(key)!;
+
+  const width = 512;
+  const height = 256;
+
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    if (ctx) {
+      // Dark basalt crust
+      ctx.fillStyle = '#09090b';
+      ctx.fillRect(0, 0, width, height);
+
+      // Tectonic magma rifts
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 3;
+      for (let r = 0; r < 20; r++) {
+        ctx.beginPath();
+        let x = (r * 33) % width;
+        let y = (r * 19) % height;
+        ctx.moveTo(x, y);
+        for (let seg = 0; seg < 5; seg++) {
+          x += (Math.random() - 0.5) * 50;
+          y += (Math.random() - 0.5) * 40;
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      // Blazing hot magma core fissures
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1.2;
+      for (let r = 0; r < 14; r++) {
+        ctx.beginPath();
+        let x = (r * 47) % width;
+        let y = (r * 23) % height;
+        ctx.moveTo(x, y);
+        for (let seg = 0; seg < 4; seg++) {
+          x += (Math.random() - 0.5) * 40;
+          y += (Math.random() - 0.5) * 30;
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.needsUpdate = true;
+    textureCache.set(key, tex);
+    return tex;
+  }
+
+  const dummy = new THREE.DataTexture(new Uint8Array(width * height * 4), width, height, THREE.RGBAFormat);
+  textureCache.set(key, dummy);
+  return dummy;
+}
