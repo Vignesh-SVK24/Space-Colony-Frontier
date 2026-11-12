@@ -169,12 +169,12 @@ export const LandingPage: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 h-[100dvh] w-screen overflow-y-auto overflow-x-hidden md:overflow-hidden scroll-touch bg-[#05070B] font-mono text-[#F4F7FA] select-none flex flex-col md:justify-between p-3 sm:p-5 md:p-6"
+      className="fixed inset-0 h-[100dvh] w-screen overflow-y-auto overflow-x-hidden lg:overflow-hidden scroll-touch bg-[#05070B] font-mono text-[#F4F7FA] select-none flex flex-col lg:justify-between p-2.5 sm:p-4 lg:p-6"
       style={{
         WebkitOverflowScrolling: 'touch',
         touchAction: 'pan-y',
-        paddingTop: 'max(12px, env(safe-area-inset-top, 12px))',
-        paddingBottom: 'max(16px, env(safe-area-inset-bottom, 16px))'
+        paddingTop: 'max(10px, env(safe-area-inset-top, 10px))',
+        paddingBottom: 'max(14px, env(safe-area-inset-bottom, 14px))'
       }}
     >
       {/* Background Cinematic Space Vista */}
@@ -265,10 +265,10 @@ export const LandingPage: React.FC = () => {
       </header>
 
       {/* Main Two-Section Game Menu Layout */}
-      <main className="relative z-10 w-full md:flex-1 md:min-h-0 flex flex-col md:grid md:grid-cols-12 items-stretch md:items-center gap-4 md:gap-6 pb-8 md:pb-0">
+      <main className="relative z-10 w-full lg:flex-1 lg:min-h-0 flex flex-col md:grid md:grid-cols-12 items-stretch md:items-center gap-3 sm:gap-4 lg:gap-6 pb-6 lg:pb-0">
         
         {/* LEFT SECTION (45% Desktop / Lower Section on Mobile): Pilot Profile & Primary Game Actions */}
-        <div className="md:col-span-5 flex flex-col justify-start md:justify-center gap-3 z-20 pointer-events-auto max-w-md w-full mx-auto md:mx-0 order-2 md:order-1">
+        <div className="md:col-span-5 flex flex-col justify-start lg:justify-center gap-2.5 sm:gap-3 z-20 pointer-events-auto max-w-md w-full mx-auto md:mx-0 order-2 md:order-1">
           
           {/* 1. Compact Pilot Profile Card (No Ship Colour Control Here) */}
           <div className="bg-[#061A35]/90 border border-[#8CCDEB]/40 rounded-xl p-3 sm:p-4 backdrop-blur-md shadow-lg">
@@ -520,17 +520,17 @@ export const LandingPage: React.FC = () => {
         </div>
 
         {/* RIGHT SECTION (55% Desktop / Top Showcase on Mobile): Large 3D Spaceship & Ship Colour Selector */}
-        <div className="md:col-span-7 flex flex-col items-center justify-center relative order-1 md:order-2 pointer-events-auto max-w-md md:max-w-none w-full mx-auto md:h-full">
+        <div className="md:col-span-7 flex flex-col items-center justify-center relative order-1 md:order-2 pointer-events-auto max-w-md md:max-w-none w-full mx-auto lg:h-full lg:min-h-0 gap-2">
           
           {/* 3D Spaceship Preview Container */}
           <div
-            className="landing-ship-canvas relative w-full h-[180px] sm:h-[240px] md:h-[58vh] flex items-center justify-center"
+            className="landing-ship-canvas relative w-full h-[135px] sm:h-[190px] md:h-[220px] lg:flex-1 lg:min-h-0 lg:max-h-[55vh] flex items-center justify-center"
             style={{ touchAction: 'pan-y' }}
           >
             {/* Subtle Reticle */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-30">
-              <div className="w-[160px] h-[160px] sm:w-[260px] sm:h-[260px] md:w-[360px] md:h-[360px] rounded-full border border-[#8CCDEB]/25 animate-[spin_80s_linear_infinite]" />
-              <div className="absolute w-[115px] h-[115px] sm:w-[190px] sm:h-[190px] md:w-[270px] md:h-[270px] rounded-full border border-dashed border-[#8CCDEB]/30 animate-[spin_50s_linear_infinite_reverse]" />
+              <div className="w-[125px] h-[125px] sm:w-[180px] sm:h-[180px] lg:w-[340px] lg:h-[340px] rounded-full border border-[#8CCDEB]/25 animate-[spin_80s_linear_infinite]" />
+              <div className="absolute w-[90px] h-[90px] sm:w-[130px] sm:h-[130px] lg:w-[250px] lg:h-[250px] rounded-full border border-dashed border-[#8CCDEB]/30 animate-[spin_50s_linear_infinite_reverse]" />
             </div>
 
             <Canvas
@@ -557,13 +557,13 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Relocated Ship Colour Customization Directly Underneath the 3D Spaceship */}
-          <div className="z-20 bg-[#061A35]/85 border border-[#8CCDEB]/35 rounded-xl px-4 py-2.5 backdrop-blur-md shadow-lg flex flex-col items-center gap-2">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-[#8CCDEB] font-semibold">Select Ship Colour:</span>
+          <div className="z-20 shrink-0 bg-[#061A35]/90 border border-[#8CCDEB]/40 rounded-xl px-3.5 py-2 backdrop-blur-md shadow-lg flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 text-[11px] sm:text-xs">
+              <span className="text-[#8CCDEB] font-semibold">Ship Colour:</span>
               <span className="text-[#FFCC00] font-black">{CHASSIS_CONFIG[playerColor].name}</span>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 sm:gap-3">
               {(Object.keys(CHASSIS_CONFIG) as BattleColor[]).map((c) => {
                 const isSelected = playerColor === c;
                 const cfg = CHASSIS_CONFIG[c];
@@ -576,15 +576,15 @@ export const LandingPage: React.FC = () => {
                       setPlayerColor(c);
                     }}
                     title={`${cfg.label} — ${cfg.name}`}
-                    className={`group relative w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                    className={`group relative w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
                       isSelected
-                        ? 'scale-110 ring-2 ring-white ring-offset-2 ring-offset-[#061A35] shadow-[0_0_14px_rgba(255,255,255,0.45)]'
+                        ? 'scale-110 ring-2 ring-white ring-offset-2 ring-offset-[#061A35] shadow-[0_0_12px_rgba(255,255,255,0.45)]'
                         : 'opacity-75 hover:opacity-100 hover:scale-105'
                     }`}
                     style={{ backgroundColor: cfg.hex }}
                   >
                     {isSelected && (
-                      <Check size={15} className={c === 'yellow' || c === 'blue' ? 'text-[#05070B] stroke-[3]' : 'text-white stroke-[3]'} />
+                      <Check size={14} className={c === 'yellow' || c === 'blue' ? 'text-[#05070B] stroke-[3]' : 'text-white stroke-[3]'} />
                     )}
                   </button>
                 );
