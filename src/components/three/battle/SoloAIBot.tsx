@@ -30,13 +30,26 @@ const PATROL_WAYPOINTS: [number, number, number][] = [
   [-60, 20, -50]
 ];
 
+// Module-scoped scratch vectors to eliminate per-frame GC allocations
+const _segVec = new THREE.Vector3();
+const _ptVec = new THREE.Vector3();
+const _projVec = new THREE.Vector3();
+const _botPlayerPos = new THREE.Vector3();
+const _botToPlayer = new THREE.Vector3();
+const _botWpVec = new THREE.Vector3();
+const _botCoverVec = new THREE.Vector3();
+const _botProjPrev = new THREE.Vector3();
+const _botProjDir = new THREE.Vector3();
+const _botProjNext = new THREE.Vector3();
+
 function distancePointToSegment(point: THREE.Vector3, start: THREE.Vector3, end: THREE.Vector3): number {
-  const seg = end.clone().sub(start);
-  const segLenSq = seg.lengthSq();
+  _segVec.subVectors(end, start);
+  const segLenSq = _segVec.lengthSq();
   if (segLenSq === 0) return point.distanceTo(start);
-  const t = Math.max(0, Math.min(1, point.clone().sub(start).dot(seg) / segLenSq));
-  const proj = start.clone().addScaledVector(seg, t);
-  return point.distanceTo(proj);
+  _ptVec.subVectors(point, start);
+  const t = Math.max(0, Math.min(1, _ptVec.dot(_segVec) / segLenSq));
+  _projVec.copy(start).addScaledVector(_segVec, t);
+  return point.distanceTo(_projVec);
 }
 
 export const SoloAIBot: React.FC = () => {
@@ -130,8 +143,10 @@ export const SoloAIBot: React.FC = () => {
     const dt = Math.min(delta, 0.1);
     const now = state.clock.elapsedTime;
     const settings = AI_DIFFICULTY_SETTINGS[aiDifficulty] || AI_DIFFICULTY_SETTINGS.NORMAL;
-    const playerPos = new THREE.Vector3(...liveSelf.position);
-    const toPlayer = new THREE.Vector3().subVectors(playerPos, dronePos.current);
+    _botPlayerPos.set(liveSelf.position[0], liveSelf.position[1], liveSelf.position[2]);
+    const playerPos = _botPlayerPos;
+    _botToPlayer.subVectors(playerPos, dronePos.current);
+    const toPlayer = _botToPlayer;
     const distToPlayer = toPlayer.length();
 
     // Line of sight check between Bot and Player
@@ -569,9 +584,12 @@ export const SoloAIBot: React.FC = () => {
     const currentProjs = useMultiplayerStore.getState().projectiles;
 
     for (const proj of currentProjs) {
-      const prevPos = new THREE.Vector3(...proj.position);
-      const projDir = new THREE.Vector3(...proj.direction).normalize();
-      const nextPos = prevPos.clone().addScaledVector(projDir, COMBAT_CONFIG.BULLET_SPEED * dt);
+      _botProjPrev.set(proj.position[0], proj.position[1], proj.position[2]);
+      _botProjDir.set(proj.direction[0], proj.direction[1], proj.direction[2]).normalize();
+      _botProjNext.copy(_botProjPrev).addScaledVector(_botProjDir, COMBAT_CONFIG.BULLET_SPEED * dt);
+
+      const prevPos = _botProjPrev;
+      const nextPos = _botProjNext;
 
       if (Date.now() - proj.createdAt > 2200 || nextPos.length() > COMBAT_CONFIG.ARENA_RADIUS) {
         continue;
@@ -581,8 +599,8 @@ export const SoloAIBot: React.FC = () => {
 
       // 1. Obstacle swept collision
       for (const obs of ARENA_OBSTACLES) {
-        const obsPos = new THREE.Vector3(...obs.position);
-        if (distancePointToSegment(obsPos, prevPos, nextPos) < obs.radius) {
+        _botWpVec.set(obs.position[0], obs.position[1], obs.position[2]);
+        if (distancePointToSegment(_botWpVec, prevPos, nextPos) < obs.radius) {
           hit = true;
           break;
         }

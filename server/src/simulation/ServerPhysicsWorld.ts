@@ -38,6 +38,9 @@ export class ServerPhysicsWorld {
     const terrainCollider = RAPIER.ColliderDesc.cuboid(300, 20, 300);
     this.world.createCollider(terrainCollider, terrainBody);
 
+    // Pre-warm Rapier WASM solver during room init so Tick 1 has zero cold-start spike
+    this.world.step();
+
     this.initialized = true;
   }
 

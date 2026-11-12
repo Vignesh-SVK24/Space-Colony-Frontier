@@ -1,5 +1,5 @@
-import React from 'react';
-import { Canvas } from '@react-three/fiber';
+import React, { useRef } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ACESFilmicToneMapping } from 'three';
 import { DeepSpaceSkybox } from '../celestial/DeepSpaceSkybox';
 import { SunSystem } from '../celestial/SunSystem';
@@ -20,8 +20,39 @@ import { generateSpaceCubeEnvironment } from '../../../utils/pbrTextureGenerator
 import { getViewDistanceFar } from '../../../config/graphicsConfig';
 import { useNexusGameStore } from '../../../state/useNexusGameStore';
 import { useMultiplayerStore } from '../../../multiplayer/useMultiplayerStore';
+import { perfTelemetryRef } from '../../ui/nexus/hud/PerfMonitorPanel';
 
-import { isMobileDevice, getOptimalDPR } from '../../../utils/mobileOptimization';
+import { isMobileDevice, isLowSpecDevice, getOptimalDPR } from '../../../utils/mobileOptimization';
+
+const PerfMonitorProbe: React.FC = () => {
+  const { gl } = useThree();
+  const framesRef = useRef(0);
+  const lastSampleRef = useRef(performance.now());
+
+  useFrame(() => {
+    framesRef.current += 1;
+    const now = performance.now();
+    const elapsed = now - lastSampleRef.current;
+    if (elapsed >= 500) {
+      const fps = Math.round((framesRef.current * 1000) / elapsed);
+      const frameTimeMs = elapsed / Math.max(1, framesRef.current);
+      const perfMem = (performance as any).memory;
+      perfTelemetryRef.current = {
+        fps,
+        frameTimeMs,
+        drawCalls: gl.info.render.calls,
+        triangles: gl.info.render.triangles,
+        geometries: gl.info.memory.geometries,
+        textures: gl.info.memory.textures,
+        heapMb: perfMem ? Math.round(perfMem.usedJSHeapSize / (1024 * 1024)) : null
+      };
+      framesRef.current = 0;
+      lastSampleRef.current = now;
+    }
+  });
+
+  return null;
+};
 
 export const BattleScene: React.FC = () => {
   const graphicsSettings = useNexusGameStore((state) => state.graphicsSettings);
@@ -31,7 +62,8 @@ export const BattleScene: React.FC = () => {
   const matchSessionId = useMultiplayerStore((state) => state.matchSessionId);
   const far = getViewDistanceFar(graphicsSettings.viewDistance);
   const isMobile = isMobileDevice();
-  const dpr = getOptimalDPR();
+  const isLowSpec = isLowSpecDevice();
+  const dpr: [number, number] = isLowSpec ? [1, 1] : getOptimalDPR();
 
   // Render up to 3 opponents in 4-player match
   const remoteShips = otherPlayers.length > 0 ? otherPlayers : (opponentState ? [opponentState] : []);
@@ -39,10 +71,10 @@ export const BattleScene: React.FC = () => {
   return (
     <Canvas
       dpr={dpr}
-      shadows={!isMobile && graphicsSettings.shadows ? 'soft' : false}
+      shadows={!isMobile && !isLowSpec && graphicsSettings.shadows ? 'soft' : false}
       camera={{ fov: 55, near: 0.1, far }}
       gl={{
-        antialias: !isMobile && graphicsSettings.antiAliasing,
+        antialias: !isMobile && !isLowSpec && graphicsSettings.antiAliasing,
         powerPreference: 'high-performance',
         toneMapping: ACESFilmicToneMapping,
         toneMappingExposure: 0.96,
@@ -87,7 +119,8 @@ export const BattleScene: React.FC = () => {
       {isSolo && <SoloAIBot key={`solo-ai-${matchSessionId}`} />}
 
       {/* Post Processing: only on desktop devices with high settings */}
-      {!isMobile && graphicsSettings.postProcessing !== 'off' && <CinematicPostProcessing />}
+      {!isMobile && !isLowSpec && graphicsSettings.postProcessing !== 'off' && <CinematicPostProcessing />}
+      <PerfMonitorProbe />
     </Canvas>
   );
 };

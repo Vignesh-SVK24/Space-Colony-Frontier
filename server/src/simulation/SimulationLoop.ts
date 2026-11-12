@@ -18,6 +18,8 @@ export class SimulationLoop {
   private isRunning = false;
   private intervalId: any = null;
   private lastTime = 0;
+  public lastTickDurationMs = 0;
+  public maxTickDurationMs = 0;
 
   constructor() {
     this.physicsWorld = new ServerPhysicsWorld();
@@ -36,6 +38,7 @@ export class SimulationLoop {
    * Fixed 30Hz simulation step
    */
   update(state: BattleStateSchema, dt: number): { hits: any[]; blocked: any[]; matchEnded: boolean } {
+    const tickStart = performance.now();
     state.serverTick += 1;
 
     // 1. Advance match countdown if active
@@ -45,10 +48,12 @@ export class SimulationLoop {
         state.roomStatus = 'BATTLE';
         state.countdown = 0;
       }
+      this.recordTickDuration(tickStart);
       return { hits: [], blocked: [], matchEnded: false };
     }
 
     if (state.roomStatus !== 'BATTLE') {
+      this.recordTickDuration(tickStart);
       return { hits: [], blocked: [], matchEnded: false };
     }
 
@@ -87,6 +92,7 @@ export class SimulationLoop {
 
     // 6. Check match completion / win condition
     const matchEnded = this.checkWinCondition(state);
+    this.recordTickDuration(tickStart);
 
     return {
       hits: projResult.hits,
@@ -95,55 +101,81 @@ export class SimulationLoop {
     };
   }
 
+  private recordTickDuration(tickStart: number) {
+    const elapsed = performance.now() - tickStart;
+    this.lastTickDurationMs = elapsed;
+    if (elapsed > this.maxTickDurationMs) {
+      this.maxTickDurationMs = elapsed;
+    }
+  }
+
   private checkWinCondition(state: BattleStateSchema): boolean {
     if (state.roomStatus !== 'BATTLE') return false;
+    const totalPlayers = state.players.size;
+    if (totalPlayers < 2) return false;
 
-    if (state.gameMode === '1v1') {
-      const players = Array.from(state.players.values());
-      if (players.length >= 2) {
-        const alivePlayers = players.filter(p => p.alive && p.hp > 0);
-        if (alivePlayers.length <= 1) {
-          // If 1 player survived, that player is the authoritative winner
-          // If both perished simultaneously, player with more damage dealt wins tiebreak
-          const winner = alivePlayers.length === 1 
-            ? alivePlayers[0] 
-            : [...players].sort((a, b) => b.damageDealt - a.damageDealt)[0] || players[0];
+    if (state.gameMode === '1v1' || state.gameMode === 'FFA') {
+      let aliveCount = 0;
+      let lastAlive: any = null;
+      let topDamagePlayer: any = null;
+
+      state.players.forEach((p) => {
+        if (p.alive && p.hp > 0) {
+          aliveCount += 1;
+          lastAlive = p;
+        }
+        if (!topDamagePlayer || p.damageDealt > topDamagePlayer.damageDealt) {
+          topDamagePlayer = p;
+        }
+      });
+
+      if (aliveCount <= 1) {
+        const winner = aliveCount === 1 ? lastAlive : topDamagePlayer;
+        if (winner) {
           state.roomStatus = 'FINISHED';
           state.winnerId = winner.sessionId || winner.id;
           state.winnerName = winner.name;
           return true;
         }
       }
-    } else if (state.gameMode === 'FFA') {
-      const players = Array.from(state.players.values());
-      const alivePlayers = players.filter(p => p.alive && p.hp > 0);
-      if (players.length >= 2 && alivePlayers.length <= 1) {
-        const winner = alivePlayers.length === 1 
-          ? alivePlayers[0] 
-          : [...players].sort((a, b) => b.damageDealt - a.damageDealt)[0] || players[0];
-        state.roomStatus = 'FINISHED';
-        state.winnerId = winner.sessionId || winner.id;
-        state.winnerName = winner.name;
-        return true;
-      }
     } else if (state.gameMode === '2v2') {
-      const players = Array.from(state.players.values());
-      const teamAAlive = players.some(p => p.team === 'A' && p.alive && p.hp > 0);
-      const teamBAlive = players.some(p => p.team === 'B' && p.alive && p.hp > 0);
+      let teamAAlive = false;
+      let teamBAlive = false;
+
+      state.players.forEach((p) => {
+        if (p.alive && p.hp > 0) {
+          if (p.team === 'A') teamAAlive = true;
+          else if (p.team === 'B') teamBAlive = true;
+        }
+      });
 
       if (!teamAAlive && teamBAlive) {
         state.roomStatus = 'FINISHED';
         state.winnerTeam = 'B';
-        const teamBPlayers = players.filter(p => p.team === 'B');
-        state.winnerName = teamBPlayers.map(p => p.name).join(' & ');
-        state.winnerId = teamBPlayers.find(p => p.alive && p.hp > 0)?.sessionId || teamBPlayers[0]?.sessionId || '';
+        const names: string[] = [];
+        let winId = '';
+        state.players.forEach((p) => {
+          if (p.team === 'B') {
+            names.push(p.name);
+            if (!winId || (p.alive && p.hp > 0)) winId = p.sessionId || winId;
+          }
+        });
+        state.winnerName = names.join(' & ');
+        state.winnerId = winId;
         return true;
       } else if (!teamBAlive && teamAAlive) {
         state.roomStatus = 'FINISHED';
         state.winnerTeam = 'A';
-        const teamAPlayers = players.filter(p => p.team === 'A');
-        state.winnerName = teamAPlayers.map(p => p.name).join(' & ');
-        state.winnerId = teamAPlayers.find(p => p.alive && p.hp > 0)?.sessionId || teamAPlayers[0]?.sessionId || '';
+        const names: string[] = [];
+        let winId = '';
+        state.players.forEach((p) => {
+          if (p.team === 'A') {
+            names.push(p.name);
+            if (!winId || (p.alive && p.hp > 0)) winId = p.sessionId || winId;
+          }
+        });
+        state.winnerName = names.join(' & ');
+        state.winnerId = winId;
         return true;
       }
     }

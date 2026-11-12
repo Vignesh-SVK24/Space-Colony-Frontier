@@ -445,6 +445,7 @@ const bindRoomEvents = (room: Room) => {
   });
 
   room.onLeave((code) => {
+    clearInterval(pingTimer);
     console.log(`Left room with code: ${code}`);
     useMultiplayerStore.getState().setConnectionQuality('disconnected');
   });

@@ -7,6 +7,7 @@ import { CombatDebugOverlay } from './CombatDebugOverlay';
 import { KillFeed } from './KillFeed';
 import { MatchScoreboard } from './MatchScoreboard';
 import { TacticalMinimap } from './TacticalMinimap';
+import { PerfMonitorPanel } from './PerfMonitorPanel';
 import { nexusAudio } from '../../../../utils/nexusAudio';
 import { COMBAT_CONFIG } from '../../../../config/combatConfig';
 import { enterFullscreen, toggleFullscreen, useFullscreen } from '../../../../utils/fullscreenHelper';
@@ -418,6 +419,7 @@ export const BattleHUD: React.FC = () => {
       <CombatDebugOverlay />
       <FullScreenTacticalMap />
       <MatchScoreboard />
+      <PerfMonitorPanel />
     </>
   );
 };

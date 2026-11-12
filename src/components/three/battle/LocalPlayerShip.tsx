@@ -76,6 +76,8 @@ export const LocalPlayerShip: React.FC = () => {
   const lastSendTime = useRef(0);
   const lastSoloSyncTime = useRef(0);
   const lastCooldownSyncTime = useRef(0);
+  const lastHudLockSyncTime = useRef(0);
+  const wasLockedRef = useRef(false);
   const lastBulletTime = useRef(0);
   const lastLaserTime = useRef(0);
   const lastSolarTime = useRef(0);
@@ -350,27 +352,33 @@ export const LocalPlayerShip: React.FC = () => {
       _oppVel.set(bestTarget.velocity[0], bestTarget.velocity[1], bestTarget.velocity[2]);
       const range = Math.floor(bestDist);
 
-      setTargetLock({
-        id: bestTarget.id,
-        name: bestTarget.name,
-        distance: range,
-        hp: bestTarget.hp
-      });
-
-      if (range < 260) {
-        const timeToHit = range / COMBAT_CONFIG.BULLET_SPEED;
-        _leadWorld.copy(_oppPos).addScaledVector(_oppVel, timeToHit);
-        setLeadIndicator({
-          worldPos: [_leadWorld.x, _leadWorld.y, _leadWorld.z],
+      // Throttle HUD lock & lead indicator updates to ~15Hz (eliminates 60fps React re-renders)
+      if (!wasLockedRef.current || now - lastHudLockSyncTime.current > 66) {
+        lastHudLockSyncTime.current = now;
+        wasLockedRef.current = true;
+        setTargetLock({
+          id: bestTarget.id,
+          name: bestTarget.name,
           distance: range,
-          visible: true
+          hp: bestTarget.hp
         });
-      } else {
-        setLeadIndicator(null);
+
+        if (range < 260) {
+          const timeToHit = range / COMBAT_CONFIG.BULLET_SPEED;
+          _leadWorld.copy(_oppPos).addScaledVector(_oppVel, timeToHit);
+          setLeadIndicator({
+            worldPos: [_leadWorld.x, _leadWorld.y, _leadWorld.z],
+            distance: range,
+            visible: true
+          });
+        } else {
+          setLeadIndicator(null);
+        }
       }
 
       aimDist = Math.max(15, Math.min(280, bestDist));
-    } else {
+    } else if (wasLockedRef.current) {
+      wasLockedRef.current = false;
       setTargetLock(null);
       setLeadIndicator(null);
     }
