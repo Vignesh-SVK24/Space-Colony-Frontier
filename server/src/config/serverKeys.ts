@@ -62,12 +62,22 @@ export function isOriginAllowed(origin?: string): boolean {
   return allowedList.includes(reqOrigin) || allowedList.includes('*');
 }
 
+function timingSafeMatch(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 /**
  * Validates whether an incoming HTTP or WebSocket request contains
- * a valid administrative server key or admin token.
+ * a valid administrative server key or admin token using timing-safe comparison.
  */
 export function validateServerAdminKey(keyProvided?: string | null): boolean {
   if (!keyProvided) return false;
   const cleanKey = keyProvided.trim();
-  return cleanKey === SERVER_KEYS.SERVER_API_KEY || cleanKey === SERVER_KEYS.ADMIN_TOKEN;
+  return (
+    timingSafeMatch(cleanKey, SERVER_KEYS.SERVER_API_KEY) ||
+    timingSafeMatch(cleanKey, SERVER_KEYS.ADMIN_TOKEN)
+  );
 }

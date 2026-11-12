@@ -9,7 +9,9 @@ import {
 } from '../server/src/security/schemas';
 import { AntiCheatSystem } from '../server/src/security/antiCheat';
 import { AuthService } from '../server/src/security/authService';
-import { RoomBruteForceProtection } from '../server/src/security/rateLimiter';
+import { RoomBruteForceProtection, ConnectionFloodGuard, WebSocketRateLimiter } from '../server/src/security/rateLimiter';
+import { SecurityLogger } from '../server/src/security/securityLogger';
+import { SERVER_KEYS, validateServerAdminKey } from '../server/src/config/serverKeys';
 import { useMultiplayerStore } from '../src/multiplayer/useMultiplayerStore';
 import { PlayerSchema } from '../server/src/schema/BattleState';
 
@@ -465,6 +467,118 @@ describe('Security & Anti-Cheat Comprehensive Test Suite', () => {
 
       useMultiplayerStore.getState().setAuthModalOpen(false);
       expect(useMultiplayerStore.getState().authModalOpen).toBe(false);
+    });
+  });
+
+  describe('9. Extended Security Hardening (Replay, Flood Guard, Admin Logs & Timing-Safe Keys)', () => {
+    it('should reject non-finite NaN or Infinity coordinates in validateMovement', () => {
+      const sessionId = 'sec_nan_01';
+      AntiCheatSystem.registerPlayer(sessionId, { x: 0, y: 10, z: 0 });
+      const player = new PlayerSchema();
+      player.id = 'p_nan';
+      player.sessionId = sessionId;
+
+      const res = AntiCheatSystem.validateMovement(sessionId, player, [NaN, 10, 0], [0, 0, 0], [0, 0, 0]);
+      expect(res.valid).toBe(false);
+      expect(res.position).toEqual({ x: 0, y: 10, z: 0 });
+      expect(res.velocity).toEqual({ x: 0, y: 0, z: 0 });
+      AntiCheatSystem.unregisterPlayer(sessionId);
+    });
+
+    it('should clamp spoofed extreme velocity vectors to physically valid maximums', () => {
+      const sessionId = 'sec_vel_01';
+      AntiCheatSystem.registerPlayer(sessionId, { x: 0, y: 10, z: 0 });
+      const player = new PlayerSchema();
+      player.id = 'p_vel';
+      player.sessionId = sessionId;
+
+      const res = AntiCheatSystem.validateMovement(sessionId, player, [1, 10, 0], [0, 0, 0], [500, 500, 500]);
+      expect(res.valid).toBe(true);
+      const speed = Math.hypot(res.velocity.x, res.velocity.y, res.velocity.z);
+      expect(speed).toBeLessThanOrEqual(96 * 1.15 + 0.01);
+      AntiCheatSystem.unregisterPlayer(sessionId);
+    });
+
+    it('should reject stale or far-future weapon packet timestamps (replay protection)', () => {
+      const sessionId = 'sec_ts_01';
+      AntiCheatSystem.registerPlayer(sessionId, { x: 0, y: 10, z: 0 });
+      const player = new PlayerSchema();
+      player.id = 'p_ts';
+      player.sessionId = sessionId;
+      player.position.set(0, 10, 0);
+
+      const staleTs = Date.now() - 30000;
+      const staleRes = AntiCheatSystem.validateWeaponFiring(
+        sessionId,
+        player,
+        'BULLET',
+        { x: 0, y: 10, z: 1 },
+        { x: 0, y: 0, z: 1 },
+        'atk_stale_1',
+        staleTs
+      );
+      expect(staleRes.valid).toBe(false);
+      expect(staleRes.reason).toContain('timestamp');
+
+      const futureTs = Date.now() + 20000;
+      const futureRes = AntiCheatSystem.validateWeaponFiring(
+        sessionId,
+        player,
+        'BULLET',
+        { x: 0, y: 10, z: 1 },
+        { x: 0, y: 0, z: 1 },
+        'atk_future_1',
+        futureTs
+      );
+      expect(futureRes.valid).toBe(false);
+      AntiCheatSystem.unregisterPlayer(sessionId);
+    });
+
+    it('should enforce per-IP connection flood limits and track open/close lifecycle', () => {
+      const floodIp = '203.0.113.77';
+      for (let i = 0; i < 8; i++) {
+        expect(ConnectionFloodGuard.canAcceptConnection(floodIp)).toBe(true);
+        ConnectionFloodGuard.trackOpen(floodIp);
+      }
+      // 9th simultaneous connection from same IP must be rejected
+      expect(ConnectionFloodGuard.canAcceptConnection(floodIp)).toBe(false);
+
+      // Closing connections frees slots
+      for (let i = 0; i < 8; i++) {
+        ConnectionFloodGuard.trackClose(floodIp);
+      }
+      expect(ConnectionFloodGuard.canAcceptConnection(floodIp)).toBe(true);
+    });
+
+    it('should track WebSocket message flood abuse and flag client for eviction', () => {
+      const spammer = 'ws_spam_client';
+      for (let i = 0; i < 25; i++) {
+        expect(WebSocketRateLimiter.canProcessMessage(spammer)).toBe(true);
+      }
+      for (let i = 0; i < 100; i++) {
+        WebSocketRateLimiter.canProcessMessage(spammer);
+      }
+      expect(WebSocketRateLimiter.isAbusive(spammer)).toBe(true);
+      WebSocketRateLimiter.unregisterClient(spammer);
+    });
+
+    it('should validate server admin keys using timing-safe comparison and reject invalid keys', () => {
+      expect(validateServerAdminKey(SERVER_KEYS.ADMIN_TOKEN)).toBe(true);
+      expect(validateServerAdminKey(SERVER_KEYS.SERVER_API_KEY)).toBe(true);
+      expect(validateServerAdminKey('wrong_key')).toBe(false);
+      expect(validateServerAdminKey(null)).toBe(false);
+    });
+
+    it('should buffer redacted security events for admin monitoring', () => {
+      SecurityLogger.logEvent('ACCESS_DENIED', {
+        ip: '198.51.100.99',
+        details: { reason: 'Test audit', password: 'should_not_leak', apiKey: 'secret_123' }
+      });
+      const events = SecurityLogger.getRecentEvents(5);
+      expect(events.length).toBeGreaterThan(0);
+      expect(events[0].details?.password).toBe('[REDACTED]');
+      expect(events[0].details?.apiKey).toBe('[REDACTED]');
+      expect(SecurityLogger.getSummary().counters.ACCESS_DENIED).toBeGreaterThan(0);
     });
   });
 });

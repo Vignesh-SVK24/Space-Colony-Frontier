@@ -6,6 +6,7 @@ import { SecurityLogger } from './securityLogger.js';
 export interface MovementRecord {
   lastPosition: Vector3D;
   lastTimestamp: number;
+  lastDecayTime: number;
   violationScore: number;
   lastBulletTime: number;
   lastLaserTime: number;
@@ -18,9 +19,11 @@ export class AntiCheatSystem {
   private static records = new Map<string, MovementRecord>();
 
   static registerPlayer(sessionId: string, initialPos: Vector3D) {
+    const now = Date.now();
     this.records.set(sessionId, {
       lastPosition: { ...initialPos },
-      lastTimestamp: Date.now(),
+      lastTimestamp: now,
+      lastDecayTime: now,
       violationScore: 0,
       lastBulletTime: 0,
       lastLaserTime: 0,
@@ -47,15 +50,32 @@ export class AntiCheatSystem {
     desiredPos: [number, number, number],
     desiredRot: [number, number, number],
     desiredVel: [number, number, number]
-  ): { valid: boolean; position: Vector3D; shouldDisconnect: boolean } {
+  ): { valid: boolean; position: Vector3D; velocity: Vector3D; shouldDisconnect: boolean } {
     const record = this.records.get(sessionId);
     const now = Date.now();
+
+    // 0. Reject non-finite numbers (NaN / Infinity) to prevent physics corruption
+    const allCoords = [...desiredPos, ...desiredRot, ...desiredVel];
+    if (allCoords.some(v => !Number.isFinite(v))) {
+      if (record) {
+        record.violationScore += 3;
+        SecurityLogger.logViolation(sessionId, player.id, 'INVALID_NON_FINITE_COORDS', record.violationScore);
+        return {
+          valid: false,
+          position: record.lastPosition,
+          velocity: { x: 0, y: 0, z: 0 },
+          shouldDisconnect: record.violationScore >= 12
+        };
+      }
+      return { valid: false, position: { x: 0, y: 0, z: 0 }, velocity: { x: 0, y: 0, z: 0 }, shouldDisconnect: false };
+    }
 
     if (!record) {
       this.registerPlayer(sessionId, { x: desiredPos[0], y: desiredPos[1], z: desiredPos[2] });
       return {
         valid: true,
         position: { x: desiredPos[0], y: desiredPos[1], z: desiredPos[2] },
+        velocity: { x: desiredVel[0], y: desiredVel[1], z: desiredVel[2] },
         shouldDisconnect: false
       };
     }
@@ -86,10 +106,11 @@ export class AntiCheatSystem {
         dt: dt.toFixed(3)
       });
 
-      // Reject teleportation: revert to last authoritative position
+      // Reject teleportation: revert to last authoritative position and zero spoofed velocity
       return {
         valid: false,
         position: record.lastPosition,
+        velocity: { x: 0, y: 0, z: 0 },
         shouldDisconnect: record.violationScore >= 12
       };
     }
@@ -110,7 +131,12 @@ export class AntiCheatSystem {
         z: target.z * factor
       };
       record.lastPosition = clamped;
-      return { valid: false, position: clamped, shouldDisconnect: record.violationScore >= 12 };
+      return {
+        valid: false,
+        position: clamped,
+        velocity: { x: 0, y: 0, z: 0 },
+        shouldDisconnect: record.violationScore >= 12
+      };
     }
 
     // 4. Check terrain and obstacle collision
@@ -120,17 +146,32 @@ export class AntiCheatSystem {
       resolvedPos = { x: colRes.position.x, y: colRes.position.y, z: colRes.position.z };
     }
 
+    // Clamp reported velocity magnitude to physically possible speed
+    let vx = desiredVel[0];
+    let vy = desiredVel[1];
+    let vz = desiredVel[2];
+    const velMag = Math.hypot(vx, vy, vz);
+    const maxAllowedVel = GAME_CONFIG.SHIP_PHYSICS.boostSpeed * 1.15;
+    if (velMag > maxAllowedVel) {
+      const vScale = maxAllowedVel / velMag;
+      vx *= vScale;
+      vy *= vScale;
+      vz *= vScale;
+    }
+
     // Valid movement step: update authoritative position
     record.lastPosition = resolvedPos;
 
-    // Decay violation score slowly over legitimate play
-    if (record.violationScore > 0 && Math.random() < 0.05) {
+    // Deterministic violation score decay: -1 every 10s of clean play
+    if (record.violationScore > 0 && now - record.lastDecayTime >= 10000) {
       record.violationScore = Math.max(0, record.violationScore - 1);
+      record.lastDecayTime = now;
     }
 
     return {
       valid: true,
       position: resolvedPos,
+      velocity: { x: vx, y: vy, z: vz },
       shouldDisconnect: false
     };
   }
@@ -144,20 +185,34 @@ export class AntiCheatSystem {
     weaponType: 'BULLET' | 'LASER' | 'SOLAR',
     origin: Vector3D,
     direction: Vector3D,
-    attackId?: string
+    attackId?: string,
+    packetTimestamp?: number
   ): { valid: boolean; reason?: string } {
     const record = this.records.get(sessionId);
     if (!record) return { valid: false, reason: 'Unregistered session' };
 
     const now = Date.now();
 
-    // 1. Packet replay / duplicate attack ID check
+    // 0. Optional packet timestamp freshness check (prevents stale packet replay)
+    if (typeof packetTimestamp === 'number' && Number.isFinite(packetTimestamp)) {
+      const ageMs = now - packetTimestamp;
+      if (ageMs > 15000 || ageMs < -5000) {
+        record.violationScore += 1;
+        SecurityLogger.logViolation(sessionId, player.id, 'STALE_OR_FUTURE_PACKET', record.violationScore, {
+          ageMs
+        });
+        return { valid: false, reason: 'Stale or invalid packet timestamp' };
+      }
+    }
+
+    // 1. Packet replay / duplicate attack ID check (500-entry window)
     if (attackId) {
       if (record.recentAttackIds.has(attackId)) {
+        SecurityLogger.logViolation(sessionId, player.id, 'REPLAY_ATTACK_ID', record.violationScore, { attackId });
         return { valid: false, reason: 'Duplicate packet replay detected' };
       }
       record.recentAttackIds.add(attackId);
-      if (record.recentAttackIds.size > 100) {
+      if (record.recentAttackIds.size > 500) {
         const first = record.recentAttackIds.values().next().value;
         if (first) record.recentAttackIds.delete(first);
       }

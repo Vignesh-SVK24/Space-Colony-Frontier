@@ -2,7 +2,7 @@ import config, { listen } from '@colyseus/tools';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import express from 'express';
 import { BattleRoom } from './rooms/BattleRoom.js';
-import { SERVER_KEYS, validateServerAdminKey } from './config/serverKeys.js';
+import { SERVER_KEYS, validateServerAdminKey, isOriginAllowed } from './config/serverKeys.js';
 import { configureSecurityHeaders, configureCors } from './security/httpHeaders.js';
 import { authRateLimiter } from './security/rateLimiter.js';
 import { AuthService } from './security/authService.js';
@@ -10,7 +10,18 @@ import { AuthRegisterSchema, AuthLoginSchema } from './security/schemas.js';
 import { SecurityLogger } from './security/securityLogger.js';
 
 listen(config({
-  initializeTransport: (options) => new WebSocketTransport(options),
+  initializeTransport: (options) => new WebSocketTransport({
+    ...options,
+    maxPayload: 16 * 1024, // 16 KB WebSocket frame limit (DoS memory exhaustion protection)
+    perMessageDeflate: false, // Prevents CRIME/BREACH side-channel attacks
+    verifyClient: (info, next) => {
+      if (!isOriginAllowed(info.origin)) {
+        SecurityLogger.logAccessDenied('WebSocket origin rejected (CSWSH guard)', info.req?.socket?.remoteAddress);
+        return next(false, 403, 'Forbidden Origin');
+      }
+      return next(true);
+    }
+  }),
   initializeExpress: (app) => {
     // 1. Production HTTP Security Headers (Helmet, CSP, HSTS, frame protection)
     app.use(configureSecurityHeaders());
@@ -76,8 +87,8 @@ listen(config({
       }
     });
 
-    // 7. Instant Guest Session Generation
-    app.post('/api/auth/guest', (req, res) => {
+    // 7. Instant Guest Session Generation (Rate Limited against token flooding)
+    app.post('/api/auth/guest', authRateLimiter, (req, res) => {
       const callsign = typeof req.body?.callsign === 'string' ? req.body.callsign : undefined;
       const guest = AuthService.generateGuestSession(callsign);
       res.json({
@@ -134,6 +145,28 @@ listen(config({
         nodeEnv: SERVER_KEYS.NODE_ENV,
         activeUptime: process.uptime(),
         memoryUsageMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        timestamp: Date.now()
+      });
+    });
+
+    // 11. Protected Administrative Security Logs & Suspicious-Activity Monitoring
+    app.get('/api/admin/security-logs', (req, res) => {
+      const authHeader = req.headers['authorization'] || req.headers['x-server-key'];
+      const token = typeof authHeader === 'string' ? authHeader.replace(/^Bearer\s+/i, '') : null;
+
+      const isAdminKey = validateServerAdminKey(token);
+      const isAuthAdmin = token ? AuthService.verifyToken(token)?.role === 'admin' : false;
+
+      if (!isAdminKey && !isAuthAdmin) {
+        SecurityLogger.logAccessDenied('Unauthorized access to /api/admin/security-logs', req.ip);
+        return res.status(401).json({ error: 'Unauthorized: Admin privileges required' });
+      }
+
+      const limit = Number(req.query.limit || 50);
+      res.json({
+        status: 'ok',
+        summary: SecurityLogger.getSummary(),
+        events: SecurityLogger.getRecentEvents(Number.isFinite(limit) ? limit : 50),
         timestamp: Date.now()
       });
     });

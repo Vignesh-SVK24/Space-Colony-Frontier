@@ -15,6 +15,17 @@ export interface SecurityEventData {
 }
 
 export class SecurityLogger {
+  private static readonly MAX_RECENT_EVENTS = 250;
+  private static recentEvents: SecurityEventData[] = [];
+  private static counters: Record<SecurityEventData['eventType'], number> = {
+    AUTH_SUCCESS: 0,
+    AUTH_FAILURE: 0,
+    LOGOUT: 0,
+    VIOLATION: 0,
+    RATE_LIMIT: 0,
+    ACCESS_DENIED: 0
+  };
+
   private static redact(obj: Record<string, unknown>): Record<string, unknown> {
     const clean: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
@@ -42,7 +53,25 @@ export class SecurityLogger {
       details: data.details ? this.redact(data.details) : undefined
     };
 
+    this.counters[eventType] = (this.counters[eventType] || 0) + 1;
+    this.recentEvents.unshift(event);
+    if (this.recentEvents.length > this.MAX_RECENT_EVENTS) {
+      this.recentEvents.length = this.MAX_RECENT_EVENTS;
+    }
+
     console.log(`[SECURITY] ${event.eventType} ${JSON.stringify(event)}`);
+  }
+
+  static getRecentEvents(limit = 50): SecurityEventData[] {
+    const safeLimit = Math.max(1, Math.min(this.MAX_RECENT_EVENTS, limit));
+    return this.recentEvents.slice(0, safeLimit);
+  }
+
+  static getSummary() {
+    return {
+      counters: { ...this.counters },
+      bufferedEvents: this.recentEvents.length
+    };
   }
 
   static logAuthSuccess(userId: string, username: string, ip?: string) {

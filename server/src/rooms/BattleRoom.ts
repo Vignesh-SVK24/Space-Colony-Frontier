@@ -11,7 +11,7 @@ import {
 import { sanitizeCallsign, isValidRoomCode, generateSecureRoomCode } from '../security/sanitizer.js';
 import { AuthService, AuthTokenPayload } from '../security/authService.js';
 import { AntiCheatSystem } from '../security/antiCheat.js';
-import { WebSocketRateLimiter, RoomBruteForceProtection } from '../security/rateLimiter.js';
+import { WebSocketRateLimiter, RoomBruteForceProtection, ConnectionFloodGuard } from '../security/rateLimiter.js';
 import { SecurityLogger } from '../security/securityLogger.js';
 
 interface JoinOptions {
@@ -34,6 +34,7 @@ interface RoomAuthContext {
 export class BattleRoom extends Room {
   maxClients = 4;
   private simulationLoop!: SimulationLoop;
+  private clientIps = new Map<string, string>();
 
   async onCreate(options: JoinOptions) {
     this.setState(new BattleStateSchema());
@@ -124,7 +125,13 @@ export class BattleRoom extends Room {
    * Colyseus Server-side Authentication & Rate-Limit Hook
    */
   async onAuth(client: Client, options: unknown, request: any): Promise<RoomAuthContext> {
-    const ip = request?.headers['x-forwarded-for']?.toString() || request?.socket?.remoteAddress || 'unknown';
+    const ip = request?.headers['x-forwarded-for']?.toString().split(',')[0].trim() || request?.socket?.remoteAddress || 'unknown';
+
+    // 0. Connection Flooding & Resource Exhaustion Guard
+    if (!ConnectionFloodGuard.canAcceptConnection(ip)) {
+      SecurityLogger.logAccessDenied('Connection flood threshold exceeded', ip);
+      throw new Error('Too many active connections from your network.');
+    }
 
     // 1. Check Room-Code Brute Force Lockout
     if (RoomBruteForceProtection.isLocked(ip)) {
@@ -182,6 +189,8 @@ export class BattleRoom extends Room {
     const state = this.state as BattleStateSchema;
     const ip = auth?.ip || 'unknown';
     RoomBruteForceProtection.recordSuccess(ip);
+    this.clientIps.set(client.sessionId, ip);
+    ConnectionFloodGuard.trackOpen(ip);
 
     console.log(`[BattleRoom] Pilot ${auth?.username} (${client.sessionId}) joining room ${state.roomCode}`);
 
@@ -254,6 +263,11 @@ export class BattleRoom extends Room {
       console.log(`[BattleRoom] Player ${player.name} successfully reconnected!`);
     } catch {
       console.log(`[BattleRoom] Player ${player.name} permanently removed.`);
+      const ip = this.clientIps.get(client.sessionId);
+      if (ip) {
+        ConnectionFloodGuard.trackClose(ip);
+        this.clientIps.delete(client.sessionId);
+      }
       state.players.delete(client.sessionId);
 
       // Reassign host if needed
@@ -275,7 +289,12 @@ export class BattleRoom extends Room {
   private registerMessages() {
     // 1. Authoritative Flight Movement Validation
     this.onMessage('input', (client, rawInput: unknown) => {
-      if (!WebSocketRateLimiter.canProcessMessage(client.sessionId)) return;
+      if (!WebSocketRateLimiter.canProcessMessage(client.sessionId)) {
+        if (WebSocketRateLimiter.isAbusive(client.sessionId)) {
+          client.leave(4002);
+        }
+        return;
+      }
 
       const state = this.state as BattleStateSchema;
       const player = state.players.get(client.sessionId);
@@ -304,10 +323,10 @@ export class BattleRoom extends Room {
           return;
         }
 
-        // Apply authoritative coordinates
+        // Apply authoritative coordinates and clamped/verified velocity
         player.position.set(check.position.x, check.position.y, check.position.z);
         player.rotation.set(input.rotation[0], input.rotation[1], input.rotation[2]);
-        player.velocity.set(input.velocity[0], input.velocity[1], input.velocity[2]);
+        player.velocity.set(check.velocity.x, check.velocity.y, check.velocity.z);
       }
     });
 
@@ -329,7 +348,8 @@ export class BattleRoom extends Room {
         'BULLET',
         data.origin,
         data.direction,
-        data.attackId
+        data.attackId,
+        data.timestamp
       );
 
       if (!combatCheck.valid) return;
@@ -373,7 +393,8 @@ export class BattleRoom extends Room {
         'LASER',
         data.origin,
         data.direction,
-        data.attackId
+        data.attackId,
+        data.timestamp
       );
 
       if (!combatCheck.valid) return;
@@ -430,7 +451,8 @@ export class BattleRoom extends Room {
         'SOLAR',
         data.origin,
         data.direction,
-        data.attackId
+        data.attackId,
+        data.timestamp
       );
 
       if (!combatCheck.valid) return;
@@ -471,6 +493,7 @@ export class BattleRoom extends Room {
 
     // 5. Launch Match (requires host or >= 2 players)
     this.onMessage('start_match', (client) => {
+      if (!WebSocketRateLimiter.canProcessMessage(client.sessionId)) return;
       const state = this.state as BattleStateSchema;
       const player = state.players.get(client.sessionId);
       if (!player) return;
@@ -485,6 +508,7 @@ export class BattleRoom extends Room {
 
     // 6. Manual Reload Request
     this.onMessage('reload', (client) => {
+      if (!WebSocketRateLimiter.canProcessMessage(client.sessionId)) return;
       const state = this.state as BattleStateSchema;
       const player = state.players.get(client.sessionId);
       if (!player || !player.alive || player.isReloading) return;
@@ -496,6 +520,7 @@ export class BattleRoom extends Room {
 
     // 7. Team Switch (for 2v2 lobby)
     this.onMessage('set_team', (client, rawData: unknown) => {
+      if (!WebSocketRateLimiter.canProcessMessage(client.sessionId)) return;
       const state = this.state as BattleStateSchema;
       const player = state.players.get(client.sessionId);
       if (!player || state.roomStatus !== 'LOBBY') return;
@@ -507,7 +532,8 @@ export class BattleRoom extends Room {
     });
 
     // 8. Rematch Request
-    this.onMessage('request_rematch', () => {
+    this.onMessage('request_rematch', (client) => {
+      if (!WebSocketRateLimiter.canProcessMessage(client.sessionId)) return;
       const state = this.state as BattleStateSchema;
       if (state.roomStatus === 'FINISHED') {
         state.roomStatus = 'LOBBY';
@@ -537,7 +563,8 @@ export class BattleRoom extends Room {
 
     // 9. Lightweight Ping/Pong Telemetry Heartbeat
     this.onMessage('ping', (client, data: { clientTime?: number }) => {
-      client.send('pong', { clientTime: data?.clientTime || 0 });
+      if (!WebSocketRateLimiter.canProcessMessage(client.sessionId)) return;
+      client.send('pong', { clientTime: typeof data?.clientTime === 'number' ? data.clientTime : 0 });
     });
   }
 

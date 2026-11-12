@@ -140,12 +140,13 @@ export class AuthService {
     };
 
     return jwt.sign(payload, SERVER_KEYS.JWT_SECRET, {
+      algorithm: 'HS256',
       expiresIn: isGuest ? '6h' : '24h'
     });
   }
 
   /**
-   * Verifies and decodes an incoming JWT token.
+   * Verifies and decodes an incoming JWT token using explicit HS256 enforcement.
    */
   static verifyToken(token?: string | null): AuthTokenPayload | null {
     if (!token) return null;
@@ -153,7 +154,9 @@ export class AuthService {
     if (!cleanToken) return null;
 
     try {
-      const decoded = jwt.verify(cleanToken, SERVER_KEYS.JWT_SECRET) as AuthTokenPayload;
+      const decoded = jwt.verify(cleanToken, SERVER_KEYS.JWT_SECRET, {
+        algorithms: ['HS256']
+      }) as AuthTokenPayload;
       if (this.revokedTokens.has(decoded.jti)) {
         return null;
       }
@@ -164,17 +167,29 @@ export class AuthService {
   }
 
   /**
-   * Revokes a session token immediately on logout.
+   * Revokes a session token immediately on logout (bounded to prevent memory exhaustion).
    */
   static revokeToken(token?: string | null) {
     if (!token) return;
     const cleanToken = token.replace(/^Bearer\s+/i, '').trim();
     try {
-      const decoded = jwt.decode(cleanToken) as AuthTokenPayload;
+      const decoded = jwt.verify(cleanToken, SERVER_KEYS.JWT_SECRET, {
+        algorithms: ['HS256']
+      }) as AuthTokenPayload;
       if (decoded && decoded.jti) {
         this.revokedTokens.add(decoded.jti);
+        if (this.revokedTokens.size > 10000) {
+          const oldest = this.revokedTokens.values().next().value;
+          if (oldest) this.revokedTokens.delete(oldest);
+        }
+        SecurityLogger.logEvent('LOGOUT', {
+          userId: decoded.userId,
+          details: { username: decoded.username }
+        });
       }
-    } catch {}
+    } catch {
+      // Ignore malformed/tampered tokens on logout
+    }
   }
 
   /**
