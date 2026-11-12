@@ -95,7 +95,7 @@ export const BattleHUD: React.FC = () => {
           <TacticalMinimap />
 
           <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-col sm:flex-row items-center gap-1.5">
               <button
                 onClick={handleExit}
                 className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/75 hover:bg-red-950/80 border border-gray-700/60 hover:border-red-500/50 text-[11px] text-gray-300 hover:text-red-300 transition-colors cursor-pointer backdrop-blur-md shadow-lg"
@@ -138,7 +138,7 @@ export const BattleHUD: React.FC = () => {
         </div>
 
         {/* Top Center: Match Header & Mode */}
-        <div className="absolute top-3 sm:top-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-20">
+        <div className="hidden sm:flex absolute top-3 sm:top-4 left-1/2 -translate-x-1/2 flex-col items-center gap-1 z-20">
           <div className="text-[10px] sm:text-xs text-cyan-300 bg-black/80 px-3.5 py-1 rounded-full border border-cyan-500/40 backdrop-blur-md flex items-center gap-2 shadow-lg">
             {isSolo ? (
               <>
@@ -267,11 +267,11 @@ export const BattleHUD: React.FC = () => {
 
         {/* Bottom Center: Authoritative 250 HP Gauge */}
         {selfState && (
-          <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 z-20">
-            <div className="text-xs sm:text-sm font-bold tracking-wider text-sky-200 drop-shadow">
+          <div className="absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-20">
+            <div className="text-[11px] sm:text-sm font-bold tracking-wider text-sky-200 drop-shadow truncate max-w-[160px] sm:max-w-none">
               {selfState.name} {selfState.team !== 'NONE' ? `[TEAM ${selfState.team}]` : ''}
             </div>
-            <div className="w-[240px] sm:w-[360px] h-[22px] sm:h-[26px] bg-black/85 border border-sky-500/50 rounded-sm relative overflow-hidden backdrop-blur-md shadow-[0_0_20px_rgba(2,132,199,0.35)]">
+            <div className="w-[165px] sm:w-[340px] h-[20px] sm:h-[26px] bg-black/85 border border-sky-500/50 rounded-sm relative overflow-hidden backdrop-blur-md shadow-[0_0_20px_rgba(2,132,199,0.35)]">
               <div 
                 className={`h-full transition-all duration-300 ${getHpColor(selfState.hp)}`}
                 style={{ width: `${Math.max(0, Math.min(100, (selfState.hp / 250) * 100))}%` }}

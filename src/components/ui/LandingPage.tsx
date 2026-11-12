@@ -214,20 +214,20 @@ export const LandingPage: React.FC = () => {
       </div>
 
       {/* Top Header */}
-      <header className="relative z-20 flex items-center justify-between w-full shrink-0 mb-2 pointer-events-auto">
-        <div className="flex items-center gap-2.5 sm:gap-3">
+      <header className="relative z-20 flex items-center justify-between w-full shrink-0 mb-3 sm:mb-4 pb-2.5 border-b border-[#8CCDEB]/15 pointer-events-auto">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <img
             src={`${import.meta.env.BASE_URL}app-icon.png`}
             alt="Space Colony: Frontier"
-            className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg border border-[#8CCDEB]/40 shadow-[0_0_12px_rgba(140,205,235,0.2)] object-cover"
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg border border-[#8CCDEB]/40 shadow-[0_0_12px_rgba(140,205,235,0.2)] object-cover shrink-0"
           />
-          <div className="flex items-baseline gap-1.5 leading-none">
+          <div className="flex flex-wrap items-baseline gap-x-1.5 leading-tight min-w-0">
             <span className="text-sm sm:text-lg font-black tracking-wider text-[#F4F7FA]">SPACE COLONY</span>
             <span className="text-sm sm:text-lg font-black tracking-wider text-[#FFCC00]">FRONTIER</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <div
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#061A35]/85 border border-[#8CCDEB]/25 backdrop-blur-md text-[10px] text-[#F4F7FA]"
             title={isServerOnline === false ? 'Server Offline' : isServerOnline === true ? 'Server Online' : 'Connecting...'}
@@ -265,13 +265,10 @@ export const LandingPage: React.FC = () => {
       </header>
 
       {/* Main Two-Section Game Menu Layout */}
-      <main className="relative z-10 w-full md:flex-1 md:min-h-0 grid grid-cols-1 md:grid-cols-12 landscape:grid-cols-12 items-start md:items-center gap-4 sm:gap-5 pb-8 md:pb-0">
+      <main className="relative z-10 w-full md:flex-1 md:min-h-0 flex flex-col md:grid md:grid-cols-12 items-stretch md:items-center gap-4 md:gap-6 pb-8 md:pb-0">
         
-        {/* LEFT SECTION (45% Desktop / Bottom on Portrait Mobile): Pilot Profile & Primary Game Actions */}
-        <div
-          className="md:col-span-5 landscape:col-span-5 flex flex-col justify-center gap-2.5 sm:gap-3 z-20 pointer-events-auto max-w-md w-full mx-auto md:mx-0 order-2 md:order-1 landscape:order-1 landscape:max-h-[calc(100dvh-76px)] landscape:overflow-y-auto landscape:pr-1.5 scroll-touch"
-          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-        >
+        {/* LEFT SECTION (45% Desktop / Lower Section on Mobile): Pilot Profile & Primary Game Actions */}
+        <div className="md:col-span-5 flex flex-col justify-start md:justify-center gap-3 z-20 pointer-events-auto max-w-md w-full mx-auto md:mx-0 order-2 md:order-1">
           
           {/* 1. Compact Pilot Profile Card (No Ship Colour Control Here) */}
           <div className="bg-[#061A35]/90 border border-[#8CCDEB]/40 rounded-xl p-3 sm:p-4 backdrop-blur-md shadow-lg">
@@ -522,8 +519,8 @@ export const LandingPage: React.FC = () => {
           </div>
         </div>
 
-        {/* RIGHT SECTION (55% Desktop / Top on Portrait Mobile): Large 3D Spaceship & Ship Colour Selector */}
-        <div className="md:col-span-7 landscape:col-span-7 flex flex-col items-center justify-center relative order-1 md:order-2 landscape:order-2 pointer-events-auto md:h-full">
+        {/* RIGHT SECTION (55% Desktop / Top Showcase on Mobile): Large 3D Spaceship & Ship Colour Selector */}
+        <div className="md:col-span-7 flex flex-col items-center justify-center relative order-1 md:order-2 pointer-events-auto max-w-md md:max-w-none w-full mx-auto md:h-full">
           
           {/* 3D Spaceship Preview Container */}
           <div
