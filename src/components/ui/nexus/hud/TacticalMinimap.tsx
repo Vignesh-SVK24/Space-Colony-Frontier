@@ -27,7 +27,7 @@ export const TacticalMinimap: React.FC = () => {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const displaySize = isMobile ? (isExpanded ? 156 : 122) : (isExpanded ? 236 : 188);
+  const displaySize = isMobile ? (isExpanded ? 124 : 88) : (isExpanded ? 184 : 136);
 
   useEffect(() => {
     if (isCollapsed) return;
@@ -313,8 +313,8 @@ export const TacticalMinimap: React.FC = () => {
 
   return (
     <div
-      className="pointer-events-auto relative rounded-xl bg-[#05070B]/85 border border-[#8CCDEB]/40 backdrop-blur-md shadow-[0_0_18px_rgba(140,205,235,0.18)] p-1.5 flex flex-col items-center transition-all duration-200"
-      style={{ width: displaySize + 12 }}
+      className="pointer-events-auto relative rounded-xl bg-[#05070B]/85 border border-[#8CCDEB]/40 backdrop-blur-md shadow-[0_0_16px_rgba(140,205,235,0.16)] p-1 flex flex-col items-center transition-all duration-200"
+      style={{ width: displaySize + 8 }}
     >
       {/* Top Bar Controls */}
       <div className="w-full flex items-center justify-between px-1 mb-0.5 text-[9px] text-[#8CCDEB]/85 font-bold">
