@@ -11,7 +11,7 @@ import { AntiCheatSystem } from '../server/src/security/antiCheat';
 import { AuthService } from '../server/src/security/authService';
 import { RoomBruteForceProtection, ConnectionFloodGuard, WebSocketRateLimiter } from '../server/src/security/rateLimiter';
 import { SecurityLogger } from '../server/src/security/securityLogger';
-import { SERVER_KEYS, validateServerAdminKey } from '../server/src/config/serverKeys';
+import { SERVER_KEYS, validateServerAdminKey, isOriginAllowed } from '../server/src/config/serverKeys';
 import { useMultiplayerStore } from '../src/multiplayer/useMultiplayerStore';
 import { PlayerSchema } from '../server/src/schema/BattleState';
 
@@ -579,6 +579,23 @@ describe('Security & Anti-Cheat Comprehensive Test Suite', () => {
       expect(events[0].details?.password).toBe('[REDACTED]');
       expect(events[0].details?.apiKey).toBe('[REDACTED]');
       expect(SecurityLogger.getSummary().counters.ACCESS_DENIED).toBeGreaterThan(0);
+    });
+
+    it('should reject substring-spoofed localhost origins (e.g. https://localhost.evil.com)', () => {
+      const prevEnv = SERVER_KEYS.NODE_ENV;
+      const prevCors = SERVER_KEYS.CORS_ORIGIN;
+      SERVER_KEYS.NODE_ENV = 'production';
+      SERVER_KEYS.CORS_ORIGIN = 'https://space-colony-frontier-two.vercel.app';
+      try {
+        expect(isOriginAllowed('http://localhost:5173')).toBe(true);
+        expect(isOriginAllowed('http://127.0.0.1:3000')).toBe(true);
+        expect(isOriginAllowed('https://space-colony-frontier-two.vercel.app')).toBe(true);
+        expect(isOriginAllowed('https://localhost.evil.com')).toBe(false);
+        expect(isOriginAllowed('not-a-valid-url')).toBe(false);
+      } finally {
+        SERVER_KEYS.NODE_ENV = prevEnv;
+        SERVER_KEYS.CORS_ORIGIN = prevCors;
+      }
     });
   });
 });

@@ -47,18 +47,25 @@ export function isOriginAllowed(origin?: string): boolean {
     return true;
   }
 
+  let parsedHostname = '';
+  try {
+    const parsedUrl = new URL(origin.trim());
+    parsedHostname = parsedUrl.hostname.toLowerCase();
+  } catch {
+    return false; // Reject malformed Origin headers
+  }
+
+  // Exact hostname check for local development (prevents localhost.evil.com substring bypass)
+  if (parsedHostname === 'localhost' || parsedHostname === '127.0.0.1' || parsedHostname === '[::1]') {
+    return true;
+  }
+
   const allowedList = configured
     .split(',')
     .map(o => o.trim().toLowerCase())
     .filter(Boolean);
 
   const reqOrigin = origin.trim().toLowerCase();
-
-  // Allow standard local dev hosts when not strictly in external production
-  if (reqOrigin.includes('localhost') || reqOrigin.includes('127.0.0.1')) {
-    return true;
-  }
-
   return allowedList.includes(reqOrigin) || allowedList.includes('*');
 }
 

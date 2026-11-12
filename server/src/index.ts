@@ -23,6 +23,10 @@ listen(config({
     }
   }),
   initializeExpress: (app) => {
+    if (process.env.RENDER || process.env.TRUST_PROXY === 'true') {
+      app.set('trust proxy', 1);
+    }
+
     // 1. Production HTTP Security Headers (Helmet, CSP, HSTS, frame protection)
     app.use(configureSecurityHeaders());
 

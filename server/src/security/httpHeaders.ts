@@ -40,6 +40,7 @@ export const configureSecurityHeaders = (): RequestHandler => {
  * Production-hardened CORS Middleware with explicit origin allowlist.
  */
 export const configureCors = (): RequestHandler => {
+  const hasExplicitAllowlist = SERVER_KEYS.CORS_ORIGIN !== '*';
   return cors({
     origin: (requestOrigin, callback) => {
       if (!requestOrigin || isOriginAllowed(requestOrigin)) {
@@ -48,7 +49,7 @@ export const configureCors = (): RequestHandler => {
         callback(new Error(`Origin ${requestOrigin} rejected by Space Colony security policy.`));
       }
     },
-    credentials: true,
+    credentials: hasExplicitAllowlist,
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Server-Key']
   });

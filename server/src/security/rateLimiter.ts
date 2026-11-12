@@ -52,6 +52,12 @@ export class RoomBruteForceProtection {
     }
 
     this.failedAttempts.set(ip, existing);
+    if (this.failedAttempts.size > 2000) {
+      for (const [k, v] of this.failedAttempts) {
+        if (v.lockedUntil > 0 && now >= v.lockedUntil) this.failedAttempts.delete(k);
+        if (this.failedAttempts.size <= 1500) break;
+      }
+    }
   }
 
   static recordSuccess(ip?: string) {
@@ -129,6 +135,12 @@ export class ConnectionFloodGuard {
     const recent = this.recentConnects.get(ip);
     if (!recent || now - recent.windowStart > this.WINDOW_MS) {
       this.recentConnects.set(ip, { count: 1, windowStart: now });
+      if (this.recentConnects.size > 2000) {
+        for (const [k, v] of this.recentConnects) {
+          if (now - v.windowStart > this.WINDOW_MS) this.recentConnects.delete(k);
+          if (this.recentConnects.size <= 1500) break;
+        }
+      }
       return true;
     }
 

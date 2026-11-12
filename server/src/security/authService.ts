@@ -50,6 +50,9 @@ export class AuthService {
     if (this.users.has(key)) {
       throw new Error('Callsign is already registered by another pilot');
     }
+    if (this.users.size >= 10000) {
+      throw new Error('Pilot registry capacity reached. Please try again later.');
+    }
 
     if (rawPassword.length < 6) {
       throw new Error('Security clearance password must be at least 6 characters');

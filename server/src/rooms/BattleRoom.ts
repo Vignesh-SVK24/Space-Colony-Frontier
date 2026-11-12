@@ -125,7 +125,11 @@ export class BattleRoom extends Room {
    * Colyseus Server-side Authentication & Rate-Limit Hook
    */
   async onAuth(client: Client, options: unknown, request: any): Promise<RoomAuthContext> {
-    const ip = request?.headers['x-forwarded-for']?.toString().split(',')[0].trim() || request?.socket?.remoteAddress || 'unknown';
+    const trustProxy = Boolean(process.env.RENDER || process.env.TRUST_PROXY === 'true');
+    const forwarded = request?.headers?.['x-forwarded-for']?.toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+    const ip = (trustProxy && forwarded && forwarded.length > 0)
+      ? forwarded[forwarded.length - 1]
+      : (request?.socket?.remoteAddress || 'unknown');
 
     // 0. Connection Flooding & Resource Exhaustion Guard
     if (!ConnectionFloodGuard.canAcceptConnection(ip)) {
