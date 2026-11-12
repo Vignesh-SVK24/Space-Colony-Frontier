@@ -8,61 +8,59 @@ import { SpaceshipModel } from '../three/spaceships/SpaceshipModel';
 import { SpaceshipPaintSchemeKey } from '../../config/visualTheme';
 import { CombatDifficulty } from '../../config/combatConfig';
 import { nexusAudio } from '../../utils/nexusAudio';
-import { 
-  Users, 
+import {
+  Users,
   User,
-  Bot, 
-  ArrowRight, 
-  Zap, 
-  Maximize, 
-  Minimize, 
-  Shield, 
-  Swords, 
+  Bot,
+  ArrowRight,
+  Zap,
+  Maximize,
+  Minimize,
+  Shield,
+  Swords,
   RotateCw,
   Copy,
   Check,
   Volume2,
   VolumeX,
   Crosshair,
-  Radio,
   X,
   AlertCircle,
-  ChevronUp,
-  ChevronDown,
   Info,
   Loader2,
   Play,
-  ShieldCheck
+  ShieldCheck,
+  Gamepad2
 } from 'lucide-react';
 import { PilotAuthModal } from './PilotAuthModal';
-import { enterFullscreen, toggleFullscreen, useFullscreen } from '../../utils/fullscreenHelper';
+import { toggleFullscreen, useFullscreen } from '../../utils/fullscreenHelper';
 import { getOptimalDPR, isMobileDevice } from '../../utils/mobileOptimization';
 
-const CHASSIS_CONFIG: Record<BattleColor, { hex: string; label: string; scheme: SpaceshipPaintSchemeKey }> = {
-  yellow: { hex: '#FFCC00', label: 'Solar Vanguard', scheme: 'battle_yellow' },
-  blue: { hex: '#8CCDEB', label: 'Frost Interceptor', scheme: 'battle_blue' },
-  red: { hex: '#ef4444', label: 'Crimson Raptor', scheme: 'battle_red' },
-  green: { hex: '#107E57', label: 'Emerald Phantom', scheme: 'battle_green' }
+const CHASSIS_CONFIG: Record<BattleColor, { hex: string; label: string; name: string; scheme: SpaceshipPaintSchemeKey }> = {
+  yellow: { hex: '#FFCC00', label: 'Yellow', name: 'Solar Vanguard', scheme: 'battle_yellow' },
+  blue: { hex: '#8CCDEB', label: 'Blue', name: 'Frost Interceptor', scheme: 'battle_blue' },
+  red: { hex: '#ef4444', label: 'Red', name: 'Crimson Raptor', scheme: 'battle_red' },
+  green: { hex: '#107E57', label: 'Green', name: 'Emerald Phantom', scheme: 'battle_green' }
 };
 
 const MODE_DESCRIPTIONS = {
-  '1v1': '1v1 Orbital Duel — 2 Pilots duel to 250 HP elimination.',
-  'FFA': '4-Player FFA — Free-for-all dogfight, last survivor wins.',
-  '2v2': '2v2 Squad Strike — 2 vs 2 coordinated team battle.'
+  '1v1': '1v1 Orbital Duel — 2 pilots battle to 250 HP elimination.',
+  'FFA': '4-Player Free-For-All — Every pilot for themselves, last survivor wins.',
+  '2v2': '2v2 Team Battle — Coordinated 2 vs 2 squad combat.'
 };
 
 const RotatingHeroShip: React.FC<{ scheme: SpaceshipPaintSchemeKey }> = ({ scheme }) => {
   const groupRef = useRef<THREE.Group>(null);
-  
+
   useFrame((_, delta) => {
     if (groupRef.current) {
       groupRef.current.rotation.y += delta * 0.35;
-      groupRef.current.position.y = Math.sin(Date.now() * 0.0015) * 0.12 - 0.1;
+      groupRef.current.position.y = Math.sin(Date.now() * 0.0015) * 0.1 - 0.05;
     }
   });
 
   return (
-    <group ref={groupRef} position={[0, -0.1, 0]} rotation={[0.2, 0, 0]}>
+    <group ref={groupRef} position={[0, -0.05, 0]} rotation={[0.18, 0, 0]}>
       <SpaceshipModel paintScheme={scheme} throttle={0.35} />
     </group>
   );
@@ -81,7 +79,6 @@ export const LandingPage: React.FC = () => {
     error,
     setError,
     serverUrl,
-    setServerUrl,
     isServerOnline,
     checkServerReachability,
     startSoloGame,
@@ -92,7 +89,7 @@ export const LandingPage: React.FC = () => {
 
   const [joinModalOpen, setJoinModalOpen] = useState(false);
   const [soloModalOpen, setSoloModalOpen] = useState(false);
-  const [intelDrawerOpen, setIntelDrawerOpen] = useState(false);
+  const [infoModalTab, setInfoModalTab] = useState<'INFO' | 'CONTROLS' | null>(null);
   const [showModeInfo, setShowModeInfo] = useState(false);
 
   const [joinCode, setJoinCode] = useState('');
@@ -101,7 +98,7 @@ export const LandingPage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [isMuted, setIsMuted] = useState(() => nexusAudio.getMuted());
-  
+
   const { isFullscreen } = useFullscreen();
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -128,7 +125,6 @@ export const LandingPage: React.FC = () => {
 
   const effectiveName = playerName.trim() || 'Cadet-01';
 
-  // Smooth, direct Room Creation
   const handleDirectCreate = async () => {
     if (isCreating) return;
     setIsCreating(true);
@@ -137,7 +133,6 @@ export const LandingPage: React.FC = () => {
     const success = await createRoom(effectiveName, playerColor, gameMode, createCode);
     setIsCreating(false);
     if (!success) {
-      // Regenerate fresh code for next try
       setCreateCode(generateRoomCode());
     }
   };
@@ -173,11 +168,14 @@ export const LandingPage: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-[#05070B] font-mono text-[#F4F7FA] select-none flex flex-col justify-between p-2 sm:p-4 md:p-6">
-      
-      {/* =========================================================================
-          1. BACKGROUND CINEMATIC SPACE VIDEO (85-90% HIGHLY VISIBLE, NO WHITE OVERLAYS)
-          ========================================================================= */}
+    <div
+      className="fixed inset-0 h-screen w-screen overflow-hidden bg-[#05070B] font-mono text-[#F4F7FA] select-none flex flex-col justify-between p-3 sm:p-5 md:p-6"
+      style={{
+        paddingTop: 'max(12px, env(safe-area-inset-top, 12px))',
+        paddingBottom: 'max(12px, env(safe-area-inset-bottom, 12px))'
+      }}
+    >
+      {/* Background Cinematic Space Vista */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#05070B]">
         <img
           src={`${import.meta.env.BASE_URL}space_landing_bg.jpg`}
@@ -209,93 +207,73 @@ export const LandingPage: React.FC = () => {
           />
         )}
 
-        {/* Controlled Midnight Black & Deep Navy Vignette */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#05070B]/90 via-[#061A35]/45 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#05070B]/90 via-[#061A35]/45 to-[#05070B]/40 pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#05070B]/85 via-transparent to-[#05070B]/40 pointer-events-none" />
       </div>
 
-      {/* =========================================================================
-          2. TOP HEADER HUD
-          ========================================================================= */}
-      <header className="relative z-20 flex items-center justify-between w-full shrink-0 mb-1 sm:mb-2 pointer-events-auto">
-        {/* Logo & Branding */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <img 
-            src={`${import.meta.env.BASE_URL}app-icon.png`} 
-            alt="Space Colony Frontier Emblem" 
-            className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg border border-[#8CCDEB]/40 shadow-[0_0_15px_rgba(140,205,235,0.25)] object-cover" 
+      {/* Top Header */}
+      <header className="relative z-20 flex items-center justify-between w-full shrink-0 mb-2 pointer-events-auto">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <img
+            src={`${import.meta.env.BASE_URL}app-icon.png`}
+            alt="Space Colony: Frontier"
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg border border-[#8CCDEB]/40 shadow-[0_0_12px_rgba(140,205,235,0.2)] object-cover"
           />
-          <div>
-            <div className="flex items-center gap-1.5 leading-none">
-              <span className="text-sm sm:text-lg font-black tracking-wider text-[#F4F7FA]">SPACE COLONY</span>
-              <span className="text-sm sm:text-lg font-black tracking-wider text-[#FFCC00]">FRONTIER</span>
-            </div>
-            <p className="text-[8px] sm:text-[10px] uppercase tracking-[0.2em] text-[#8CCDEB]/80 mt-0.5">
-              BATTLE • EXPLORE • SURVIVE
-            </p>
+          <div className="flex items-baseline gap-1.5 leading-none">
+            <span className="text-sm sm:text-lg font-black tracking-wider text-[#F4F7FA]">SPACE COLONY</span>
+            <span className="text-sm sm:text-lg font-black tracking-wider text-[#FFCC00]">FRONTIER</span>
           </div>
         </div>
 
-        {/* Right Status & Tools */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5">
-          {/* Server Connectivity Status (ONLINE / OFFLINE) */}
-          <div 
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-[#061A35]/85 border border-[#8CCDEB]/30 backdrop-blur-md text-[9px] sm:text-[10px] text-[#F4F7FA] shadow-sm select-none"
-            title={isServerOnline === false ? 'Multiplayer Server: OFFLINE' : isServerOnline === true ? 'Multiplayer Server: ONLINE' : 'Checking Server Status...'}
+        <div className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#061A35]/85 border border-[#8CCDEB]/25 backdrop-blur-md text-[10px] text-[#F4F7FA]"
+            title={isServerOnline === false ? 'Server Offline' : isServerOnline === true ? 'Server Online' : 'Connecting...'}
           >
-            <span className={`w-2 h-2 rounded-full ${
-              isServerOnline === false 
-                ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]' 
-                : isServerOnline === true
-                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse'
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isServerOnline === false
+                  ? 'bg-red-500'
+                  : isServerOnline === true
+                  ? 'bg-emerald-400 animate-pulse'
                   : 'bg-amber-400 animate-pulse'
-            }`} />
-            <span className="font-bold tracking-wider">
-              {isServerOnline === false ? 'OFFLINE' : isServerOnline === true ? 'ONLINE' : 'CONNECTING'}
+              }`}
+            />
+            <span className="font-semibold">
+              {isServerOnline === false ? 'Offline' : isServerOnline === true ? 'Online' : 'Connecting'}
             </span>
           </div>
 
-          <button 
-            onClick={toggleAudio} 
-            className="p-1.5 sm:p-2 rounded-lg bg-[#061A35]/80 hover:bg-[#0B315A] border border-[#8CCDEB]/30 text-[#8CCDEB] transition-colors cursor-pointer"
+          <button
+            onClick={toggleAudio}
+            className="p-1.5 sm:p-2 rounded-lg bg-[#061A35]/80 hover:bg-[#08264A] border border-[#8CCDEB]/25 text-[#8CCDEB] transition-colors cursor-pointer"
             title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
           >
-            {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
           </button>
 
-          <button 
-            onClick={toggleFullscreen} 
-            className="p-1.5 sm:p-2 rounded-lg bg-[#061A35]/80 hover:bg-[#0B315A] border border-[#8CCDEB]/30 text-[#8CCDEB] transition-colors cursor-pointer"
+          <button
+            onClick={toggleFullscreen}
+            className="p-1.5 sm:p-2 rounded-lg bg-[#061A35]/80 hover:bg-[#08264A] border border-[#8CCDEB]/25 text-[#8CCDEB] transition-colors cursor-pointer"
             title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
           >
-            {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+            {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
           </button>
         </div>
       </header>
 
-      {/* =========================================================================
-          3. MAIN RESPONSIVE BATTLE ARENA DISPLAY:
-             - Desktop: 40% Left Controls / 60% Right 3D Spaceship
-             - Landscape Mobile: Side-by-Side 50/50, top-aligned scrollable controls
-             - Portrait Mobile: Pilot Profile & Actions at TOP (Guaranteed Visible), 3D Spaceship below
-          ========================================================================= */}
-      <main className="relative z-10 flex-1 w-full min-h-0 grid grid-cols-1 md:grid-cols-12 landscape:grid-cols-12 items-start md:items-center my-0 md:my-auto pointer-events-none gap-2 sm:gap-4 overflow-hidden">
+      {/* Main Two-Section Game Menu Layout */}
+      <main className="relative z-10 flex-1 w-full min-h-0 grid grid-cols-1 md:grid-cols-12 landscape:grid-cols-12 items-center gap-3 sm:gap-5 overflow-y-auto md:overflow-hidden">
         
-        {/* ========================================================
-            LEFT COLUMN: FULLY SCROLLABLE DETAILS & GAME ACTIONS
-            - order-1 on ALL screens guarantees Pilot Name is visible at top!
-            ======================================================== */}
-        <div 
-          className="md:col-span-5 landscape:col-span-5 flex flex-col justify-start gap-2 sm:gap-2.5 z-20 pointer-events-auto max-w-md w-full h-full max-h-full overflow-y-auto overscroll-contain touch-pan-y scroll-touch pr-1 sm:pr-2 order-1 md:order-1 landscape:order-1"
-          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-        >
+        {/* LEFT SECTION (45% Desktop / Bottom on Portrait Mobile): Pilot Profile & Primary Game Actions */}
+        <div className="md:col-span-5 landscape:col-span-5 flex flex-col justify-center gap-2.5 sm:gap-3 z-20 pointer-events-auto max-w-md w-full mx-auto md:mx-0 order-2 md:order-1 landscape:order-1">
           
-          {/* 1. Pilot Profile Card - High Visibility Pilot Name & Callsign */}
-          <div className="bg-[#061A35]/95 border-2 border-[#8CCDEB] rounded-xl p-2.5 sm:p-3.5 backdrop-blur-md shadow-[0_0_20px_rgba(140,205,235,0.25)] shrink-0">
-            <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-[#0B315A]">
-              <span className="text-[10px] sm:text-[11px] font-black text-[#8CCDEB] uppercase tracking-wider flex items-center gap-1.5">
-                <Radio size={13} className="text-[#FFCC00] animate-pulse" />
-                <span>PILOT PROFILE</span>
+          {/* 1. Compact Pilot Profile Card (No Ship Colour Control Here) */}
+          <div className="bg-[#061A35]/90 border border-[#8CCDEB]/40 rounded-xl p-3 sm:p-4 backdrop-blur-md shadow-lg">
+            <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-[#8CCDEB]/15">
+              <span className="text-xs font-bold text-[#8CCDEB] flex items-center gap-1.5">
+                <User size={14} className="text-[#FFCC00]" />
+                <span>Pilot Profile</span>
               </span>
               <button
                 type="button"
@@ -303,295 +281,258 @@ export const LandingPage: React.FC = () => {
                   nexusAudio.playClick(1000);
                   setAuthModalOpen(true);
                 }}
-                className={`text-[9px] px-2 py-0.5 rounded border font-black uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer ${
+                className={`text-[10px] px-2.5 py-0.5 rounded-md border font-bold flex items-center gap-1 transition-all cursor-pointer ${
                   authUser && !authUser.isGuest
-                    ? 'bg-[#107E57]/40 border-[#107E57] text-[#34d399] shadow-[0_0_8px_rgba(52,211,153,0.4)]'
-                    : 'bg-[#08264A] border-[#8CCDEB]/40 text-[#8CCDEB] hover:text-[#FFCC00] hover:border-[#FFCC00]/50'
+                    ? 'bg-[#107E57]/35 border-[#107E57] text-emerald-300'
+                    : 'bg-[#08264A] border-[#8CCDEB]/35 text-[#8CCDEB] hover:text-[#FFCC00] hover:border-[#FFCC00]/50'
                 }`}
-                title="Pilot Authentication and Security Dossier"
               >
-                <ShieldCheck size={11} />
-                <span>{authUser && !authUser.isGuest ? 'VERIFIED' : 'AUTH / DOSSIER'}</span>
+                <ShieldCheck size={12} />
+                <span>{authUser && !authUser.isGuest ? 'Verified' : 'Sign In'}</span>
               </button>
             </div>
 
-            {/* Enter Pilot Name / Callsign - Maximum Contrast & Mobile Legibility */}
-            <div className="mb-2.5">
+            <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-[11px] sm:text-xs font-black uppercase text-[#FFCC00] tracking-wider flex items-center gap-1.5">
-                  <User size={14} className="text-[#FFCC00]" />
-                  <span>PILOT CALLSIGN / NAME:</span>
+                <label className="text-[11px] font-semibold text-[#F4F7FA]">
+                  Pilot Name
                 </label>
-                <span className="text-[9px] text-[#8CCDEB]/80 font-mono">
-                  {playerName.trim() ? `${playerName.length}/15` : 'Required'}
-                </span>
+                {authUser && !authUser.isGuest && authUser.stats && (
+                  <span className="text-[10px] text-emerald-300 font-semibold">
+                    {authUser.stats.matchesWon} Wins · {authUser.stats.kills} Eliminations
+                  </span>
+                )}
               </div>
               <div className="relative flex items-center">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Enter pilot callsign..."
+                  placeholder="Enter pilot name..."
                   maxLength={15}
-                  className="w-full bg-[#05070B] border-2 border-[#8CCDEB] focus:border-[#FFCC00] focus:ring-2 focus:ring-[#FFCC00]/30 px-3.5 py-2 sm:py-2.5 rounded-xl text-base font-black text-white placeholder:text-slate-500 outline-none shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)] transition-all"
+                  className="w-full bg-[#05070B] border border-[#8CCDEB]/50 focus:border-[#FFCC00] px-3 py-2 rounded-lg text-sm font-bold text-white placeholder:text-slate-500 outline-none transition-colors"
                 />
                 {playerName && (
                   <button
                     type="button"
                     onClick={() => setPlayerName('')}
-                    className="absolute right-2.5 px-1.5 py-0.5 text-xs text-slate-400 hover:text-white rounded cursor-pointer"
-                    title="Clear Callsign"
+                    className="absolute right-2 px-1 text-xs text-slate-400 hover:text-white cursor-pointer"
+                    title="Clear Name"
                   >
                     ✕
                   </button>
                 )}
               </div>
             </div>
-
-            {/* Hull Scheme Selector */}
-            <div>
-              <div className="flex items-center justify-between text-[9px] sm:text-[10px] text-[#8CCDEB]/80 uppercase tracking-widest mb-1 font-bold">
-                <span>CHASSIS PAINT</span>
-                <span className="text-[#FFCC00] font-black">{CHASSIS_CONFIG[playerColor].label}</span>
-              </div>
-              <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
-                {(Object.keys(CHASSIS_CONFIG) as BattleColor[]).map((c) => {
-                  const isSelected = playerColor === c;
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => {
-                        nexusAudio.playClick(1200);
-                        setPlayerColor(c);
-                      }}
-                      className={`py-1 px-1 rounded-md border flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                        isSelected
-                          ? 'border-[#FFCC00] bg-[#FFB000]/20 text-[#FFCC00] shadow-[0_0_10px_rgba(255,204,0,0.35)] font-black'
-                          : 'border-[#0B315A] bg-[#05070B]/70 text-slate-400 hover:border-[#8CCDEB]/40'
-                      }`}
-                    >
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: CHASSIS_CONFIG[c].hex }} />
-                      <span className="text-[9px] uppercase font-bold">{c.slice(0, 3)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </div>
 
-          {/* 2. Combat Mode Selector with top-right 'i' info popover */}
-          <div className="bg-[#061A35]/85 border border-[#8CCDEB]/35 rounded-xl p-2 sm:p-2.5 backdrop-blur-md shadow-md shrink-0 relative">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[9px] font-bold text-[#8CCDEB] uppercase tracking-wider">
-                COMBAT DOCTRINE
-              </span>
+          {/* 2. Game Mode & Room Code */}
+          <div className="bg-[#061A35]/85 border border-[#8CCDEB]/30 rounded-xl p-3 backdrop-blur-md shadow-md space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-[#8CCDEB]">Game Mode</span>
               <button
                 type="button"
                 onClick={() => setShowModeInfo(!showModeInfo)}
                 className="text-[#FFCC00] hover:text-[#FFB000] p-0.5 rounded cursor-pointer"
-                title="Combat Mode Info"
+                title="Mode Details"
               >
                 <Info size={13} />
               </button>
             </div>
 
-            {/* Info Popover */}
             {showModeInfo && (
-              <div className="p-2 mb-2 bg-[#05070B] border border-[#8CCDEB]/40 rounded-lg text-[10px] text-slate-300 leading-tight">
+              <div className="p-2 bg-[#05070B] border border-[#8CCDEB]/30 rounded-lg text-[10px] text-slate-300 leading-snug">
                 {MODE_DESCRIPTIONS[gameMode]}
               </div>
             )}
 
-            {/* Clean Mode Buttons (No extra descriptive text inside buttons) */}
             <div className="grid grid-cols-3 gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  nexusAudio.playClick(1000);
-                  setGameMode('1v1');
-                }}
-                className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  gameMode === '1v1'
-                    ? 'border-[#8CCDEB] bg-[#0B315A] text-[#F4F7FA] shadow-[0_0_12px_rgba(140,205,235,0.3)] font-black'
-                    : 'border-[#0B315A] bg-[#05070B]/60 text-slate-400 hover:border-[#8CCDEB]/30'
-                }`}
-              >
-                <Swords size={13} className={gameMode === '1v1' ? 'text-[#8CCDEB]' : 'text-slate-500'} />
-                <span className="text-[11px] font-black tracking-wider">1V1</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  nexusAudio.playClick(1100);
-                  setGameMode('FFA');
-                }}
-                className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  gameMode === 'FFA'
-                    ? 'border-[#8CCDEB] bg-[#0B315A] text-[#F4F7FA] shadow-[0_0_12px_rgba(140,205,235,0.3)] font-black'
-                    : 'border-[#0B315A] bg-[#05070B]/60 text-slate-400 hover:border-[#8CCDEB]/30'
-                }`}
-              >
-                <Crosshair size={13} className={gameMode === 'FFA' ? 'text-[#8CCDEB]' : 'text-slate-500'} />
-                <span className="text-[11px] font-black tracking-wider">FFA</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  nexusAudio.playClick(1200);
-                  setGameMode('2v2');
-                }}
-                className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  gameMode === '2v2'
-                    ? 'border-[#8CCDEB] bg-[#0B315A] text-[#F4F7FA] shadow-[0_0_12px_rgba(140,205,235,0.3)] font-black'
-                    : 'border-[#0B315A] bg-[#061A35]/60 text-slate-400 hover:border-[#8CCDEB]/30'
-                }`}
-              >
-                <Shield size={13} className={gameMode === '2v2' ? 'text-[#8CCDEB]' : 'text-slate-500'} />
-                <span className="text-[11px] font-black tracking-wider">2V2</span>
-              </button>
+              {(['1v1', 'FFA', '2v2'] as const).map((mode) => {
+                const active = gameMode === mode;
+                const Icon = mode === '1v1' ? Swords : mode === 'FFA' ? Crosshair : Shield;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => {
+                      nexusAudio.playClick(1050);
+                      setGameMode(mode);
+                    }}
+                    className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      active
+                        ? 'border-[#8CCDEB] bg-[#08264A] text-[#F4F7FA] font-black shadow-sm'
+                        : 'border-[#08264A] bg-[#05070B]/60 text-slate-400 hover:border-[#8CCDEB]/30'
+                    }`}
+                  >
+                    <Icon size={13} className={active ? 'text-[#8CCDEB]' : 'text-slate-500'} />
+                    <span className="text-xs font-bold">{mode === 'FFA' ? 'FFA' : mode}</span>
+                  </button>
+                );
+              })}
             </div>
-          </div>
 
-          {/* 3. Stable Room Code Preview Box */}
-          <div className="bg-[#05070B]/80 border border-[#8CCDEB]/30 rounded-xl p-2 sm:p-2.5 flex items-center justify-between shrink-0 shadow-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] uppercase font-bold text-[#8CCDEB]">SECTOR KEY:</span>
-              <span className="font-black text-sm sm:text-base text-[#FFCC00] tracking-widest">{createCode}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={handleCopyCode}
-                className="px-2 py-1 rounded bg-[#061A35] hover:bg-[#0B315A] border border-[#8CCDEB]/40 text-[#8CCDEB] text-[10px] font-bold uppercase flex items-center gap-1 cursor-pointer transition-colors"
-                title="Copy Room Key"
-              >
-                {copiedCode ? <Check size={12} className="text-[#22c55e]" /> : <Copy size={12} />}
-                <span>{copiedCode ? 'COPIED' : 'COPY'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setCreateCode(generateRoomCode());
-                  nexusAudio.playClick(1100);
-                }}
-                className="p-1 rounded bg-[#061A35] hover:bg-[#0B315A] border border-[#8CCDEB]/40 text-[#FFCC00] cursor-pointer transition-colors"
-                title="Regenerate Sector Key"
-              >
-                <RotateCw size={12} />
-              </button>
+            {/* Compact Room Code Row */}
+            <div className="flex items-center justify-between pt-2 border-t border-[#8CCDEB]/15">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-[#8CCDEB]/80 font-semibold">Room Code:</span>
+                <span className="font-black text-sm text-[#FFCC00] tracking-widest">{createCode}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  className="px-2 py-1 rounded bg-[#05070B] hover:bg-[#08264A] border border-[#8CCDEB]/30 text-[#8CCDEB] text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  {copiedCode ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                  <span>{copiedCode ? 'Copied' : 'Copy'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateCode(generateRoomCode());
+                    nexusAudio.playClick(1100);
+                  }}
+                  className="p-1 rounded bg-[#05070B] hover:bg-[#08264A] border border-[#8CCDEB]/30 text-[#FFCC00] cursor-pointer transition-colors"
+                  title="New Room Code"
+                >
+                  <RotateCw size={12} />
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Error Banner */}
           {error && (
-            <div className="p-2 sm:p-2.5 bg-[#05070B]/95 border border-red-500/80 rounded-xl text-red-300 text-[10px] sm:text-[11px] flex flex-col gap-1.5 shadow-xl shrink-0">
+            <div className="p-2.5 bg-[#05070B]/95 border border-red-500/70 rounded-xl text-red-300 text-[11px] flex flex-col gap-1.5">
               <div className="flex items-start gap-1.5">
                 <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
-                <span className="flex-1 leading-snug">{error}</span>
-                <button 
-                  onClick={() => setError(null)}
-                  className="text-red-400 font-bold hover:bg-white/10 px-1 rounded cursor-pointer"
-                >
+                <span className="flex-1">{error}</span>
+                <button onClick={() => setError(null)} className="text-red-400 font-bold px-1 cursor-pointer">
                   ✕
                 </button>
               </div>
-              <div className="flex items-center gap-2 mt-0.5">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handleDirectCreate}
-                  className="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded font-bold text-[9px] uppercase tracking-wider cursor-pointer"
+                  className="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded font-bold text-[10px] cursor-pointer"
                 >
-                  Retry Connection
+                  Retry
                 </button>
                 <button
                   type="button"
                   onClick={handleStartSolo}
-                  className="px-2.5 py-1 bg-[#107E57] hover:bg-emerald-600 text-white rounded font-bold text-[9px] uppercase tracking-wider cursor-pointer"
+                  className="px-2.5 py-1 bg-[#107E57] hover:bg-emerald-600 text-white rounded font-bold text-[10px] cursor-pointer"
                 >
-                  Play Solo vs AI Drone
+                  Play Solo
                 </button>
               </div>
             </div>
           )}
 
-          {/* 4. Primary Game Action Buttons (Guaranteed Visible on Mobile & Landscape) */}
-          <div className="flex flex-col gap-2 shrink-0 pt-0.5">
-            
-            {/* [ CREATE ROOM ] - Primary CTA */}
+          {/* 3. Primary Actions: Create Room, Join Room, Solo Practice */}
+          <div className="flex flex-col gap-2">
             <button
               type="button"
               onClick={handleDirectCreate}
               disabled={isCreating}
-              className="w-full py-3 sm:py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#0B315A] via-[#08264A] to-[#0B315A] hover:from-[#0E3E73] hover:to-[#0E3E73] active:scale-[0.99] border-2 border-[#8CCDEB] text-[#F4F7FA] font-black text-xs sm:text-sm tracking-[0.2em] uppercase transition-all shadow-[0_0_20px_rgba(140,205,235,0.25)] flex items-center justify-center gap-2 cursor-pointer group"
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#08264A] to-[#0D3B73] hover:from-[#0D3B73] hover:to-[#134E96] active:scale-[0.99] border border-[#8CCDEB] text-[#F4F7FA] font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-[0_0_16px_rgba(140,205,235,0.2)] flex items-center justify-center gap-2 cursor-pointer"
             >
               {isCreating ? (
                 <>
                   <Loader2 size={16} className="text-[#FFCC00] animate-spin" />
-                  <span>CREATING ROOM...</span>
+                  <span>Creating Room...</span>
                 </>
               ) : (
                 <>
-                  <Users size={16} className="text-[#FFCC00] group-hover:scale-110 transition-transform" />
-                  <span>CREATE ROOM</span>
+                  <Users size={16} className="text-[#FFCC00]" />
+                  <span>Create Room</span>
                 </>
               )}
             </button>
 
-            {/* 2-Column Action Grid: [ JOIN ROOM ] & [ SOLO MODE ] SIDE-BY-SIDE */}
             <div className="grid grid-cols-2 gap-2">
-              
-              {/* [ JOIN ROOM ] */}
               <button
                 type="button"
                 onClick={() => {
                   nexusAudio.playClick(1000);
                   setJoinModalOpen(true);
                 }}
-                className="py-2.5 px-3 rounded-xl bg-[#05070B]/85 hover:bg-[#061A35] active:scale-[0.99] border border-[#8CCDEB]/60 hover:border-[#8CCDEB] text-[#8CCDEB] hover:text-[#F4F7FA] font-black text-[11px] sm:text-xs tracking-wider uppercase transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                className="py-2.5 px-3 rounded-xl bg-[#05070B]/85 hover:bg-[#061A35] active:scale-[0.99] border border-[#8CCDEB]/50 hover:border-[#8CCDEB] text-[#8CCDEB] hover:text-white font-bold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <ArrowRight size={14} />
-                <span>JOIN ROOM</span>
+                <span>Join Room</span>
               </button>
 
-              {/* [ SOLO MODE ] - ALWAYS VISIBLE */}
               <button
                 type="button"
                 onClick={() => {
                   nexusAudio.playClick(900);
                   setSoloModalOpen(true);
                 }}
-                className="py-2.5 px-3 rounded-xl bg-[#107E57]/20 hover:bg-[#107E57]/40 active:scale-[0.99] border border-[#107E57]/60 hover:border-emerald-400 text-emerald-300 hover:text-white font-black text-[11px] sm:text-xs tracking-wider uppercase transition-all shadow-[0_0_12px_rgba(16,126,87,0.25)] flex items-center justify-center gap-1.5 cursor-pointer"
+                className="py-2.5 px-3 rounded-xl bg-[#107E57]/25 hover:bg-[#107E57]/45 active:scale-[0.99] border border-[#107E57]/70 hover:border-emerald-400 text-emerald-300 hover:text-white font-bold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <Bot size={15} className="text-[#22c55e]" />
-                <span>SOLO MODE</span>
+                <Bot size={14} className="text-emerald-400" />
+                <span>Solo Practice</span>
               </button>
             </div>
-
           </div>
 
+          {/* 4. Compact Navigation Links */}
+          <div className="flex items-center justify-between pt-1 text-[11px] text-[#8CCDEB]/80">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  nexusAudio.playClick(1000);
+                  setInfoModalTab('INFO');
+                }}
+                className="hover:text-[#FFCC00] transition-colors flex items-center gap-1 cursor-pointer font-semibold"
+              >
+                <Info size={12} />
+                <span>Game Info</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  nexusAudio.playClick(1000);
+                  setInfoModalTab('CONTROLS');
+                }}
+                className="hover:text-[#FFCC00] transition-colors flex items-center gap-1 cursor-pointer font-semibold"
+              >
+                <Gamepad2 size={12} />
+                <span>Controls</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                nexusAudio.playClick(1000);
+                setAuthModalOpen(true);
+              }}
+              className="hover:text-[#FFCC00] transition-colors cursor-pointer font-semibold"
+            >
+              Pilot Profile
+            </button>
+          </div>
         </div>
 
-        {/* ========================================================
-            RIGHT COLUMN: 3D HERO SPACESHIP & SPACE ENVIRONMENT (60%)
-            ======================================================== */}
-        <div className="md:col-span-7 landscape:col-span-7 h-[150px] sm:h-[220px] md:h-full landscape:h-full flex items-center justify-center relative order-2 md:order-2 landscape:order-2 pointer-events-auto shrink-0">
+        {/* RIGHT SECTION (55% Desktop / Top on Portrait Mobile): Large 3D Spaceship & Ship Colour Selector */}
+        <div className="md:col-span-7 landscape:col-span-7 flex flex-col items-center justify-center relative order-1 md:order-2 landscape:order-2 pointer-events-auto h-full max-h-full">
           
-          {/* Holographic Aerospace Reticle */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-40">
-            <div className="w-[180px] h-[180px] sm:w-[320px] sm:h-[320px] md:w-[380px] md:h-[380px] rounded-full border border-[#8CCDEB]/20 animate-[spin_80s_linear_infinite]" />
-            <div className="absolute w-[130px] h-[130px] sm:w-[240px] sm:h-[240px] md:w-[300px] md:h-[300px] rounded-full border border-dashed border-[#8CCDEB]/25 animate-[spin_50s_linear_infinite_reverse]" />
-          </div>
+          {/* 3D Spaceship Preview Container */}
+          <div className="relative w-full h-[190px] sm:h-[260px] md:h-[58vh] flex items-center justify-center">
+            {/* Subtle Reticle */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-30">
+              <div className="w-[170px] h-[170px] sm:w-[280px] sm:h-[280px] md:w-[360px] md:h-[360px] rounded-full border border-[#8CCDEB]/25 animate-[spin_80s_linear_infinite]" />
+              <div className="absolute w-[125px] h-[125px] sm:w-[210px] sm:h-[210px] md:w-[270px] md:h-[270px] rounded-full border border-dashed border-[#8CCDEB]/30 animate-[spin_50s_linear_infinite_reverse]" />
+            </div>
 
-          {/* Three.js Interactive 3D Canvas */}
-          <div className="w-full h-full max-h-[58vh] aspect-square flex items-center justify-center relative">
-            <Canvas 
+            <Canvas
               dpr={getOptimalDPR()}
-              camera={{ position: [0, 1.4, 4.8], fov: 45 }} 
-              gl={{ 
-                alpha: true, 
+              camera={{ position: [0, 1.3, 4.6], fov: 45 }}
+              gl={{
+                alpha: true,
                 antialias: !isMobileDevice(),
                 powerPreference: 'high-performance',
                 stencil: false,
@@ -609,204 +550,207 @@ export const LandingPage: React.FC = () => {
             </Canvas>
           </div>
 
-          {/* Subtle Telemetry Overlay */}
-          <div className="absolute bottom-1 right-1 text-right pointer-events-none font-mono text-[9px] text-[#8CCDEB]/60 hidden sm:block">
-            <p>SECTOR // FRONTIER-04</p>
-            <p className="text-[#FFCC00]/70">ARENA 300M READY</p>
+          {/* Relocated Ship Colour Customization Directly Underneath the 3D Spaceship */}
+          <div className="z-20 bg-[#061A35]/85 border border-[#8CCDEB]/35 rounded-xl px-4 py-2.5 backdrop-blur-md shadow-lg flex flex-col items-center gap-2">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-[#8CCDEB] font-semibold">Select Ship Colour:</span>
+              <span className="text-[#FFCC00] font-black">{CHASSIS_CONFIG[playerColor].name}</span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {(Object.keys(CHASSIS_CONFIG) as BattleColor[]).map((c) => {
+                const isSelected = playerColor === c;
+                const cfg = CHASSIS_CONFIG[c];
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      nexusAudio.playClick(1200);
+                      setPlayerColor(c);
+                    }}
+                    title={`${cfg.label} — ${cfg.name}`}
+                    className={`group relative w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                      isSelected
+                        ? 'scale-110 ring-2 ring-white ring-offset-2 ring-offset-[#061A35] shadow-[0_0_14px_rgba(255,255,255,0.45)]'
+                        : 'opacity-75 hover:opacity-100 hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: cfg.hex }}
+                  >
+                    {isSelected && (
+                      <Check size={15} className={c === 'yellow' || c === 'blue' ? 'text-[#05070B] stroke-[3]' : 'text-white stroke-[3]'} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
         </div>
 
       </main>
 
-      {/* =========================================================================
-          4. BOTTOM HUD / TACTICAL INTEL TRIGGER
-          ========================================================================= */}
-      <footer className="relative z-20 w-full flex items-center justify-between pointer-events-auto border-t border-[#0B315A]/60 pt-1.5 sm:pt-2 text-[9px] sm:text-[10px] text-[#8CCDEB]/70 shrink-0">
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#107E57]" />
-          <span className="hidden sm:inline font-mono">WASD / JOYSTICK TO FLY • MOUSE / TOUCH TO FIRE</span>
-          <span className="sm:hidden font-mono">TOUCH JOYSTICK TO FLY</span>
-        </div>
-
-        {/* Toggle Tactical Intel Slide-up */}
-        <button 
-          onClick={() => setIntelDrawerOpen(!intelDrawerOpen)}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#061A35]/80 hover:bg-[#0B315A] border border-[#8CCDEB]/30 text-[#F4F7FA] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+      {/* Compact Info & Controls Modal */}
+      {infoModalTab && (
+        <div
+          className="fixed inset-0 z-50 bg-[#05070B]/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn pointer-events-auto"
+          onClick={() => setInfoModalTab(null)}
         >
-          <Info size={11} className="text-[#FFCC00]" />
-          <span>TACTICAL INTEL</span>
-          {intelDrawerOpen ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
-        </button>
-
-        <div className="hidden sm:block text-[#8CCDEB]/60">
-          SYS // 60HZ TICK • V2.4.0
-        </div>
-      </footer>
-
-      {/* =========================================================================
-          5. TACTICAL INTEL DRAWER (SLIDE-UP MODAL)
-          ========================================================================= */}
-      {intelDrawerOpen && (
-        <div className="fixed inset-0 z-40 bg-[#05070B]/80 backdrop-blur-md flex items-end justify-center animate-fadeIn pointer-events-auto">
-          <div 
-            className="w-full max-w-4xl bg-[#061A35]/95 border-t-2 border-[#8CCDEB] rounded-t-2xl p-4 sm:p-6 max-h-[75vh] overflow-y-auto overscroll-contain shadow-2xl flex flex-col gap-4 text-[#F4F7FA]"
+          <div
+            className="w-full max-w-2xl bg-[#061A35] border border-[#8CCDEB]/50 rounded-2xl p-5 shadow-2xl flex flex-col gap-4 text-[#F4F7FA]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-2 border-b border-[#0B315A]">
-              <div>
-                <h3 className="text-sm sm:text-base font-black tracking-wider text-[#F4F7FA]">
-                  TACTICAL INTEL & DOCTRINES
-                </h3>
-                <p className="text-[10px] text-[#8CCDEB] uppercase tracking-widest">
-                  Authoritative combat parameters & operational rules
-                </p>
+            <div className="flex items-center justify-between pb-2.5 border-b border-[#8CCDEB]/20">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setInfoModalTab('INFO')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    infoModalTab === 'INFO' ? 'bg-[#08264A] text-[#FFCC00] border border-[#8CCDEB]/40' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Game Info
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInfoModalTab('CONTROLS')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    infoModalTab === 'CONTROLS' ? 'bg-[#08264A] text-[#FFCC00] border border-[#8CCDEB]/40' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Controls
+                </button>
               </div>
-              <button 
-                onClick={() => setIntelDrawerOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#0B315A] cursor-pointer"
+              <button
+                onClick={() => setInfoModalTab(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#08264A] cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-3 rounded-xl bg-[#05070B]/70 border border-[#0B315A]">
-                <div className="text-[#FFCC00] font-bold text-xs uppercase mb-1 flex items-center gap-1.5">
-                  <Zap size={14} /> RAPID PLASMA BOLTS
+            {infoModalTab === 'INFO' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 rounded-xl bg-[#05070B]/70 border border-[#8CCDEB]/20">
+                  <div className="text-[#FFCC00] font-bold text-xs mb-1 flex items-center gap-1.5">
+                    <Zap size={14} /> Plasma Bullets
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    2 HP rapid-fire bolts with a 30-round magazine and 2.0s reload.
+                  </p>
                 </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  260 m/s high-velocity authoritative bullets. 30 round capacity with 2.0s automatic reload cycle.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl bg-[#05070B]/70 border border-[#0B315A]">
-                <div className="text-[#8CCDEB] font-bold text-xs uppercase mb-1 flex items-center gap-1.5">
-                  <Crosshair size={14} /> DIRECTED LASER BEAM
+                <div className="p-3 rounded-xl bg-[#05070B]/70 border border-[#8CCDEB]/20">
+                  <div className="text-[#8CCDEB] font-bold text-xs mb-1 flex items-center gap-1.5">
+                    <Crosshair size={14} /> Laser Beam
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    12 HP precision beam with a 3.0s recharge interval.
+                  </p>
                 </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  12 HP instantaneous directed beam with 3.0s recharge interval. Lock on with generous target cone.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl bg-[#05070B]/70 border border-[#0B315A]">
-                <div className="text-amber-400 font-bold text-xs uppercase mb-1 flex items-center gap-1.5">
-                  <Radio size={14} /> HIGH-YIELD SOLAR BURST
+                <div className="p-3 rounded-xl bg-[#05070B]/70 border border-[#8CCDEB]/20">
+                  <div className="text-amber-400 font-bold text-xs mb-1 flex items-center gap-1.5">
+                    <Shield size={14} /> Solar Beam
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    30 HP high-yield energy burst with a 10.0s recharge interval.
+                  </p>
                 </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  30 HP heavy piercing blast with 10.0s cooldown. Devastating punch through asteroid cover.
-                </p>
               </div>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-[#08264A]/60 border border-[#8CCDEB]/20 text-[11px] text-slate-300 flex items-center justify-between">
-              <span>Authoritative Colyseus Server • 60Hz State Synchronization</span>
-              <button
-                onClick={() => setIntelDrawerOpen(false)}
-                className="px-3 py-1 bg-[#0B315A] hover:bg-[#0E3E73] text-[#F4F7FA] font-bold uppercase rounded-lg text-[10px] cursor-pointer"
-              >
-                Close Intel
-              </button>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-[#05070B]/70 border border-[#8CCDEB]/20 space-y-1.5">
+                  <div className="text-[#FFCC00] font-bold mb-1">Desktop Controls</div>
+                  <div><span className="text-[#8CCDEB] font-bold">W / S / A / D:</span> Thrust &amp; Turn</div>
+                  <div><span className="text-[#8CCDEB] font-bold">Space / C (or Down):</span> Ascend / Descend</div>
+                  <div><span className="text-[#8CCDEB] font-bold">Shift:</span> Boost</div>
+                  <div><span className="text-[#8CCDEB] font-bold">Left Click / J:</span> Fire Bullets</div>
+                  <div><span className="text-[#8CCDEB] font-bold">Right Click / K:</span> Fire Laser</div>
+                  <div><span className="text-[#8CCDEB] font-bold">L:</span> Fire Solar Beam</div>
+                  <div><span className="text-[#8CCDEB] font-bold">R / M / Tab:</span> Reload / Map / Scoreboard</div>
+                </div>
+                <div className="p-3 rounded-xl bg-[#05070B]/70 border border-[#8CCDEB]/20 space-y-1.5">
+                  <div className="text-emerald-400 font-bold mb-1">Mobile Touch Controls</div>
+                  <div><span className="text-[#8CCDEB] font-bold">Left Joystick:</span> Flight Thrust &amp; Steering</div>
+                  <div><span className="text-[#8CCDEB] font-bold">Up / Down Pads:</span> Altitude Control</div>
+                  <div><span className="text-[#8CCDEB] font-bold">Right Buttons:</span> Bullet, Laser, Solar &amp; Boost</div>
+                  <div><span className="text-[#8CCDEB] font-bold">Swipe Screen:</span> Adjust Camera Aim</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* =========================================================================
-          6. JOIN ROOM GAME MODAL (MIDNIGHT BLACK + DEEP NAVY + CYAN)
-          ========================================================================= */}
+      {/* Join Room Modal */}
       {joinModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#05070B]/85 backdrop-blur-md animate-fadeIn pointer-events-auto">
-          <div 
-            className="w-full max-w-lg bg-[#061A35]/95 border-2 border-[#8CCDEB]/60 rounded-2xl shadow-[0_0_40px_rgba(5,7,11,0.9)] overflow-hidden flex flex-col max-h-[90vh]"
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#05070B]/85 backdrop-blur-md animate-fadeIn pointer-events-auto"
+          onClick={() => setJoinModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-[#061A35] border border-[#8CCDEB]/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div className="p-3.5 sm:p-4 pb-2.5 border-b border-[#0B315A] flex items-center justify-between bg-[#08264A]/80">
+            <div className="p-4 border-b border-[#8CCDEB]/20 flex items-center justify-between bg-[#08264A]/80">
               <div className="flex items-center gap-2">
                 <ArrowRight size={16} className="text-[#8CCDEB]" />
-                <div>
-                  <h3 className="text-sm sm:text-base font-black tracking-wider text-[#F4F7FA]">
-                    JOIN FRONTIER MATCH
-                  </h3>
-                  <p className="text-[10px] text-[#8CCDEB]">
-                    Connect to an existing squad sector
-                  </p>
-                </div>
+                <h3 className="text-sm font-black tracking-wider text-[#F4F7FA]">Join Room</h3>
               </div>
-              <button 
-                onClick={() => setJoinModalOpen(false)}
-                className="p-1 rounded text-slate-400 hover:text-white cursor-pointer"
-              >
+              <button onClick={() => setJoinModalOpen(false)} className="p-1 text-slate-400 hover:text-white cursor-pointer">
                 <X size={18} />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-4 sm:p-5 space-y-3 overflow-y-auto">
-              {/* Room Code Input */}
+            <div className="p-5 space-y-4">
               <div>
-                <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1">
-                  ENTER ROOM CODE
-                </label>
-                <input 
-                  type="text" 
+                <label className="block text-xs font-bold text-[#8CCDEB] mb-1.5">Room Code</label>
+                <input
+                  type="text"
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  placeholder="ROOM CODE"
+                  placeholder="ENTER CODE"
                   maxLength={6}
                   autoFocus
-                  className="w-full bg-[#05070B] border-2 border-[#8CCDEB] focus:border-[#FFCC00] p-2.5 sm:p-3 rounded-xl text-center text-xl sm:text-2xl font-black tracking-[0.3em] text-[#FFCC00] outline-none shadow-[0_0_15px_rgba(140,205,235,0.25)] transition-all uppercase placeholder:text-slate-600"
+                  className="w-full bg-[#05070B] border border-[#8CCDEB] focus:border-[#FFCC00] p-3 rounded-xl text-center text-xl font-black tracking-[0.3em] text-[#FFCC00] outline-none uppercase placeholder:text-slate-600"
                 />
               </div>
 
-              {/* Callsign */}
               <div>
-                <label className="block text-[11px] sm:text-xs font-black uppercase text-[#FFCC00] tracking-wider mb-1 flex items-center gap-1.5">
-                  <User size={14} className="text-[#FFCC00]" />
-                  <span>ENTER PILOT NAME / CALLSIGN</span>
-                </label>
-                <input 
-                  type="text" 
+                <label className="block text-xs font-bold text-[#F4F7FA] mb-1.5">Pilot Name</label>
+                <input
+                  type="text"
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Enter your pilot callsign..."
+                  placeholder="Enter pilot name..."
                   maxLength={15}
-                  className="w-full bg-[#05070B] border-2 border-[#8CCDEB] focus:border-[#FFCC00] px-3.5 py-2.5 rounded-xl text-base font-black text-white placeholder:text-slate-500 outline-none transition-colors"
+                  className="w-full bg-[#05070B] border border-[#8CCDEB]/60 focus:border-[#FFCC00] px-3.5 py-2.5 rounded-xl text-sm font-bold text-white placeholder:text-slate-500 outline-none"
                 />
               </div>
-
-              {joinCode.trim().length > 0 && joinCode.trim().length < 4 && (
-                <p className="text-[10px] text-amber-400">
-                  Room code must be 4 to 6 characters.
-                </p>
-              )}
             </div>
 
-            {/* Modal Footer */}
-            <div className="p-3.5 sm:p-4 pt-2 border-t border-[#0B315A] flex items-center justify-end gap-2 bg-[#08264A]/80">
+            <div className="p-4 border-t border-[#8CCDEB]/20 flex items-center justify-end gap-2 bg-[#08264A]/60">
               <button
                 type="button"
                 onClick={() => setJoinModalOpen(false)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase text-slate-300 hover:text-white cursor-pointer"
+                className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-300 hover:text-white cursor-pointer"
               >
-                BACK
+                Cancel
               </button>
               <button
                 type="button"
                 onClick={handleJoin}
                 disabled={joinCode.trim().length < 4 || isJoining}
-                className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#0B315A] to-[#08264A] hover:from-[#0E3E73] hover:to-[#0E3E73] disabled:opacity-40 border-2 border-[#8CCDEB] text-[#F4F7FA] font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(140,205,235,0.3)] flex items-center gap-1.5 cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-[#08264A] hover:bg-[#0D3B73] disabled:opacity-40 border border-[#8CCDEB] text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
               >
                 {isJoining ? (
                   <>
                     <Loader2 size={14} className="animate-spin text-[#8CCDEB]" />
-                    <span>CONNECTING...</span>
+                    <span>Joining...</span>
                   </>
                 ) : (
                   <>
                     <ArrowRight size={14} />
-                    <span>ENTER SECTOR</span>
+                    <span>Join Room</span>
                   </>
                 )}
               </button>
@@ -815,44 +759,30 @@ export const LandingPage: React.FC = () => {
         </div>
       )}
 
-      {/* =========================================================================
-          7. SOLO AI TRAINING MODAL
-          ========================================================================= */}
+      {/* Solo Practice Modal */}
       {soloModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#05070B]/85 backdrop-blur-md animate-fadeIn pointer-events-auto">
-          <div 
-            className="w-full max-w-lg bg-[#061A35]/95 border-2 border-emerald-500/60 rounded-2xl shadow-[0_0_40px_rgba(5,7,11,0.9)] overflow-hidden flex flex-col max-h-[90vh]"
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#05070B]/85 backdrop-blur-md animate-fadeIn pointer-events-auto"
+          onClick={() => setSoloModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-[#061A35] border border-emerald-500/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div className="p-3.5 sm:p-4 pb-2.5 border-b border-[#0B315A] flex items-center justify-between bg-[#08264A]/80">
+            <div className="p-4 border-b border-[#8CCDEB]/20 flex items-center justify-between bg-[#08264A]/80">
               <div className="flex items-center gap-2">
-                <Bot size={18} className="text-[#22c55e]" />
-                <div>
-                  <h3 className="text-sm sm:text-base font-black tracking-wider text-[#F4F7FA]">
-                    SOLO AI TRAINING
-                  </h3>
-                  <p className="text-[10px] text-emerald-400">
-                    Offline tactical combat vs autonomous drone (Zero lag)
-                  </p>
-                </div>
+                <Bot size={18} className="text-emerald-400" />
+                <h3 className="text-sm font-black tracking-wider text-[#F4F7FA]">Solo Practice</h3>
               </div>
-              <button 
-                onClick={() => setSoloModalOpen(false)}
-                className="p-1 rounded text-slate-400 hover:text-white cursor-pointer"
-              >
+              <button onClick={() => setSoloModalOpen(false)} className="p-1 text-slate-400 hover:text-white cursor-pointer">
                 <X size={18} />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-4 sm:p-5 space-y-3 overflow-y-auto">
-              {/* Difficulty Selection */}
+            <div className="p-5 space-y-4">
               <div>
-                <label className="block text-[10px] uppercase font-bold text-[#8CCDEB] mb-1.5">
-                  DRONE COMBAT PROTOCOL
-                </label>
-                <div className="grid grid-cols-3 gap-1.5">
+                <label className="block text-xs font-bold text-[#8CCDEB] mb-1.5">AI Difficulty</label>
+                <div className="grid grid-cols-3 gap-2">
                   {(['EASY', 'NORMAL', 'HARD'] as CombatDifficulty[]).map((diff) => (
                     <button
                       key={diff}
@@ -863,53 +793,45 @@ export const LandingPage: React.FC = () => {
                           ? diff === 'HARD'
                             ? 'border-red-500 bg-red-950/60 text-red-300 font-bold'
                             : diff === 'NORMAL'
-                            ? 'border-[#8CCDEB] bg-[#0B315A] text-[#F4F7FA] font-bold'
+                            ? 'border-[#8CCDEB] bg-[#08264A] text-white font-bold'
                             : 'border-emerald-500 bg-emerald-950/60 text-emerald-300 font-bold'
-                          : 'border-[#0B315A] bg-[#05070B]/60 text-slate-400'
+                          : 'border-[#08264A] bg-[#05070B]/60 text-slate-400'
                       }`}
                     >
                       <p className="text-xs font-black">{diff}</p>
-                      <p className="text-[8px] opacity-75">
-                        {diff === 'EASY' ? 'Relaxed' : diff === 'NORMAL' ? 'Tactical' : 'Relentless'}
-                      </p>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Callsign */}
               <div>
-                <label className="block text-[11px] sm:text-xs font-black uppercase text-[#FFCC00] tracking-wider mb-1 flex items-center gap-1.5">
-                  <User size={14} className="text-[#FFCC00]" />
-                  <span>ENTER PILOT NAME / CALLSIGN</span>
-                </label>
-                <input 
-                  type="text" 
+                <label className="block text-xs font-bold text-[#F4F7FA] mb-1.5">Pilot Name</label>
+                <input
+                  type="text"
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Enter your pilot callsign..."
+                  placeholder="Enter pilot name..."
                   maxLength={15}
-                  className="w-full bg-[#05070B] border-2 border-[#8CCDEB] focus:border-[#FFCC00] px-3.5 py-2.5 rounded-xl text-base font-black text-white placeholder:text-slate-500 outline-none transition-colors"
+                  className="w-full bg-[#05070B] border border-[#8CCDEB]/60 focus:border-[#FFCC00] px-3.5 py-2.5 rounded-xl text-sm font-bold text-white placeholder:text-slate-500 outline-none"
                 />
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="p-3.5 sm:p-4 pt-2 border-t border-[#0B315A] flex items-center justify-end gap-2 bg-[#08264A]/80">
+            <div className="p-4 border-t border-[#8CCDEB]/20 flex items-center justify-end gap-2 bg-[#08264A]/60">
               <button
                 type="button"
                 onClick={() => setSoloModalOpen(false)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase text-slate-300 hover:text-white cursor-pointer"
+                className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-300 hover:text-white cursor-pointer"
               >
-                BACK
+                Cancel
               </button>
               <button
                 type="button"
                 onClick={handleStartSolo}
-                className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#107E57] to-[#0B315A] hover:from-emerald-600 hover:to-[#0E3E73] border-2 border-emerald-400 text-white font-black text-xs uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(16,126,87,0.4)] flex items-center gap-1.5 cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-[#107E57] hover:bg-emerald-600 border border-emerald-400 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
               >
                 <Play size={14} fill="currentColor" />
-                <span>LAUNCH BATTLE</span>
+                <span>Launch Battle</span>
               </button>
             </div>
           </div>
@@ -918,7 +840,6 @@ export const LandingPage: React.FC = () => {
 
       {/* Pilot Authentication & Security Dossier Modal */}
       <PilotAuthModal />
-
     </div>
   );
 };

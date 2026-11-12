@@ -6,6 +6,7 @@ import { FullScreenTacticalMap } from './FullScreenTacticalMap';
 import { CombatDebugOverlay } from './CombatDebugOverlay';
 import { KillFeed } from './KillFeed';
 import { MatchScoreboard } from './MatchScoreboard';
+import { TacticalMinimap } from './TacticalMinimap';
 import { nexusAudio } from '../../../../utils/nexusAudio';
 import { COMBAT_CONFIG } from '../../../../config/combatConfig';
 import { enterFullscreen, toggleFullscreen, useFullscreen } from '../../../../utils/fullscreenHelper';
@@ -83,51 +84,56 @@ export const BattleHUD: React.FC = () => {
     <>
       <div className="absolute inset-0 pointer-events-none font-mono text-white select-none overflow-hidden">
         
-        {/* Top Left: Exit Match & Controls Guide */}
-        <div className="absolute top-3 sm:top-4 left-3 sm:left-4 z-30 flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleExit}
-              className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/70 hover:bg-red-950/80 border border-gray-700/60 hover:border-red-500/50 text-[11px] text-gray-300 hover:text-red-300 transition-colors cursor-pointer backdrop-blur-md shadow-lg"
-              title="Return to Menu"
-            >
-              <LogOut size={13} />
-              <span className="hidden sm:inline uppercase tracking-wider font-semibold">Exit Match</span>
-            </button>
+        {/* Top Left: Live Tactical Minimap + Quick Match Controls */}
+        <div
+          className="absolute top-0 left-0 z-30 flex items-start gap-2 sm:gap-2.5"
+          style={{
+            paddingTop: 'max(10px, env(safe-area-inset-top, 10px))',
+            paddingLeft: 'max(10px, env(safe-area-inset-left, 10px))'
+          }}
+        >
+          <TacticalMinimap />
 
-            <button
-              onClick={toggleFullscreen}
-              className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/70 hover:bg-sky-950/80 border border-gray-700/60 hover:border-sky-500/50 text-[11px] text-gray-300 hover:text-sky-300 transition-colors cursor-pointer backdrop-blur-md shadow-lg"
-              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            >
-              {isFullscreen ? <Minimize size={13} /> : <Maximize size={13} />}
-              <span className="hidden sm:inline uppercase tracking-wider font-semibold">
-                {isFullscreen ? 'Window' : 'Fullscreen'}
-              </span>
-            </button>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleExit}
+                className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/75 hover:bg-red-950/80 border border-gray-700/60 hover:border-red-500/50 text-[11px] text-gray-300 hover:text-red-300 transition-colors cursor-pointer backdrop-blur-md shadow-lg"
+                title="Return to Menu"
+              >
+                <LogOut size={13} />
+                <span className="hidden xl:inline uppercase tracking-wider font-semibold">Exit</span>
+              </button>
 
-            <button
-              onClick={() => {
-                toggleScoreboard();
-                nexusAudio.playClick();
-              }}
-              className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/70 hover:bg-amber-950/80 border border-gray-700/60 hover:border-amber-500/50 text-[11px] text-gray-300 hover:text-amber-300 transition-colors cursor-pointer backdrop-blur-md shadow-lg"
-              title="Tactical Scoreboard (TAB)"
-            >
-              <Trophy size={13} className="text-[#FFCC00]" />
-              <span className="hidden sm:inline uppercase tracking-wider font-semibold">Dossier</span>
-            </button>
-          </div>
+              <button
+                onClick={toggleFullscreen}
+                className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/75 hover:bg-sky-950/80 border border-gray-700/60 hover:border-sky-500/50 text-[11px] text-gray-300 hover:text-sky-300 transition-colors cursor-pointer backdrop-blur-md shadow-lg"
+                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              >
+                {isFullscreen ? <Minimize size={13} /> : <Maximize size={13} />}
+              </button>
 
-          {/* Flight & Combat Keys */}
-          <div className="hidden lg:flex flex-col gap-1 p-2 bg-black/60 border border-gray-800/80 rounded-lg text-[10px] text-gray-400 backdrop-blur-md">
-            <div><span className="text-cyan-400 font-bold">W/S/A/D / ARROWS:</span> Thrust & Yaw</div>
-            <div><span className="text-cyan-400 font-bold">SPACE / C (or CTRL / DOWN):</span> Ascend / Descend</div>
-            <div><span className="text-cyan-400 font-bold">L-CLICK / J:</span> Bullet (2 HP · 30 Mag)</div>
-            <div><span className="text-amber-400 font-bold">R-CLICK / K:</span> Laser Beam (12 HP · 3s)</div>
-            <div><span className="text-orange-400 font-bold">L:</span> Solar Beam (30 HP · 10s)</div>
-            <div><span className="text-sky-300 font-bold">R:</span> Reload Ammo (2.0s)</div>
-            <div><span className="text-sky-300 font-bold">M:</span> Tactical Map</div>
+              <button
+                onClick={() => {
+                  toggleScoreboard();
+                  nexusAudio.playClick();
+                }}
+                className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/75 hover:bg-amber-950/80 border border-gray-700/60 hover:border-amber-500/50 text-[11px] text-gray-300 hover:text-amber-300 transition-colors cursor-pointer backdrop-blur-md shadow-lg"
+                title="Tactical Scoreboard (TAB)"
+              >
+                <Trophy size={13} className="text-[#FFCC00]" />
+              </button>
+            </div>
+
+            {/* Flight & Combat Keys */}
+            <div className="hidden xl:flex flex-col gap-0.5 p-2 bg-black/60 border border-gray-800/80 rounded-lg text-[9.5px] text-gray-400 backdrop-blur-md">
+              <div><span className="text-cyan-400 font-bold">W/S/A/D:</span> Thrust & Yaw</div>
+              <div><span className="text-cyan-400 font-bold">SPACE / C:</span> Ascend / Descend</div>
+              <div><span className="text-cyan-400 font-bold">L-CLICK / J:</span> Bullet (2 HP)</div>
+              <div><span className="text-amber-400 font-bold">R-CLICK / K:</span> Laser (12 HP · 3s)</div>
+              <div><span className="text-orange-400 font-bold">L:</span> Solar Beam (30 HP · 10s)</div>
+              <div><span className="text-sky-300 font-bold">R / M / TAB:</span> Reload / Map / Score</div>
+            </div>
           </div>
         </div>
 

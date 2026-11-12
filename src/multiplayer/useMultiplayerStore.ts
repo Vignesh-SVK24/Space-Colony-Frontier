@@ -240,13 +240,24 @@ const getDefaultServerUrl = () => {
   return DEFAULT_PRODUCTION_SERVER;
 };
 
+const ALLOWED_COLORS: BattleColor[] = ['yellow', 'blue', 'red', 'green'];
+const getSavedColor = (): BattleColor => {
+  try {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem('scf_ship_color') as BattleColor;
+      if (saved && ALLOWED_COLORS.includes(saved)) return saved;
+    }
+  } catch {}
+  return 'yellow';
+};
+
 export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   appView: 'LANDING',
   gameModeSelection: 'SELECT',
   gameMode: '1v1',
   aiDifficulty: 'NORMAL',
   playerName: '',
-  playerColor: 'yellow',
+  playerColor: getSavedColor(),
   playerTeam: 'NONE',
   roomCode: '',
   roomStatus: 'WAITING',
@@ -567,7 +578,15 @@ export const useMultiplayerStore = create<MultiplayerState>((set, get) => ({
   setGameMode: (mode) => set({ gameMode: mode }),
   setAIDifficulty: (diff) => set({ aiDifficulty: diff }),
   setPlayerName: (name) => set({ playerName: name }),
-  setPlayerColor: (color) => set({ playerColor: color }),
+  setPlayerColor: (color) => {
+    if (!ALLOWED_COLORS.includes(color)) return;
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('scf_ship_color', color);
+      }
+    } catch {}
+    set({ playerColor: color });
+  },
   setPlayerTeam: (team) => set({ playerTeam: team }),
   setRoomCode: (code) => set({ roomCode: code }),
   
