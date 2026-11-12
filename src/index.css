@@ -33,6 +33,10 @@ canvas {
   touch-action: none;
 }
 
+.landing-ship-canvas canvas {
+  touch-action: pan-y !important;
+}
+
 /* Custom scrollbars for telemetry panels */
 ::-webkit-scrollbar {
   width: 4px;

@@ -169,10 +169,12 @@ export const LandingPage: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 h-screen w-screen overflow-hidden bg-[#05070B] font-mono text-[#F4F7FA] select-none flex flex-col justify-between p-3 sm:p-5 md:p-6"
+      className="fixed inset-0 h-[100dvh] w-screen overflow-y-auto overflow-x-hidden md:overflow-hidden scroll-touch bg-[#05070B] font-mono text-[#F4F7FA] select-none flex flex-col md:justify-between p-3 sm:p-5 md:p-6"
       style={{
+        WebkitOverflowScrolling: 'touch',
+        touchAction: 'pan-y',
         paddingTop: 'max(12px, env(safe-area-inset-top, 12px))',
-        paddingBottom: 'max(12px, env(safe-area-inset-bottom, 12px))'
+        paddingBottom: 'max(16px, env(safe-area-inset-bottom, 16px))'
       }}
     >
       {/* Background Cinematic Space Vista */}
@@ -263,10 +265,13 @@ export const LandingPage: React.FC = () => {
       </header>
 
       {/* Main Two-Section Game Menu Layout */}
-      <main className="relative z-10 flex-1 w-full min-h-0 grid grid-cols-1 md:grid-cols-12 landscape:grid-cols-12 items-center gap-3 sm:gap-5 overflow-y-auto md:overflow-hidden">
+      <main className="relative z-10 w-full md:flex-1 md:min-h-0 grid grid-cols-1 md:grid-cols-12 landscape:grid-cols-12 items-start md:items-center gap-4 sm:gap-5 pb-8 md:pb-0">
         
         {/* LEFT SECTION (45% Desktop / Bottom on Portrait Mobile): Pilot Profile & Primary Game Actions */}
-        <div className="md:col-span-5 landscape:col-span-5 flex flex-col justify-center gap-2.5 sm:gap-3 z-20 pointer-events-auto max-w-md w-full mx-auto md:mx-0 order-2 md:order-1 landscape:order-1">
+        <div
+          className="md:col-span-5 landscape:col-span-5 flex flex-col justify-center gap-2.5 sm:gap-3 z-20 pointer-events-auto max-w-md w-full mx-auto md:mx-0 order-2 md:order-1 landscape:order-1 landscape:max-h-[calc(100dvh-76px)] landscape:overflow-y-auto landscape:pr-1.5 scroll-touch"
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        >
           
           {/* 1. Compact Pilot Profile Card (No Ship Colour Control Here) */}
           <div className="bg-[#061A35]/90 border border-[#8CCDEB]/40 rounded-xl p-3 sm:p-4 backdrop-blur-md shadow-lg">
@@ -518,14 +523,17 @@ export const LandingPage: React.FC = () => {
         </div>
 
         {/* RIGHT SECTION (55% Desktop / Top on Portrait Mobile): Large 3D Spaceship & Ship Colour Selector */}
-        <div className="md:col-span-7 landscape:col-span-7 flex flex-col items-center justify-center relative order-1 md:order-2 landscape:order-2 pointer-events-auto h-full max-h-full">
+        <div className="md:col-span-7 landscape:col-span-7 flex flex-col items-center justify-center relative order-1 md:order-2 landscape:order-2 pointer-events-auto md:h-full">
           
           {/* 3D Spaceship Preview Container */}
-          <div className="relative w-full h-[190px] sm:h-[260px] md:h-[58vh] flex items-center justify-center">
+          <div
+            className="landing-ship-canvas relative w-full h-[180px] sm:h-[240px] md:h-[58vh] flex items-center justify-center"
+            style={{ touchAction: 'pan-y' }}
+          >
             {/* Subtle Reticle */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-30">
-              <div className="w-[170px] h-[170px] sm:w-[280px] sm:h-[280px] md:w-[360px] md:h-[360px] rounded-full border border-[#8CCDEB]/25 animate-[spin_80s_linear_infinite]" />
-              <div className="absolute w-[125px] h-[125px] sm:w-[210px] sm:h-[210px] md:w-[270px] md:h-[270px] rounded-full border border-dashed border-[#8CCDEB]/30 animate-[spin_50s_linear_infinite_reverse]" />
+              <div className="w-[160px] h-[160px] sm:w-[260px] sm:h-[260px] md:w-[360px] md:h-[360px] rounded-full border border-[#8CCDEB]/25 animate-[spin_80s_linear_infinite]" />
+              <div className="absolute w-[115px] h-[115px] sm:w-[190px] sm:h-[190px] md:w-[270px] md:h-[270px] rounded-full border border-dashed border-[#8CCDEB]/30 animate-[spin_50s_linear_infinite_reverse]" />
             </div>
 
             <Canvas
@@ -538,7 +546,8 @@ export const LandingPage: React.FC = () => {
                 stencil: false,
                 depth: true
               }}
-              className="w-full h-full z-10 relative cursor-grab active:cursor-grabbing touch-none select-none"
+              style={{ touchAction: 'pan-y' }}
+              className="w-full h-full z-10 relative cursor-grab active:cursor-grabbing select-none"
             >
               <ambientLight intensity={0.9} />
               <directionalLight position={[6, 8, 5]} intensity={2.0} color="#F4F7FA" />
